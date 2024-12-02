@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = "--cov=idealpestimation --cov-report=html --cov-config=.coveragerc --import-mode=importlib"
+testpaths = ["idealpestimation/tests",]
+
+classifiers = [
+  "Intended Audience :: Researchers, Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10"
+]
