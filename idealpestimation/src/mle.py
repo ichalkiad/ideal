@@ -2,201 +2,24 @@ import os
 import sys
 import time 
 import ipdb
-import jax
-import jax.numpy as jnp
-from jax import jvp, grad, hessian
 import pathlib
 import jsonlines
 import pickle
 import numpy as np
-from scipy import stats
+from datetime import datetime
 from scipy.stats import norm
 from scipy.optimize import minimize
-from scipy.optimize import approx_fprime
+from jax import hessian
 from idealpestimation.src.parallel_manager import ProcessManager, \
                                                     jsonlines
 from idealpestimation.src.utils import params2optimisation_dict, \
                                             optimisation_dict2params, \
-                                                initialise_optimisation_vector_sobol
+                                                initialise_optimisation_vector_sobol, \
+                                                    visualise_hessian, fix_plot_layout_and_save, \
+                                                        get_hessian_diag_jax, get_jacobian, combine_estimate_variance_rule
 
-def uni_gaussian_hessian(mu, sigma, x):
-    
-    x = np.asarray(x)    
-    z = (x - mu) / sigma
-    
-    # Hessian matrix elements for log-likelihood
-    # First parameter (mu): [d²/d2mu]
-    d2l_dmu2 = -len(x) / (sigma**2)
-    # print(d2l_dmu2)
-    # Second parameter (sigma): [d²/d2σ]
-    d2l_d2sigma = len(x) / (sigma**2) - 3*np.sum(z**2) / (sigma**2)
-    # print(d2l_d2sigma)
-    # Mixed partial derivative [d²/dμdσ]
-    d2l_dmu_dsigma2 = -2*np.sum(z) / (sigma**2)
-    # print(d2l_dmu_dsigma2)
-        
-    # Construct the Hessian matrix
-    hessian = np.array([
-        [d2l_dmu2, d2l_dmu_dsigma2],
-        [d2l_dmu_dsigma2, d2l_d2sigma]
-    ])
-    
-    return hessian
-
-
-def aux_test_parameter_estimation(distribution_type='poisson', sample_size=1000, num_trials=100):
-    """
-    Test maximum likelihood estimation for Poisson and Normal distributions.
-    
-    Parameters:
-    -----------
-    distribution_type : str, optional
-        Type of distribution to test. Options: 'poisson' or 'normal'
-    sample_size : int, optional
-        Number of samples to generate in each trial
-    num_trials : int, optional
-        Number of Monte Carlo trials to run
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing mean squared errors for parameter estimates
-    """
-    # Set random seed for reproducibility
-    np.random.seed(2611)    
-    # Containers for results
-    mse_results = {}
-
-    if distribution_type == 'poisson':
-        # True parameter (lambda)
-        true_lambda = 4.5
-
-        def poisson_likelihood(theta):
-            """Negative log-likelihood for Poisson"""
-            try:
-                nll = -np.sum(stats.poisson.logpmf(data, theta))
-            except:
-                nll = -jnp.sum(jax.scipy.stats.poisson.logpmf(data, theta))
-            return nll
-
-        def poisson_likelihood_at_data_point(i, j, theta, data):
-            xp = data[i, j]            
-            return stats.poisson.logpmf(xp, theta)
-        
-        # Monte Carlo trials
-        lambdas_estimated = []
-        for _ in range(num_trials):
-            # Generate data from Poisson distribution
-            data = np.random.poisson(true_lambda, sample_size)            
-            # Estimate parameters
-            mle, results = maximum_likelihood_estimator(poisson_likelihood, initial_guess=[np.mean(data)], 
-                                                        variance_method='jacobian', data=data, 
-                                                        loglikelihood_per_data_point=poisson_likelihood_at_data_point)                     
-            lambdas_estimated.append(mle[0])        
-        # Compute Mean Squared Error
-        mse_results['poisson'] = np.mean((np.array(lambdas_estimated) - true_lambda)**2)
-        mse_results["all_results"] = results
-    
-    elif distribution_type == 'normal':
-        # True parameters (mu, sigma)
-        true_mu = 2.0
-        true_sigma = 1.5
-        
-        def normal_likelihood(params, data):
-            """Negative log-likelihood for Normal distribution"""
-            mu, sigma = params
-            try:
-                nll = -np.sum(stats.norm.logpdf(data, mu, sigma))
-            except:
-                nll = -jnp.sum(jax.scipy.stats.norm.logpdf(data, mu, sigma))
-            return nll
-
-        def normal_likelihood_at_data_point(i, j, params, data):            
-            mu, sigma = params
-            xp = data[i, j]
-            return stats.norm.logpdf(xp, mu, sigma)
-    
-        # Monte Carlo trials
-        mus_estimated = []
-        sigmas_estimated = []
-        hess_estimated = []
-        full_hessian = False 
-        diag_hessian_only = True
-        for _ in range(num_trials):
-            # Generate data from Normal distribution
-            data = np.random.normal(true_mu, true_sigma, sample_size)       
-            nloglik = lambda params: normal_likelihood(params, data)    
-            # Estimate parameters
-            mle, results = maximum_likelihood_estimator(nloglik, 
-                                                        initial_guess=[np.mean(data), np.std(data)],
-                                                        variance_method='jacobian',
-                                                        data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
-                                                        loglikelihood_per_data_point=normal_likelihood_at_data_point)            
-            mus_estimated.append(mle[0])
-            sigmas_estimated.append(mle[1])
-            if full_hessian:
-                true_hess = uni_gaussian_hessian(true_mu, true_sigma, data)
-                hess_estimated.append(np.mean((true_hess-np.array(results.full_hessian))**2))            
-
-        # Compute Mean Squared Errors
-        mse_results['normal_mu'] = np.mean((np.array(mus_estimated) - true_mu)**2)
-        mse_results['normal_sigma'] = np.mean((np.array(sigmas_estimated) - true_sigma)**2)    ##################################################
-        if full_hessian:
-            mse_results["hessian vs jax"] = np.mean(np.asarray(hess_estimated))
-        mse_results["all_results"] = results
-    else:
-        raise ValueError("Invalid distribution type. Choose 'poisson' or 'normal'.")
-    
-    return mse_results
-
-def get_jacobian(params, likelihood_function):
-    """Numerical approximation of Jacobian"""
-    fprime = approx_fprime(params, likelihood_function)    
-    return fprime
-
-# def hessian(f):
-#     # f: function w.r.t to parameter vector
-#     return jax.jacfwd(jax.jacrev(f))
-
-def hvp(f, x, v):
-  return jvp(grad(f), (x,), (v,))[1]
-
-def get_hessian_diag_jax(f, x):
-    # f: function w.r.t to parameter vector x
-    print(jnp.diag(hessian(f)(x)))
-    print(hvp(f, x, jnp.ones_like(x)))
-    return hvp(f, x, jnp.ones_like(x))
-
-def get_hessian_diag(likelihood_function, params, eps=1e-8):
-    """
-    Compute Hessian's diagonal using numerical second-order central differences
-    """
-    n = len(params)
-    hessian = np.zeros((n,))
-    
-    # Compute mixed partial derivatives
-    for i in range(n):
-        # Central difference approximation for second derivatives
-        x_ij_plus = params.copy()
-        x_ij_minus = params.copy()
-        x_ij_plus[i] += eps
-        x_ij_minus[i] -= eps
-        
-        x_i_plus = params.copy()
-        x_i_minus = params.copy()
-        x_i_plus[i] += eps
-        x_i_minus[i] -= eps
-        
-        # Compute mixed second partial derivative
-        hessian[i, i] = (
-            likelihood_function(x_ij_plus) - likelihood_function(x_ij_minus) - 
-            likelihood_function(x_i_plus) + likelihood_function(x_i_minus)
-        ) / (4 * eps**2)
-    
-    return hessian
-
-  
-def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, data=None, full_hessian=True, diag_hessian_only=True):
+def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
+                        data=None, full_hessian=True, diag_hessian_only=True):
 
     params = estimation_result.x        
     try:                        
@@ -211,36 +34,36 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                     score_function_xp = lambda params: get_jacobian(params, likelihood_function=loglik_xp)        
                     scores.append(score_function_xp(params))            
             scores = np.asarray(scores)
-            sigma_sq_inv = np.mean(np.diag(scores@scores.T))                
+            sigma_sq_inv = np.mean(np.diag(scores @ scores.T))                
             # Compute variance as the inverse of the Fisher Information
             # Add small regularization to prevent singularity
             variance = np.linalg.inv(sigma_sq_inv + 1e-8 * np.eye(len(params)))
+            hess = hessian(loglikelihood)(params)  
             if np.isnan(variance):
                 raise ArithmeticError
             else:
-                return sigma_sq_inv, None, variance
+                return sigma_sq_inv, hess, variance
         else:
             if full_hessian:
-                # use Hessian approximation            
-                hess = hessian(loglikelihood)(params)
-                # Compute Fisher Information as the sample Hessian         
-                sigma_sq_inv = -hess                            
+                # Use Hessian approximation to compute Fisher Information as the sample Hessian                    
+                hess = hessian(loglikelihood)(params)                                     
                 # Add small regularization to prevent singularity
-                variance = np.linalg.inv(sigma_sq_inv + 1e-8 * np.eye(len(params)))            
+                variance = -np.linalg.inv(hess + 1e-8 * np.eye(len(params)))            
                 if np.any(np.isnan(variance)):                                
                     raise ArithmeticError
                 else:
                     return variance, hess, np.diag(variance)
             if diag_hessian_only:
-                # use Hessian approximation            
-                hess = get_hessian_diag(loglikelihood, params)  ###############################################
-                ipdb.set_trace()
-                hess_jax = get_hessian_diag_jax(loglikelihood, params)         
-                sigma_sq_inv = -hess_jax                            
-                # Add small regularization to prevent singularity
-                variance = 1/sigma_sq_inv            
-                if np.any(np.isnan(variance)):                                
-                    raise ArithmeticError
+                hess_jax = get_hessian_diag_jax(loglikelihood, params)                                     
+                variance = -1/np.asarray(hess_jax)            
+                if np.any(np.isnan(variance)):    
+                    if hasattr(estimation_result, 'hess_inv') and estimation_result["hess_inv"] is not None:
+                        if not isinstance(estimation_result["hess_inv"], np.ndarray):
+                            variance = -np.diag(estimation_result["hess_inv"].todense())
+                        else:
+                            variance = -np.diag(estimation_result["hess_inv"])
+                    else:                            
+                        raise ArithmeticError
                 else:
                     return None, None, variance
     except Exception as e:
@@ -252,7 +75,8 @@ def maximum_likelihood_estimator(
     variance_method='jacobian', 
     optimization_method='L-BFGS-B',
     data=None, full_hessian=True, diag_hessian_only=True,
-    loglikelihood_per_data_point=None, disp=False, niter=None, jac=None):
+    loglikelihood_per_data_point=None, disp=False, niter=None, 
+    jac=None, output_dir="/tmp/", plot_hessian=False):
     """
     Estimate the maximum likelihood parameter and its variance.
 
@@ -275,8 +99,8 @@ def maximum_likelihood_estimator(
     optimize_kwargs = {
         'method': optimization_method,
         'x0': initial_guess,                
-        'jac': '2-point',
-        'hess': '2-point'
+        'jac': '3-point'#,
+        # 'hess': '2-point'
     }                   
     # Perform maximum likelihood estimation    
     if niter is not None:
@@ -285,6 +109,7 @@ def maximum_likelihood_estimator(
         result = minimize(likelihood_function, **optimize_kwargs, options={"disp":disp, "maxls":20})
     
     mle = result.x          
+
     try:        
         variance_noninv, hessian, variance_diag = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
                                        data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
@@ -293,6 +118,12 @@ def maximum_likelihood_estimator(
         result["variance"] = variance_diag
         if full_hessian:
             result["full_hessian"] = hessian
+            if plot_hessian:
+                fig = visualise_hessian(hessian)
+                fix_plot_layout_and_save(fig, "{}/hessian_{}.html".format(output_dir, datetime.now().strftime("%Y-%m-%d")),
+                                        xaxis_title="", yaxis_title="", title="Full Hessian matrix estimate", showgrid=False, showlegend=False,
+                                        print_png=True, print_html=True, print_pdf=False)
+                
     except ArithmeticError as e:            
         # Fallback to zero variance if computation fails
         print(f"Variance estimation failed: {e}")
@@ -367,7 +198,7 @@ def estimate_mle(args):
     mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                             variance_method='jacobian', 
                                             optimization_method=optimisation_method, 
-                                            data=Y, full_hessian=True, diag_hessian_only=False,   ####################################
+                                            data=Y, full_hessian=True, diag_hessian_only=True,   ####################################
                                             loglikelihood_per_data_point=nloglik_at_data_point)          
     params_hat = optimisation_dict2params(mle.x, param_positions_dict, J, K, d, parameter_names)
     
@@ -378,7 +209,8 @@ def estimate_mle(args):
     grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
     grid_and_optim_outcome["Theta"] = [mle.x]
     grid_and_optim_outcome["Theta Variance"] = [result["variance"]]
-            
+    grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
+
     out_file = "{}/estimationresult_dataset{}.jsonl".format(DIR_out, dataset_index)
     with open(out_file, 'a') as f:         
         writer = jsonlines.Writer(f)
@@ -490,6 +322,6 @@ if __name__ == "__main__":
     main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
          data_location=data_location, parallel=parallel, 
          parameter_names=parameter_names, optimisation_method=optimisation_method, dst_func=dst_func)
-
+    combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)
 
     # read outputs and combine

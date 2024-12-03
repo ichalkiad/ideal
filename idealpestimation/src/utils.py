@@ -3,6 +3,56 @@ import ipdb
 import math
 import numpy as np
 import math
+import pathlib
+import plotly.graph_objs as go
+import plotly.io as pio
+import jax.numpy as jnp
+from jax import jvp, grad
+import jsonlines
+from scipy.optimize import approx_fprime
+
+def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
+                             print_png=True, print_html=True, print_pdf=True):
+        fig.update_xaxes(showline=True, linewidth=2, linecolor='black')
+        fig.update_yaxes(showline=True, linewidth=2, linecolor='black')
+        fig.update_layout(title=title, plot_bgcolor='rgb(255,255,255)',
+                        yaxis=dict(
+                            title=yaxis_title,
+                            titlefont_size=20,
+                            tickfont_size=20,
+                            showgrid=showgrid,
+                        ),
+                        xaxis=dict(
+                            title=xaxis_title,
+                            titlefont_size=20,
+                            tickfont_size=20,
+                            showgrid=showgrid
+                        ),
+                        font=dict(
+                            size=20
+                        ),
+                        showlegend=showlegend)
+        if showlegend:
+            fig.update_layout(legend=dict(
+                yanchor="top",
+                y=1.1,  # 0.01
+                xanchor="right",  # "left", #  "right"
+                x=1,    #0.01,  # 0.99
+                bordercolor="Black",
+                borderwidth=0.3,
+                font=dict(
+                    size=18,
+        )))
+
+        if print_html:
+            pio.write_html(fig, savename, auto_open=False)
+        if print_pdf:
+            pio.write_image(fig, savename.replace(".html", ".pdf"), engine="kaleido")
+        if print_png:
+            pio.write_image(fig, savename.replace("html", "png"), width=1540, height=871, scale=1)
+            
+
+####################### MLE #############################
 
 def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e):
     
@@ -55,7 +105,6 @@ def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, g
             k += 1
         
     return optim_vector, param_positions_dict
-
 
 def optimisation_dict2params(optim_vector, param_positions_dict, J, K, d, parameter_names):
     
@@ -111,3 +160,88 @@ def initialise_optimisation_vector_sobol(m=16, J=2, K=2, d=1):
     sigma_e = 1
 
     return X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e
+
+def visualise_hessian(hessian, title='Hessian matrix'):
+    
+    hessian = np.asarray(hessian)
+    
+    # Create the heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=hessian,
+        colorscale='RdBu_r',  
+        zmin=-np.max(np.abs(hessian)), 
+        zmax=np.max(np.abs(hessian)),
+        colorbar=dict(title='Hessian Value')
+    ))
+    
+    # Customize layout
+    fig.update_layout(
+        title=title,
+        xaxis_title='Parameter Index',
+        yaxis_title='Parameter Index',
+        width=600,
+        height=600,
+    )
+    
+    return fig
+
+def uni_gaussian_hessian(mu, sigma, x):
+    
+    x = np.asarray(x)    
+    z = (x - mu) / sigma
+    
+    # First parameter (mu): [d²/d2mu]
+    d2l_dmu2 = len(x) / (sigma**2)
+    # print(d2l_dmu2)
+    # Second parameter (sigma): [d²/d2σ]
+    d2l_d2sigma = -len(x) / (sigma**2) + 3*np.sum(z**2) / (sigma**2)
+    # print(d2l_d2sigma)
+    # Mixed partial derivative [d²/dμdσ]
+    d2l_dmu_dsigma2 = 2*np.sum(z) / (sigma**2)
+    # print(d2l_dmu_dsigma2)
+        
+    hessian = np.array([
+        [d2l_dmu2, d2l_dmu_dsigma2],
+        [d2l_dmu_dsigma2, d2l_d2sigma]
+    ])
+    
+    return hessian
+
+def get_jacobian(params, likelihood_function):
+    """Numerical approximation of Jacobian"""
+    fprime = approx_fprime(params, likelihood_function)    
+    return fprime
+
+def hvp(f, x, v):
+  return jvp(grad(f), (x,), (v,))[1]
+
+def get_hessian_diag_jax(f, x):
+    # f: function w.r.t to parameter vector x
+    return hvp(f, x, jnp.ones_like(x))
+    
+def combine_estimate_variance_rule(DIR_out, param_positions_dict, J, K, d, parameter_names):
+
+    path = pathlib.Path(DIR_out)
+    estimates_names = [file.name for file in path.iterdir() if file.is_file() and "estimationresult_dataset" in file.name]
+    weighted_estimate = None
+    all_weights = []
+    all_estimates = []
+    for estim in estimates_names:
+        with jsonlines.open("{}/{}".format(DIR_out, estim), mode="r") as f:               
+            for result in f.iter(type=dict, skip_invalid=True):                      
+                weight = result["Theta Variance"]
+                theta = result["Theta"]
+                all_weights.append(weight)
+                all_estimates.append(theta)
+    all_weights = np.array(all_weights)
+    all_estimates = np.array(all_estimates)
+    # sum accross each coordinate's weight
+    all_weights_sum = np.sum(all_weights, axis=1)
+    all_weights_norm = all_weights/all_weights_sum
+    # element-wise multiplication
+    weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=1)
+    param_positions_dict = result["param_positions_dict"]
+    params_out = optimisation_dict2params(weighted_estimate, param_positions_dict, J, K, d, parameter_names)
+
+    return params_out
+####################### MLE #############################
