@@ -182,7 +182,7 @@ def estimate_mle(args):
     ipdb.set_trace()
 
     current_pid = os.getpid()    
-    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func = args
+    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter = args
 
     # load data    
     with open("{}/{}".format(data_location, subdataset_name), "rb") as f:
@@ -190,7 +190,7 @@ def estimate_mle(args):
     # since each batch has N rows
     Y = Y.astype(np.int8).reshape((N, J), order="F")     
     nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-    nloglik_at_data_point = lambda i, j, theta, Y: negative_loglik_at_data_point(i, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
+    # nloglik_at_data_point = lambda i, j, theta, Y: negative_loglik_at_data_point(i, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
 
     # init parameter vector x0
     X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e = initialise_optimisation_vector_sobol(m=16, J=J, K=N, d=d)
@@ -199,7 +199,7 @@ def estimate_mle(args):
                                             variance_method='jacobian', 
                                             optimization_method=optimisation_method, 
                                             data=Y, full_hessian=True, diag_hessian_only=True,   ####################################
-                                            loglikelihood_per_data_point=nloglik_at_data_point)          
+                                            loglikelihood_per_data_point=None, niter=niter)          
     params_hat = optimisation_dict2params(mle.x, param_positions_dict, J, K, d, parameter_names)
     
     ipdb.set_trace()                           
@@ -255,7 +255,7 @@ class ProcessManagerSynthetic(ProcessManager):
 
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
-        parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2):
+        parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, niter=None):
 
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
@@ -270,7 +270,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             manager.create_results_dict(optim_target="all")              
         for dataset_index in range(len(subdatasets_names)):
             subdataset_name = subdatasets_names[dataset_index]
-            args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func)    
+            args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter)    
             if parallel:                          
                 #####  parallelisation with Parallel Manager #####
                 manager.cleanup_finished_processes()
@@ -319,9 +319,11 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = round(parameter_space_dim/J)
     dst_func = lambda x, y: np.sum((x-y)**2)
+    niter = 2
     main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-         data_location=data_location, parallel=parallel, 
-         parameter_names=parameter_names, optimisation_method=optimisation_method, dst_func=dst_func)
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, niter=niter)
     combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)
 
     # read outputs and combine
