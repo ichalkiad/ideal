@@ -10,6 +10,9 @@ from datetime import datetime
 from scipy.stats import norm
 from scipy.optimize import minimize
 from jax import hessian
+import jax
+import jax.numpy as jnp
+import math
 from idealpestimation.src.parallel_manager import ProcessManager, \
                                                     jsonlines
 from idealpestimation.src.utils import params2optimisation_dict, \
@@ -19,7 +22,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                         get_hessian_diag_jax, get_jacobian, combine_estimate_variance_rule
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
-                        data=None, full_hessian=True, diag_hessian_only=True):
+                        data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None):
 
     params = estimation_result.x        
     try:                        
@@ -45,16 +48,18 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                 return sigma_sq_inv, hess, variance
         else:
             if full_hessian:
-                # Use Hessian approximation to compute Fisher Information as the sample Hessian                    
-                hess = hessian(loglikelihood)(params)                                     
+                # Use Hessian approximation to compute Fisher Information as the sample Hessian                                                  
+                params_jax = jnp.asarray(params)                  
+                hess = np.asarray(hessian(nloglik_jax)(params_jax)                                     )
                 # Add small regularization to prevent singularity
                 variance = -np.linalg.inv(hess + 1e-8 * np.eye(len(params)))            
                 if np.any(np.isnan(variance)):                                
                     raise ArithmeticError
                 else:
                     return variance, hess, np.diag(variance)
-            if diag_hessian_only:
-                hess_jax = get_hessian_diag_jax(loglikelihood, params)                                     
+            if diag_hessian_only:                
+                params_jax = jnp.asarray(params)                  
+                hess_jax = get_hessian_diag_jax(nloglik_jax, params_jax)                                     
                 variance = -1/np.asarray(hess_jax)            
                 if np.any(np.isnan(variance)):    
                     if hasattr(estimation_result, 'hess_inv') and estimation_result["hess_inv"] is not None:
@@ -76,7 +81,7 @@ def maximum_likelihood_estimator(
     optimization_method='L-BFGS-B',
     data=None, full_hessian=True, diag_hessian_only=True,
     loglikelihood_per_data_point=None, disp=False, niter=None, 
-    jac=None, output_dir="/tmp/", plot_hessian=False):
+    jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None):
     """
     Estimate the maximum likelihood parameter and its variance.
 
@@ -113,7 +118,7 @@ def maximum_likelihood_estimator(
     try:        
         variance_noninv, hessian, variance_diag = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
                                        data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
-                                       loglikelihood_per_data_point=loglikelihood_per_data_point)
+                                       loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax)
         result["variance_method"] = variance_method
         result["variance"] = variance_diag
         if full_hessian:
@@ -156,6 +161,31 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
 
     return -nll
 
+def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict):
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
+    Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")       
+    Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+    alpha = jnp.asarray(params_hat["alpha"])
+    beta = jnp.asarray(params_hat["beta"])
+    # c = params_hat["c"]
+    gamma = jnp.asarray(params_hat["gamma"])
+    delta = jnp.asarray(params_hat["delta"])
+    mu_e = jnp.asarray(params_hat["mu_e"])
+    sigma_e = jnp.asarray(params_hat["sigma_e"])
+    nll = 0
+    dst_func = lambda x, y: jnp.sum((x-y)**2)
+    for i in range(K):
+        for j in range(J):
+            phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+            errscale = sigma_e
+            errloc = mu_e
+            nll += Y[i, j]*jax.scipy.stats.norm.logcdf(1-phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jax.scipy.stats.norm.logcdf(1-phi, loc=errloc, scale=errscale)
+
+    return -nll[0]
+
+
 def negative_loglik_at_data_point(i, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -188,19 +218,20 @@ def estimate_mle(args):
     with open("{}/{}".format(data_location, subdataset_name), "rb") as f:
         Y = pickle.load(f)
     # since each batch has N rows
-    Y = Y.astype(np.int8).reshape((N, J), order="F")     
+    N = Y.shape[0]
+    Y = Y.astype(np.int8).reshape((N, J), order="F")         
     nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-    # nloglik_at_data_point = lambda i, j, theta, Y: negative_loglik_at_data_point(i, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
-
+    nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
+    
     # init parameter vector x0
     X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e = initialise_optimisation_vector_sobol(m=16, J=J, K=N, d=d)
     x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
     mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
-                                            variance_method='jacobian', 
+                                            variance_method='jacobian', disp=True, 
                                             optimization_method=optimisation_method, 
-                                            data=Y, full_hessian=True, diag_hessian_only=True,   ####################################
-                                            loglikelihood_per_data_point=None, niter=niter)          
-    params_hat = optimisation_dict2params(mle.x, param_positions_dict, J, K, d, parameter_names)
+                                            data=Y, full_hessian=False, diag_hessian_only=True,   
+                                            loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax)          
+    params_hat = optimisation_dict2params(mle, param_positions_dict, J, K, d, parameter_names)
     
     ipdb.set_trace()                           
     
@@ -303,7 +334,8 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
 
 if __name__ == "__main__":
-
+    
+    jax.config.update("jax_traceback_filtering", "off")
     data_location = "./idealpestimation/data"    
     total_running_processes = 1
     parallel = False
@@ -317,13 +349,11 @@ if __name__ == "__main__":
 
     parameter_space_dim = (K+2*J)*d + J + K + 4
     # for distributing per N rows
-    N = round(parameter_space_dim/J)
+    N = math.floor(parameter_space_dim/J)
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 2
+    niter = 1
     main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
         dst_func=dst_func, niter=niter)
     combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)
-
-    # read outputs and combine
