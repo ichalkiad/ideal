@@ -125,7 +125,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             k += 1
             kvar += 1
         
-    return optim_vector, var_vector 
+    return optim_vector, var_vector, param_positions_dict 
 
 def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e):
     
@@ -292,7 +292,7 @@ def get_hessian_diag_jax(f, x):
     # f: function w.r.t to parameter vector x
     return hvp(f, x, jnp.ones_like(x))
     
-def combine_estimate_variance_rule(DIR_out, param_positions_dict, J, K, d, parameter_names):
+def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
 
     ipdb.set_trace()
 
@@ -310,12 +310,12 @@ def combine_estimate_variance_rule(DIR_out, param_positions_dict, J, K, d, param
                 all_estimates.append(theta)
     all_weights = np.array(all_weights)
     all_estimates = np.array(all_estimates)
-    # sum accross each coordinate's weight
-    all_weights_sum = np.sum(all_weights, axis=1)
+    # sum acrocs each coordinate's weight
+    all_weights_sum = np.sum(all_weights, axis=0)
     all_weights_norm = all_weights/all_weights_sum
     # element-wise multiplication
-    weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=1)
-    param_positions_dict = result["param_positions_dict"]
+    weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
+    param_positions_dict = result["param_positions_dict_global"]
     params_out = optimisation_dict2params(weighted_estimate, param_positions_dict, J, K, d, parameter_names)
 
     return params_out

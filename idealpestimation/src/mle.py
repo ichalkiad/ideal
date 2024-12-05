@@ -217,10 +217,10 @@ def estimate_mle(args):
     # Place estimates and their variance in the correct positions in the global Theta parameter vector
     theta_global = np.zeros((parameter_space_dim,))
     theta_global_variance = np.zeros((parameter_space_dim,))
-    theta_global, theta_global_variance = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
-                                                        params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
-                                                        params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
-                                                        params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
+    theta_global, theta_global_variance, param_positions_dict_global = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
+                                                                            params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
+                                                                            params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
+                                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
 
     grid_and_optim_outcome = dict()
     grid_and_optim_outcome["PID"] = [current_pid]        
@@ -230,6 +230,7 @@ def estimate_mle(args):
     grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
     # in optimisation vector, not the global
     grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
+    grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
 
     # ipdb.set_trace()
     out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
@@ -275,22 +276,25 @@ class ProcessManagerSynthetic(ProcessManager):
         # Place estimates and their variance in the correct positions in the global Theta parameter vector
         theta_global = np.zeros((parameter_space_dim,))
         theta_global_variance = np.zeros((parameter_space_dim,))
-        theta_global, theta_global_variance = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
-                                                            params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
-                                                            params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
-                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
+        theta_global, theta_global_variance, param_positions_dict_global  = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
+                                                                            params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
+                                                                            params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
+                                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
                    
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = [current_pid]        
         grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
-        grid_and_optim_outcome["local theta"] = [mle.tolist()]
-        grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
-        grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
+        grid_and_optim_outcome["local theta"] = mle.tolist()
+        grid_and_optim_outcome["Theta"] = theta_global.tolist()
+        grid_and_optim_outcome["Theta Variance"] = theta_global_variance.tolist()
         # in optimisation vector, not the global
         grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
+        grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
         
         out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
         self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
+
+         
 
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
@@ -347,8 +351,8 @@ if __name__ == "__main__":
     
     jax.config.update("jax_traceback_filtering", "off")
     data_location = "./idealpestimation/data"    
-    total_running_processes = 1
-    parallel = False
+    total_running_processes = 3
+    parallel = True
     optimisation_method = "L-BFGS-B"
     # In parameter names keep "X" first (the variable the splitting takes place over)
     parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
@@ -365,10 +369,11 @@ if __name__ == "__main__":
     print("Observed data points per data split: {}".format(N*J))
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = 1
-    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
-        parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim)
+    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+    #     data_location=data_location, parallel=parallel, 
+    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
+    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim)
     
     ipdb.set_trace()
     combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)
+    
