@@ -19,7 +19,8 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                             optimisation_dict2params, \
                                                 initialise_optimisation_vector_sobol, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
-                                                        get_hessian_diag_jax, get_jacobian, combine_estimate_variance_rule
+                                                        get_hessian_diag_jax, get_jacobian, \
+                                                            combine_estimate_variance_rule, get_global_theta
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None):
@@ -186,37 +187,16 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     return -nll[0]
 
 
-def negative_loglik_at_data_point(i, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
-
-    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
-    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
-    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")       
-    Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
-    alpha = params_hat["alpha"]
-    beta = params_hat["beta"]
-    # c = params_hat["c"]
-    gamma = params_hat["gamma"]
-    delta = params_hat["delta"]
-    mu_e = params_hat["mu_e"]
-    sigma_e = params_hat["sigma_e"]    
-    phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
-    errscale = sigma_e
-    errloc = mu_e
-    nll = Y[i, j]*norm.logcdf(1-phi, loc=errloc, scale=errscale) + (1-Y[i, j])*norm.logcdf(1-phi, loc=errloc, scale=errscale)
-
-    return nll
-
-
 def estimate_mle(args):
 
-    ipdb.set_trace()
-
     current_pid = os.getpid()    
-    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter = args
+    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim = args
 
     # load data    
     with open("{}/{}".format(data_location, subdataset_name), "rb") as f:
         Y = pickle.load(f)
+    from_row = int(subdataset_name.split("_")[1])
+    to_row = int(subdataset_name.split("_")[2][:-7])
     # since each batch has N rows
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
@@ -231,18 +211,28 @@ def estimate_mle(args):
                                             optimization_method=optimisation_method, 
                                             data=Y, full_hessian=False, diag_hessian_only=True,   
                                             loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax)          
-    params_hat = optimisation_dict2params(mle, param_positions_dict, J, K, d, parameter_names)
+    params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
     
-    ipdb.set_trace()                           
-    
+    print(subdataset_name)                        
+    # Place estimates and their variance in the correct positions in the global Theta parameter vector
+    theta_global = np.zeros((parameter_space_dim,))
+    theta_global_variance = np.zeros((parameter_space_dim,))
+    theta_global, theta_global_variance = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
+                                                        params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
+                                                        params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
+                                                        params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
+
     grid_and_optim_outcome = dict()
     grid_and_optim_outcome["PID"] = [current_pid]        
     grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
-    grid_and_optim_outcome["Theta"] = [mle.x]
-    grid_and_optim_outcome["Theta Variance"] = [result["variance"]]
+    grid_and_optim_outcome["local theta"] = [mle.tolist()]
+    grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
+    grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
+    # in optimisation vector, not the global
     grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
 
-    out_file = "{}/estimationresult_dataset{}.jsonl".format(DIR_out, dataset_index)
+    # ipdb.set_trace()
+    out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
     with open(out_file, 'a') as f:         
         writer = jsonlines.Writer(f)
         writer.write(grid_and_optim_outcome)
@@ -251,7 +241,6 @@ class ProcessManagerSynthetic(ProcessManager):
     def __init__(self, max_processes):
         super().__init__(max_processes)
     
-    # estimate_with_retry
     def worker_process(self, args):
 
         current_pid = os.getpid()
@@ -259,34 +248,54 @@ class ProcessManagerSynthetic(ProcessManager):
             self.execution_counter.value += 1
             self.shared_dict[current_pid] = self.execution_counter.value
         
-        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, dst_func = args
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim = args
 
         # load data    
         with open("{}/{}".format(data_location, subdataset_name), "rb") as f:
             Y = pickle.load(f)
-        
-        nloglik = lambda x: negative_loglik(Y, J, K, d, parameter_names, x, dst_func)
+        from_row = int(subdataset_name.split("_")[1])
+        to_row = int(subdataset_name.split("_")[2][:-7])
+        # since each batch has N rows
+        N = Y.shape[0]
+        Y = Y.astype(np.int8).reshape((N, J), order="F")         
+        nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
+        nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
         
         # init parameter vector x0
-        X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e = initialise_optimisation_vector_sobol(m=16, J=J, K=K, d=d)
-        x0, param_positions_dict = params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
+        X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e = initialise_optimisation_vector_sobol(m=16, J=J, K=N, d=d)
+        x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
-                                                            variance_method='jacobian', 
-                                                            optimization_method=optimisation_method)          
-        params_hat = optimisation_dict2params(mle.x, param_positions_dict, J, K, d, parameter_names)
+                                                variance_method='jacobian', disp=True, 
+                                                optimization_method=optimisation_method, 
+                                                data=Y, full_hessian=False, diag_hessian_only=True,   
+                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax)          
+        params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
+        
+        print(subdataset_name)                        
+        # Place estimates and their variance in the correct positions in the global Theta parameter vector
+        theta_global = np.zeros((parameter_space_dim,))
+        theta_global_variance = np.zeros((parameter_space_dim,))
+        theta_global, theta_global_variance = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
+                                                            params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
+                                                            params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
+                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
                    
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = [current_pid]        
         grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
-        grid_and_optim_outcome["Theta"] = [mle.x]
-        grid_and_optim_outcome["Theta Variance"] = [result["variance"]]
+        grid_and_optim_outcome["local theta"] = [mle.tolist()]
+        grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
+        grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
+        # in optimisation vector, not the global
+        grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
         
-        out_file = "{}/estimationresult_dataset{}.jsonl".format(DIR_out, dataset_index)
+        out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
         self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
 
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
-        parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, niter=None):
+        parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
+        niter=None, parameter_space_dim=None):
 
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
@@ -301,7 +310,8 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             manager.create_results_dict(optim_target="all")              
         for dataset_index in range(len(subdatasets_names)):
             subdataset_name = subdatasets_names[dataset_index]
-            args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter)    
+            args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
+                    parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim)    
             if parallel:                          
                 #####  parallelisation with Parallel Manager #####
                 manager.cleanup_finished_processes()
@@ -340,6 +350,7 @@ if __name__ == "__main__":
     total_running_processes = 1
     parallel = False
     optimisation_method = "L-BFGS-B"
+    # In parameter names keep "X" first (the variable the splitting takes place over)
     parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
     with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
         for result in f.iter(type=dict, skip_invalid=True):                              
@@ -348,12 +359,16 @@ if __name__ == "__main__":
             d = result["d"]
 
     parameter_space_dim = (K+2*J)*d + J + K + 4
+    print("Parameter space dimensionality: {}".format(parameter_space_dim))
     # for distributing per N rows
-    N = math.floor(parameter_space_dim/J)
+    N = math.ceil(parameter_space_dim/J)
+    print("Observed data points per data split: {}".format(N*J))
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = 1
     main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter)
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim)
+    
+    ipdb.set_trace()
     combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)

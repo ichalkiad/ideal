@@ -54,6 +54,79 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 ####################### MLE #############################
 
+def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e, variance):
+    """
+    K: size of row split
+    """
+    param_positions_dict = dict()
+    optim_vector = np.zeros((parameter_space_dim,))
+    var_vector = np.zeros((parameter_space_dim,))
+    k = from_row*d
+    kvar = 0
+
+    # ipdb.set_trace()   
+
+    for param in parameter_names:
+        if param == "X":
+            param_positions_dict[param] = (k, k + K*d)   
+            Xvec = X.reshape((d*K,), order="F").tolist()        
+            optim_vector[k:k+K*d] = Xvec
+            var_vector[k:k+K*d] = variance[kvar:kvar+K*d]
+            k += K*d    
+            kvar += K*d
+        elif param == "beta":
+            param_positions_dict[param] = (k+from_row, k + from_row + K)               
+            optim_vector[k+from_row:k + from_row + K] = beta            
+            var_vector[k+from_row:k + from_row + K] = variance[kvar:kvar+K]
+            k += from_row + K    
+            kvar += K
+        elif param == "alpha":
+            param_positions_dict[param] = (k, k + J)               
+            optim_vector[k:k + J] = alpha
+            var_vector[k:k + J] = variance[kvar:kvar+J]
+            k += J    
+            kvar += J
+        elif param in ["Z"]:
+            param_positions_dict[param] = (k, k + J*d)            
+            Zvec = Z.reshape((d*J,), order="F").tolist()         
+            optim_vector[k:k + J*d] = Zvec
+            var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
+            k += J*d
+            kvar += J
+        elif param in ["Phi"]:            
+            param_positions_dict[param] = (k, k + J*d)            
+            Phivec = Phi.reshape((d*J,), order="F").tolist()         
+            optim_vector[k:k + J*d] = Phivec
+            var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
+            k += J*d
+            kvar += J
+        elif param == "gamma":
+            param_positions_dict[param] = (k, k + 1)                        
+            optim_vector[k:k + 1] = gamma
+            var_vector[k:k + 1] = variance[kvar:kvar+1]
+            k += 1
+            kvar += 1
+        elif param == "delta":
+            param_positions_dict[param] = (k, k + 1)            
+            optim_vector[k:k + 1] = delta
+            var_vector[k:k + 1] = variance[kvar:kvar+1]
+            k += 1
+            kvar += 1
+        elif param == "mu_e":
+            param_positions_dict[param] = (k, k + 1)            
+            optim_vector[k:k + 1] = mu_e
+            var_vector[k:k + 1] = variance[kvar:kvar+1]
+            k += 1
+            kvar += 1
+        elif param == "sigma_e":
+            param_positions_dict[param] = (k, k + 1)            
+            optim_vector[k:k + 1] = sigma_e
+            var_vector[k:k + 1] = variance[kvar:kvar+1]
+            k += 1
+            kvar += 1
+        
+    return optim_vector, var_vector 
+
 def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e):
     
     param_positions_dict = dict()
@@ -112,11 +185,11 @@ def optimisation_dict2params(optim_vector, param_positions_dict, J, K, d, parame
     for param in parameter_names:
         param_out = optim_vector[param_positions_dict[param][0]:param_positions_dict[param][1]]
         if param == "X":            
-            param_out = param_out.reshape((d, K), order="F")                     
+            param_out = param_out.reshape((K, d), order="F")                     
         elif param in ["Z"]:            
-            param_out = param_out.reshape((d, J), order="F")                      
+            param_out = param_out.reshape((J, d), order="F")                      
         elif param in ["Phi"]:            
-            param_out = param_out.reshape((d, J), order="F")                                
+            param_out = param_out.reshape((J, d), order="F")                                
         params_out[param] = param_out
         
     return params_out
@@ -220,6 +293,8 @@ def get_hessian_diag_jax(f, x):
     return hvp(f, x, jnp.ones_like(x))
     
 def combine_estimate_variance_rule(DIR_out, param_positions_dict, J, K, d, parameter_names):
+
+    ipdb.set_trace()
 
     path = pathlib.Path(DIR_out)
     estimates_names = [file.name for file in path.iterdir() if file.is_file() and "estimationresult_dataset" in file.name]
