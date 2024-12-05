@@ -283,7 +283,8 @@ class ProcessManagerSynthetic(ProcessManager):
                    
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = [current_pid]        
-        grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
+        grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]
+        grid_and_optim_outcome["local dataset name"] = [subdataset_name]    
         grid_and_optim_outcome["local theta"] = mle.tolist()
         grid_and_optim_outcome["Theta"] = theta_global.tolist()
         grid_and_optim_outcome["Theta Variance"] = theta_global_variance.tolist()
@@ -311,26 +312,35 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
     try:    
         if parallel:  
-            manager.create_results_dict(optim_target="all")              
-        for dataset_index in range(len(subdatasets_names)):
-            subdataset_name = subdatasets_names[dataset_index]
-            args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                    parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim)    
-            if parallel:                          
-                #####  parallelisation with Parallel Manager #####
-                manager.cleanup_finished_processes()
-                current_count = manager.current_process_count()                                
-                print(f"Currently running processes: {current_count}")
-                manager.print_shared_dict() 
-                while current_count == total_running_processes:
+            manager.create_results_dict(optim_target="all")    
+            while True:
+                for dataset_index in range(len(subdatasets_names)):
+                    subdataset_name = subdatasets_names[dataset_index]
+                    args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
+                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim)    
+                                         
+                    #####  parallelisation with Parallel Manager #####
                     manager.cleanup_finished_processes()
-                    current_count = manager.current_process_count()                                                                                                                                                   
-                if current_count < total_running_processes:
-                    manager.spawn_process(args=(args,))                                
-                # Wait before next iteration
-                time.sleep(1)  
-                ################################################## 
-            else:
+                    current_count = manager.current_process_count()                                
+                    print(f"Currently running processes: {current_count}")
+                    manager.print_shared_dict() 
+                    while current_count == total_running_processes:
+                        manager.cleanup_finished_processes()
+                        current_count = manager.current_process_count()                                                                                                                                                   
+                    if current_count < total_running_processes:
+                        manager.spawn_process(args=(args,))      
+                    if manager.all_processes_complete.is_set():
+                        break                          
+                    # Wait before next iteration
+                    time.sleep(1)  
+                    ################################################## 
+                if manager.all_processes_complete.is_set():
+                    break       
+        else:
+            for dataset_index in range(len(subdatasets_names)):
+                subdataset_name = subdatasets_names[dataset_index]
+                args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
+                        parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim)
                 estimate_mle(args)                  
 
     except KeyboardInterrupt:
@@ -351,7 +361,7 @@ if __name__ == "__main__":
     
     jax.config.update("jax_traceback_filtering", "off")
     data_location = "./idealpestimation/data"    
-    total_running_processes = 3
+    total_running_processes = 2
     parallel = True
     optimisation_method = "L-BFGS-B"
     # In parameter names keep "X" first (the variable the splitting takes place over)
@@ -374,6 +384,6 @@ if __name__ == "__main__":
     #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
     #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim)
     
-    ipdb.set_trace()
+    # ipdb.set_trace()
     combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)
     

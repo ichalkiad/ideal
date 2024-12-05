@@ -13,6 +13,7 @@ class ProcessManager:
         self.manager = Manager()        
         self.execution_counter = multiprocessing.Value('i', 0)        
         self.file_lock = Lock()
+        self.all_processes_complete = multiprocessing.Event()
 
     def append_to_json_file(self, message, output_file):
         
@@ -62,6 +63,9 @@ class ProcessManager:
             else:
                 still_running.append(process)
         self.running_processes = still_running
+        
+        if len(still_running) == 0:
+            self.all_processes_complete.set()
     
     def current_process_count(self):
         return len(self.running_processes)
