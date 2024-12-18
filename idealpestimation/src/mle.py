@@ -289,6 +289,9 @@ class ProcessManagerSynthetic(ProcessManager):
         # Place estimates and their variance in the correct positions in the global Theta parameter vector
         theta_global = np.zeros((parameter_space_dim,))
         theta_global_variance = np.zeros((parameter_space_dim,))
+        if "Phi" not in params_hat.keys():
+            params_hat["Phi"] = None
+            params_hat["delta"] = None
         theta_global, theta_global_variance, param_positions_dict_global  = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
                                                                             params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
                                                                             params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
@@ -391,7 +394,7 @@ if __name__ == "__main__":
     sigma_e = 0.5
     d = 2    
     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e).replace(".", ""))
-    total_running_processes = 2              
+    total_running_processes = 15              
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]

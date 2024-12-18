@@ -271,8 +271,8 @@ def visualise_hessian(hessian, title='Hessian matrix'):
     fig = go.Figure(data=go.Heatmap(
         z=hessian,
         colorscale='RdBu_r',  
-        zmin=-np.max(np.abs(hessian)), 
-        zmax=np.max(np.abs(hessian)),
+        zmin=np.min(hessian), 
+        zmax=np.max(hessian),
         colorbar=dict(title='Hessian Value')
     ))
     
@@ -280,9 +280,7 @@ def visualise_hessian(hessian, title='Hessian matrix'):
     fig.update_layout(
         title=title,
         xaxis_title='Parameter Index',
-        yaxis_title='Parameter Index',
-        width=600,
-        height=600,
+        yaxis_title='Parameter Index'        
     )
     
     return fig
