@@ -54,7 +54,7 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 ####################### MLE #############################
 
-def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e, variance):
+def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e, variance, total_K):
     """
     K: size of row split
     """
@@ -63,67 +63,102 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
     var_vector = np.zeros((parameter_space_dim,))
     k = from_row*d
     kvar = 0
-
-    # ipdb.set_trace()   
+    print("global theta start {} - local theta start {}".format(k, kvar))
+    print("total K: {}".format(total_K))
+    print("N: {}".format(K))
+    
+    ipdb.set_trace()   
 
     for param in parameter_names:
         if param == "X":
-            param_positions_dict[param] = (k, k + K*d)   
+            param_positions_dict[param] = (k, k + K*d)
+            
+            if k+K*d != to_row*d:
+                ipdb.set_trace()   
+            
             Xvec = X.reshape((d*K,), order="F").tolist()        
             optim_vector[k:k+K*d] = Xvec
             var_vector[k:k+K*d] = variance[kvar:kvar+K*d]
-            k += K*d    
+            k = total_K*d    
             kvar += K*d
-        elif param == "beta":
-            param_positions_dict[param] = (k+from_row, k + from_row + K)               
-            optim_vector[k+from_row:k + from_row + K] = beta            
-            var_vector[k+from_row:k + from_row + K] = variance[kvar:kvar+K]
-            k += from_row + K    
-            kvar += K
-        elif param == "alpha":
-            param_positions_dict[param] = (k, k + J)               
-            optim_vector[k:k + J] = alpha
-            var_vector[k:k + J] = variance[kvar:kvar+J]
-            k += J    
-            kvar += J
+
+            print("after adding X: global theta {} - local theta {}".format(k, kvar))
+
         elif param in ["Z"]:
             param_positions_dict[param] = (k, k + J*d)            
             Zvec = Z.reshape((d*J,), order="F").tolist()         
             optim_vector[k:k + J*d] = Zvec
             var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
             k += J*d
-            kvar += J
+            kvar += J*d
+
+            print("after adding Z: global theta {} - local theta {}".format(k, kvar))
+
         elif param in ["Phi"]:            
             param_positions_dict[param] = (k, k + J*d)            
             Phivec = Phi.reshape((d*J,), order="F").tolist()         
             optim_vector[k:k + J*d] = Phivec
             var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
             k += J*d
+            kvar += J*d       
+
+            print("after adding Phi: global theta {} - local theta {}".format(k, kvar))
+   
+        elif param == "beta":
+            param_positions_dict[param] = (k+from_row, k + from_row + K)               
+            optim_vector[k+from_row:k + from_row + K] = beta            
+            var_vector[k+from_row:k + from_row + K] = variance[kvar:kvar+K]
+            k += total_K    
+            kvar += total_K
+
+            print("after adding beta: global theta {} - local theta {}".format(k, kvar))
+
+
+        elif param == "alpha":
+            param_positions_dict[param] = (k, k + J)               
+            optim_vector[k:k + J] = alpha
+            var_vector[k:k + J] = variance[kvar:kvar+J]
+            k += J    
             kvar += J
+
+            print("after adding alpha: global theta {} - local theta {}".format(k, kvar))
+
+        
         elif param == "gamma":
             param_positions_dict[param] = (k, k + 1)                        
             optim_vector[k:k + 1] = gamma
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
             kvar += 1
+
+            print("after adding gamma: global theta {} - local theta {}".format(k, kvar))
+
         elif param == "delta":
             param_positions_dict[param] = (k, k + 1)            
             optim_vector[k:k + 1] = delta
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
             kvar += 1
+
+            print("after adding delta: global theta {} - local theta {}".format(k, kvar))
+
         elif param == "mu_e":
             param_positions_dict[param] = (k, k + 1)            
             optim_vector[k:k + 1] = mu_e
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
             kvar += 1
+
+            print("after adding mu_e: global theta {} - local theta {}".format(k, kvar))
+
         elif param == "sigma_e":
             param_positions_dict[param] = (k, k + 1)            
             optim_vector[k:k + 1] = sigma_e
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
             kvar += 1
+        
+            print("after adding sigma_e: global theta {} - local theta {}".format(k, kvar))
         
     return optim_vector, var_vector, param_positions_dict 
 

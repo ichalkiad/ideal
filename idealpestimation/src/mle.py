@@ -279,7 +279,7 @@ class ProcessManagerSynthetic(ProcessManager):
         theta_global, theta_global_variance, param_positions_dict_global  = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
                                                                             params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
                                                                             params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
-                                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
+                                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"], total_K=K)
                    
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = [current_pid]        
@@ -362,7 +362,7 @@ if __name__ == "__main__":
     jax.config.update("jax_traceback_filtering", "off")
     data_location = "./idealpestimation/data"    
     total_running_processes = 2
-    parallel = True
+    parallel = False
     optimisation_method = "L-BFGS-B"
     # In parameter names keep "X" first (the variable the splitting takes place over)
     parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
@@ -379,10 +379,10 @@ if __name__ == "__main__":
     print("Observed data points per data split: {}".format(N*J))
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = 1
-    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-    #     data_location=data_location, parallel=parallel, 
-    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
-    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim)
+    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim)
     
     # ipdb.set_trace()
     combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)
