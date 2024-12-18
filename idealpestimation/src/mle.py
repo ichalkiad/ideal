@@ -143,13 +143,17 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
-    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")       
-    Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")      
+    if "Phi" in params_hat.keys(): 
+        Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+        delta = params_hat["delta"]
+    else:
+        Phi = np.zeros(Z.shape)
+        delta = 0
     alpha = params_hat["alpha"]
     beta = params_hat["beta"]
     # c = params_hat["c"]
-    gamma = params_hat["gamma"]
-    delta = params_hat["delta"]
+    gamma = params_hat["gamma"]    
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     nll = 0
@@ -167,12 +171,16 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
     Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")       
-    Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+    if "Phi" in params_hat.keys():
+        Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+        delta = jnp.asarray(params_hat["delta"])
+    else:
+        Phi = jnp.zeros(Z.shape)
+        delta = 0
     alpha = jnp.asarray(params_hat["alpha"])
     beta = jnp.asarray(params_hat["beta"])
     # c = params_hat["c"]
-    gamma = jnp.asarray(params_hat["gamma"])
-    delta = jnp.asarray(params_hat["delta"])
+    gamma = jnp.asarray(params_hat["gamma"])    
     mu_e = jnp.asarray(params_hat["mu_e"])
     sigma_e = jnp.asarray(params_hat["sigma_e"])
     nll = 0
@@ -190,10 +198,10 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
 def estimate_mle(args):
 
     current_pid = os.getpid()    
-    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim = args
+    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m = args
 
     # load data    
-    with open("{}/{}".format(data_location, subdataset_name), "rb") as f:
+    with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
         Y = pickle.load(f)
     from_row = int(subdataset_name.split("_")[1])
     to_row = int(subdataset_name.split("_")[2][:-7])
@@ -212,19 +220,23 @@ def estimate_mle(args):
                                             data=Y, full_hessian=False, diag_hessian_only=True,   
                                             loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax)          
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
+          
     
-    print(subdataset_name)                        
     # Place estimates and their variance in the correct positions in the global Theta parameter vector
     theta_global = np.zeros((parameter_space_dim,))
     theta_global_variance = np.zeros((parameter_space_dim,))
-    theta_global, theta_global_variance, param_positions_dict_global = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
+    if "Phi" not in params_hat.keys():
+        params_hat["Phi"] = None
+        params_hat["delta"] = None
+    theta_global, theta_global_variance, param_positions_dict_global  = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
                                                                             params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
                                                                             params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
-                                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"])
+                                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"], total_K=K)
 
     grid_and_optim_outcome = dict()
     grid_and_optim_outcome["PID"] = [current_pid]        
     grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
+    grid_and_optim_outcome["parameter names"] = parameter_names
     grid_and_optim_outcome["local theta"] = [mle.tolist()]
     grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
     grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
@@ -232,11 +244,12 @@ def estimate_mle(args):
     grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
     grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
 
-    # ipdb.set_trace()
     out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
     with open(out_file, 'a') as f:         
         writer = jsonlines.Writer(f)
         writer.write(grid_and_optim_outcome)
+
+
             
 class ProcessManagerSynthetic(ProcessManager):
     def __init__(self, max_processes):
@@ -249,10 +262,10 @@ class ProcessManagerSynthetic(ProcessManager):
             self.execution_counter.value += 1
             self.shared_dict[current_pid] = self.execution_counter.value
         
-        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim = args
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m = args
 
         # load data    
-        with open("{}/{}".format(data_location, subdataset_name), "rb") as f:
+        with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
             Y = pickle.load(f)
         from_row = int(subdataset_name.split("_")[1])
         to_row = int(subdataset_name.split("_")[2][:-7])
@@ -268,8 +281,8 @@ class ProcessManagerSynthetic(ProcessManager):
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
-                                                data=Y, full_hessian=False, diag_hessian_only=True,   
-                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax)          
+                                                data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
+                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out)          
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         
         print(subdataset_name)                        
@@ -283,11 +296,11 @@ class ProcessManagerSynthetic(ProcessManager):
                    
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = [current_pid]        
-        grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]
-        grid_and_optim_outcome["local dataset name"] = [subdataset_name]    
-        grid_and_optim_outcome["local theta"] = mle.tolist()
-        grid_and_optim_outcome["Theta"] = theta_global.tolist()
-        grid_and_optim_outcome["Theta Variance"] = theta_global_variance.tolist()
+        grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
+        grid_and_optim_outcome["parameter names"] = parameter_names
+        grid_and_optim_outcome["local theta"] = [mle.tolist()]
+        grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
+        grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
         # in optimisation vector, not the global
         grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
         grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
@@ -300,48 +313,51 @@ class ProcessManagerSynthetic(ProcessManager):
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
-        niter=None, parameter_space_dim=None):
+        niter=None, parameter_space_dim=None, trials=None):
 
+    # ipdb.set_trace()
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
-    DIR_top = data_location
-    path = pathlib.Path(data_location)
-    subdatasets_names = [file.name for file in path.iterdir() if file.is_file() and "dataset_" in file.name]
-    DIR_out = "{}/estimation/".format(DIR_top)
-    pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
-
+    DIR_top = data_location      
     try:    
         if parallel:  
             manager.create_results_dict(optim_target="all")    
             while True:
-                for dataset_index in range(len(subdatasets_names)):
-                    subdataset_name = subdatasets_names[dataset_index]
-                    args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim)    
-                                         
-                    #####  parallelisation with Parallel Manager #####
-                    manager.cleanup_finished_processes()
-                    current_count = manager.current_process_count()                                
-                    print(f"Currently running processes: {current_count}")
-                    manager.print_shared_dict() 
-                    while current_count == total_running_processes:
+                for m in range(trials):
+                    path = pathlib.Path("{}/{}".format(data_location, m))  
+                    subdatasets_names = [file.name for file in path.iterdir() if file.is_file() and "dataset_" in file.name]
+                    DIR_out = "{}/{}/estimation/".format(DIR_top, m)
+                    pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
+                    for dataset_index in range(len(subdatasets_names)):                    
+                        subdataset_name = subdatasets_names[dataset_index]
+                        args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
+                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m)    
+                                            
+                        #####  parallelisation with Parallel Manager #####
                         manager.cleanup_finished_processes()
-                        current_count = manager.current_process_count()                                                                                                                                                   
-                    if current_count < total_running_processes:
-                        manager.spawn_process(args=(args,))      
-                    if manager.all_processes_complete.is_set():
-                        break                          
-                    # Wait before next iteration
-                    time.sleep(1)  
-                    ################################################## 
+                        current_count = manager.current_process_count()                                
+                        print(f"Currently running processes: {current_count}")
+                        manager.print_shared_dict() 
+                        while current_count == total_running_processes:
+                            manager.cleanup_finished_processes()
+                            current_count = manager.current_process_count()                                                                                                                                                   
+                        if current_count < total_running_processes:
+                            manager.spawn_process(args=(args,))                                                  
+                        # Wait before next iteration
+                        time.sleep(1)  
+                        ################################################## 
                 if manager.all_processes_complete.is_set():
                     break       
         else:
-            for dataset_index in range(len(subdatasets_names)):
-                subdataset_name = subdatasets_names[dataset_index]
-                args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                        parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim)
-                estimate_mle(args)                  
+            for m in range(trials):
+                subdatasets_names = [file.name for file in path.iterdir() if file.is_file() and "dataset_" in file.name]
+                DIR_out = "{}/{}/estimation/".format(DIR_top, m)
+                pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
+                for dataset_index in range(len(subdatasets_names)):               
+                    subdataset_name = subdatasets_names[dataset_index]
+                    args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
+                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m)
+                    estimate_mle(args)                  
 
     except KeyboardInterrupt:
         # On Ctrl-C stop all processes
@@ -360,30 +376,44 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 if __name__ == "__main__":
     
     jax.config.update("jax_traceback_filtering", "off")
-    data_location = "./idealpestimation/data"    
-    total_running_processes = 2
-    parallel = False
+    parallel = True
     optimisation_method = "L-BFGS-B"
-    # In parameter names keep "X" first (the variable the splitting takes place over)
-    parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
-    with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
-        for result in f.iter(type=dict, skip_invalid=True):                              
-            J = result["J"]
-            K = result["K"]
-            d = result["d"]
-
-    parameter_space_dim = (K+2*J)*d + J + K + 4
+    dst_func = lambda x, y: np.sum((x-y)**2)
+    niter = None
+    # In parameter names keep the order fixed as is
+    # full, with status quo
+    # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
+    # no status quo
+    parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
+    M = 2
+    K = 1000
+    J = 100
+    sigma_e = 0.5
+    d = 2    
+    data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e).replace(".", ""))
+    total_running_processes = 2              
+    # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
+    #     for result in f.iter(type=dict, skip_invalid=True):                              
+    #         J = result["J"]
+    #         K = result["K"]
+    #         d = result["d"]
+    # full, with status quo
+    # parameter_space_dim = (K+2*J)*d + J + K + 4
+    # no status quo
+    parameter_space_dim = (K+J)*d + J + K + 3
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
-    print("Observed data points per data split: {}".format(N*J))
-    dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 1
+    print("Observed data points per data split: {}".format(N*J))        
     main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim)
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M)
     
-    # ipdb.set_trace()
-    combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)
-    
+    # for m in range(M):
+    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+    #     params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
+    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+    #     with open(out_file, 'a') as f:         
+    #         writer = jsonlines.Writer(f)
+    #         writer.write(params_out)

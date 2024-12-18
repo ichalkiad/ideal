@@ -66,16 +66,10 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
     print("global theta start {} - local theta start {}".format(k, kvar))
     print("total K: {}".format(total_K))
     print("N: {}".format(K))
-    
-    ipdb.set_trace()   
 
     for param in parameter_names:
         if param == "X":
-            param_positions_dict[param] = (k, k + K*d)
-            
-            if k+K*d != to_row*d:
-                ipdb.set_trace()   
-            
+            param_positions_dict[param] = (k, k + K*d)            
             Xvec = X.reshape((d*K,), order="F").tolist()        
             optim_vector[k:k+K*d] = Xvec
             var_vector[k:k+K*d] = variance[kvar:kvar+K*d]
@@ -329,8 +323,6 @@ def get_hessian_diag_jax(f, x):
     
 def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
 
-    ipdb.set_trace()
-
     path = pathlib.Path(DIR_out)
     estimates_names = [file.name for file in path.iterdir() if file.is_file() and "estimationresult_dataset" in file.name]
     weighted_estimate = None
@@ -341,8 +333,8 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
             for result in f.iter(type=dict, skip_invalid=True):                      
                 weight = result["Theta Variance"]
                 theta = result["Theta"]
-                all_weights.append(weight)
-                all_estimates.append(theta)
+                all_weights.append(weight[0])
+                all_estimates.append(theta[0])
     all_weights = np.array(all_weights)
     all_estimates = np.array(all_estimates)
     # sum acrocs each coordinate's weight
