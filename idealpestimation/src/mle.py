@@ -220,8 +220,7 @@ def estimate_mle(args):
                                             data=Y, full_hessian=False, diag_hessian_only=True,   
                                             loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax)          
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
-          
-    
+        
     # Place estimates and their variance in the correct positions in the global Theta parameter vector
     theta_global = np.zeros((parameter_space_dim,))
     theta_global_variance = np.zeros((parameter_space_dim,))
@@ -353,6 +352,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     break       
         else:
             for m in range(trials):
+                path = pathlib.Path("{}/{}".format(data_location, m))  
                 subdatasets_names = [file.name for file in path.iterdir() if file.is_file() and "dataset_" in file.name]
                 DIR_out = "{}/{}/estimation/".format(DIR_top, m)
                 pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
@@ -394,7 +394,7 @@ if __name__ == "__main__":
     sigma_e = 0.5
     d = 2    
     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e).replace(".", ""))
-    total_running_processes = 15              
+    total_running_processes = 30              
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]

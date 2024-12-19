@@ -103,7 +103,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             optim_vector[k+from_row:k + from_row + K] = beta            
             var_vector[k+from_row:k + from_row + K] = variance[kvar:kvar+K]
             k += total_K    
-            kvar += total_K
+            kvar += K
 
             print("after adding beta: global theta {} - local theta {}".format(k, kvar))
 
@@ -153,7 +153,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             kvar += 1
         
             print("after adding sigma_e: global theta {} - local theta {}".format(k, kvar))
-        
+
     return optim_vector, var_vector, param_positions_dict 
 
 def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e):
@@ -205,7 +205,7 @@ def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, g
             param_positions_dict[param] = (k, k + 1)            
             optim_vector.append(sigma_e)
             k += 1
-        
+
     return optim_vector, param_positions_dict
 
 def optimisation_dict2params(optim_vector, param_positions_dict, J, K, d, parameter_names):
