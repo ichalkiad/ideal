@@ -218,7 +218,7 @@ def estimate_mle(args):
                                             variance_method='jacobian', disp=True, 
                                             optimization_method=optimisation_method, 
                                             data=Y, full_hessian=False, diag_hessian_only=True,   
-                                            loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, subdataset_name=subdataset_name)          
+                                            loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         
     # Place estimates and their variance in the correct positions in the global Theta parameter vector
@@ -281,7 +281,7 @@ class ProcessManagerSynthetic(ProcessManager):
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
                                                 data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
-                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out)          
+                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         
         print(subdataset_name)                        
