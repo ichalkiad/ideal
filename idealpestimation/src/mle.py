@@ -82,7 +82,7 @@ def maximum_likelihood_estimator(
     optimization_method='L-BFGS-B',
     data=None, full_hessian=True, diag_hessian_only=True,
     loglikelihood_per_data_point=None, disp=False, niter=None, 
-    jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None):
+    jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None, subdataset_name=None):
     """
     Estimate the maximum likelihood parameter and its variance.
 
@@ -126,7 +126,7 @@ def maximum_likelihood_estimator(
             result["full_hessian"] = hessian
             if plot_hessian:
                 fig = visualise_hessian(hessian)
-                fix_plot_layout_and_save(fig, "{}/hessian_{}.html".format(output_dir, datetime.now().strftime("%Y-%m-%d")),
+                fix_plot_layout_and_save(fig, "{}/hessian_{}_{}.html".format(output_dir, subdataset_name, datetime.now().strftime("%Y-%m-%d")),
                                         xaxis_title="", yaxis_title="", title="Full Hessian matrix estimate", showgrid=False, showlegend=False,
                                         print_png=True, print_html=True, print_pdf=False)
                 
@@ -218,7 +218,7 @@ def estimate_mle(args):
                                             variance_method='jacobian', disp=True, 
                                             optimization_method=optimisation_method, 
                                             data=Y, full_hessian=False, diag_hessian_only=True,   
-                                            loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax)          
+                                            loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, subdataset_name=subdataset_name)          
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         
     # Place estimates and their variance in the correct positions in the global Theta parameter vector
