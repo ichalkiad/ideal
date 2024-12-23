@@ -4,6 +4,7 @@ import math
 import numpy as np
 import math
 import pathlib
+from scipy.stats import norm
 import plotly.graph_objs as go
 import plotly.io as pio
 import jax.numpy as jnp
@@ -214,11 +215,11 @@ def optimisation_dict2params(optim_vector, param_positions_dict, J, K, d, parame
     for param in parameter_names:
         param_out = optim_vector[param_positions_dict[param][0]:param_positions_dict[param][1]]
         if param == "X":            
-            param_out = param_out.reshape((K, d), order="F")                     
+            param_out = param_out.reshape((d, K), order="F")                     
         elif param in ["Z"]:            
-            param_out = param_out.reshape((J, d), order="F")                      
+            param_out = param_out.reshape((d, J), order="F")                      
         elif param in ["Phi"]:            
-            param_out = param_out.reshape((J, d), order="F")                                
+            param_out = param_out.reshape((d, J), order="F")                                
         params_out[param] = param_out
         
     return params_out
@@ -351,3 +352,112 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
 
     return params_out
 ####################### MLE #############################
+
+
+
+####################### ICM #############################
+
+def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")      
+    if "Phi" in params_hat.keys(): 
+        Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+        delta = params_hat["delta"]
+    else:
+        Phi = np.zeros(Z.shape)
+        delta = 0
+    alpha = params_hat["alpha"]
+    beta = params_hat["beta"]
+    # c = params_hat["c"]
+    gamma = params_hat["gamma"]    
+    # mu_e = params_hat["mu_e"]
+    # sigma_e = params_hat["sigma_e"]
+        
+    phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+    
+    return phi
+
+
+def log_conditional_posterior_x_il(l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
+    # l denotes the coordinate of vector x_i
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                         
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpx_il = 0
+    for j in range(J):
+        logpx_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logcdf(X[l, i], loc=0, scale=1)
+        
+    return logpx_il
+
+
+
+def log_conditional_posterior_phi_jl(l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
+    # l denotes the coordinate of vector phi_j
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")                         
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpphi_il = 0
+    for i in range(K):
+        logpphi_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logcdf(Phi[l, j], loc=0, scale=1)
+        
+    return logpphi_il
+
+
+def log_conditional_posterior_z_jl(l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
+
+    # ADD kronecker delta constraint in minimization?
+
+    # l denotes the coordinate of vector z_j
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpz_il = 0
+    for i in range(K):
+        logpz_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logcdf(Z[l, j], loc=0, scale=1)
+        
+    return logpz_il
+
+def log_conditional_posterior_alpha_j(j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
+    pass
+
+def log_conditional_posterior_beta_i(i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
+    pass
+
+def log_conditional_posterior_gamma(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
+    pass
+
+def log_conditional_posterior_delta(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
+    pass
+
+def log_conditional_posterior_mu_e(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
+    pass
+
+def log_conditional_posterior_sigma_e(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
+    pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####################### ICM #############################
