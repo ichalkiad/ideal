@@ -162,7 +162,7 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e
-            nll += Y[i, j]*norm.logcdf(1-phi, loc=errloc, scale=errscale) + (1-Y[i, j])*norm.logcdf(1-phi, loc=errloc, scale=errscale)
+            nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*norm.logcdf(1-phi, loc=errloc, scale=errscale)
 
     return -nll
 
@@ -190,7 +190,7 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e
-            nll += Y[i, j]*jax.scipy.stats.norm.logcdf(1-phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jax.scipy.stats.norm.logcdf(1-phi, loc=errloc, scale=errscale)
+            nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jax.scipy.stats.norm.logcdf(1-phi, loc=errloc, scale=errscale)
 
     return -nll[0]
 
@@ -280,7 +280,7 @@ class ProcessManagerSynthetic(ProcessManager):
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
-                                                data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
+                                                data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         
