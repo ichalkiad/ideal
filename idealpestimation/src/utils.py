@@ -69,7 +69,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
 
     for param in parameter_names:
         if param == "X":
-            param_positions_dict[param] = (k, k + K*d)            
+            param_positions_dict[param] = (0, total_K*d)            
             Xvec = X.reshape((d*K,), order="F").tolist()        
             optim_vector[k:k+K*d] = Xvec
             var_vector[k:k+K*d] = variance[kvar:kvar+K*d]
@@ -79,7 +79,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             print("after adding X: global theta {} - local theta {}".format(k, kvar))
 
         elif param in ["Z"]:
-            param_positions_dict[param] = (k, k + J*d)            
+            param_positions_dict[param] = (total_K*d, total_K*d + J*d)            
             Zvec = Z.reshape((d*J,), order="F").tolist()         
             optim_vector[k:k + J*d] = Zvec
             var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
@@ -89,7 +89,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             print("after adding Z: global theta {} - local theta {}".format(k, kvar))
 
         elif param in ["Phi"]:            
-            param_positions_dict[param] = (k, k + J*d)            
+            param_positions_dict[param] = (total_K*d + J*d, total_K*d + J*d + J*d)            
             Phivec = Phi.reshape((d*J,), order="F").tolist()         
             optim_vector[k:k + J*d] = Phivec
             var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
@@ -99,7 +99,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             print("after adding Phi: global theta {} - local theta {}".format(k, kvar))
    
         elif param == "beta":
-            param_positions_dict[param] = (k+from_row, k + from_row + K)               
+            param_positions_dict[param] = (total_K*d + J*d + J*d, total_K*d + J*d + J*d + total_K)               
             optim_vector[k+from_row:k + from_row + K] = beta            
             var_vector[k+from_row:k + from_row + K] = variance[kvar:kvar+K]
             k += total_K    
@@ -109,7 +109,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
 
 
         elif param == "alpha":
-            param_positions_dict[param] = (k, k + J)               
+            param_positions_dict[param] = (total_K*d + J*d + J*d + total_K, total_K*d + J*d + J*d + total_K + J)               
             optim_vector[k:k + J] = alpha
             var_vector[k:k + J] = variance[kvar:kvar+J]
             k += J    
@@ -119,7 +119,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
 
         
         elif param == "gamma":
-            param_positions_dict[param] = (k, k + 1)                        
+            param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J, total_K*d + J*d + J*d + total_K + J + 1)                        
             optim_vector[k:k + 1] = gamma
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
@@ -128,7 +128,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             print("after adding gamma: global theta {} - local theta {}".format(k, kvar))
 
         elif param == "delta":
-            param_positions_dict[param] = (k, k + 1)            
+            param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J + 1, total_K*d + J*d + J*d + total_K + J + 2)            
             optim_vector[k:k + 1] = delta
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
@@ -137,7 +137,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             print("after adding delta: global theta {} - local theta {}".format(k, kvar))
 
         elif param == "mu_e":
-            param_positions_dict[param] = (k, k + 1)            
+            param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J + 2, total_K*d + J*d + J*d + total_K + J + 3)            
             optim_vector[k:k + 1] = mu_e
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
@@ -146,7 +146,7 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
             print("after adding mu_e: global theta {} - local theta {}".format(k, kvar))
 
         elif param == "sigma_e":
-            param_positions_dict[param] = (k, k + 1)            
+            param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J + 3, total_K*d + J*d + J*d + total_K + J + 4)            
             optim_vector[k:k + 1] = sigma_e
             var_vector[k:k + 1] = variance[kvar:kvar+1]
             k += 1
@@ -321,14 +321,20 @@ def get_hessian_diag_jax(f, x):
     
 def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
 
+    ipdb.set_trace()
     path = pathlib.Path(DIR_out)
     estimates_names = [file.name for file in path.iterdir() if file.is_file() and "estimationresult_dataset" in file.name]
     weighted_estimate = None
     all_weights = []
     all_estimates = []
     for estim in estimates_names:
-        with jsonlines.open("{}/{}".format(DIR_out, estim), mode="r") as f:               
+        with jsonlines.open("{}/{}".format(DIR_out, estim), mode="r") as f: 
+            # skip = True              
             for result in f.iter(type=dict, skip_invalid=True):                      
+                # # skip 1st line - to be removed
+                # if skip:
+                #     skip = False
+                #     continue
                 weight = result["Theta Variance"]
                 theta = result["Theta"]
                 all_weights.append(weight[0])

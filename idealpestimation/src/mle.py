@@ -217,7 +217,7 @@ def estimate_mle(args):
     mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                             variance_method='jacobian', disp=True, 
                                             optimization_method=optimisation_method, 
-                                            data=Y, full_hessian=False, diag_hessian_only=True,   
+                                            data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                             loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         
@@ -280,7 +280,7 @@ class ProcessManagerSynthetic(ProcessManager):
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
-                                                data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
+                                                data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         
