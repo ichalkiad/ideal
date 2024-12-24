@@ -390,7 +390,7 @@ def log_conditional_posterior_x_il(l, i, Y, theta, J, K, d, parameter_names, dst
     logpx_il = 0
     for j in range(J):
         logpx_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logcdf(X[l, i], loc=0, scale=1)
+                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logpdf(X[l, i], loc=0, scale=1)
         
     return logpx_il
 
@@ -405,7 +405,7 @@ def log_conditional_posterior_phi_jl(l, j, Y, theta, J, K, d, parameter_names, d
     logpphi_il = 0
     for i in range(K):
         logpphi_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logcdf(Phi[l, j], loc=0, scale=1)
+                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logpdf(Phi[l, j], loc=0, scale=1)
         
     return logpphi_il
 
@@ -422,27 +422,97 @@ def log_conditional_posterior_z_jl(l, j, Y, theta, J, K, d, parameter_names, dst
     logpz_il = 0
     for i in range(K):
         logpz_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logcdf(Z[l, j], loc=0, scale=1)
+                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logpdf(Z[l, j], loc=0, scale=1)
         
     return logpz_il
 
 def log_conditional_posterior_alpha_j(j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
-    pass
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    alpha = params_hat["alpha"]
+    logpa_j = 0
+    logpa_j_cond = 0
+
+    mu_aj = np.zeros((J,))    #########################################################################
+    sigma_alpha_j = np.eye((J, J))
+    for j in range(J):
+        logpa_j_cond += norm.logpdf(alpha[j], loc=mu_aj_cond, scale=sigma_alpha_j_cond)
+        for i in range(K):
+            logpa_j += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                                + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e)))
+
+    return logpa_j + K*logpa_j_cond
 
 def log_conditional_posterior_beta_i(i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
-    pass
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    beta = params_hat["beta"]
+    logpb_i = 0
+    logpb_i_cond = 0
+
+    mu_bi = np.zeros((K,))    #########################################################################
+    sigma_beta_i = np.eye((K, K))
+    for i in range(K):
+        logpb_i_cond += norm.logpdf(beta[i], loc=mu_bi_cond, scale=sigma_beta_i_cond)
+        for j in range(J):
+            logpb_i += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                                + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e)))
+
+    return logpb_i + J*logpb_i_cond
 
 def log_conditional_posterior_gamma(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
-    pass
+    
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpg_il = 0
+    for j in range(J):
+        for i in range(K):
+            logpg_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                                + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e)))
+        
+    return logpg_il
 
 def log_conditional_posterior_delta(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
-    pass
+    
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpd_il = 0
+    for j in range(J):
+        for i in range(K):
+            logpd_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                                + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e)))
+        
+    return logpd_il
 
 def log_conditional_posterior_mu_e(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
-    pass
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpme_il = 0
+    for j in range(J):
+        for i in range(K):
+            logpme_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                                + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e)))
+        
+    return logpme_il
 
 def log_conditional_posterior_sigma_e(Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):    
-    pass
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpse_il = 0
+    for j in range(J):
+        for i in range(K):
+            logpse_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
+                                + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e)))
+        
+    return logpse_il
 
 
 
