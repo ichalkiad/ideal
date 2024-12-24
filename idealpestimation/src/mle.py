@@ -408,15 +408,15 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
     print("Observed data points per data split: {}".format(N*J))        
-    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
-        parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M)
+    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+    #     data_location=data_location, parallel=parallel, 
+    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
+    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M)
     
-    # for m in range(M):
-    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
-    #     params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
-    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
-    #     with open(out_file, 'a') as f:         
-    #         writer = jsonlines.Writer(f)
-    #         writer.write(params_out)
+    for m in range(M):
+        data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+        params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
+        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out)

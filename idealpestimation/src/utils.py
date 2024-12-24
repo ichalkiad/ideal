@@ -92,12 +92,12 @@ def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_n
     
     if "Phi" in parameter_names:
         param_positions_dict["beta"] = (total_K*d + 2*J*d, total_K*d + 2*J*d + total_K)               
-        var_init_loc = K*d+2*J*d
+        var_init_loc = K*d + 2*J*d
     else:
         param_positions_dict["beta"] = (total_K*d + J*d, total_K*d + J*d + total_K)               
         var_init_loc = K*d + J*d
-    optim_vector[param_positions_dict["beta"][0]:param_positions_dict["beta"][1]] = beta            
-    var_vector[param_positions_dict["beta"][0]:param_positions_dict["beta"][1]] = variance[var_init_loc:var_init_loc+K]
+    optim_vector[param_positions_dict["beta"][0]+from_row:param_positions_dict["beta"][0]+to_row] = beta            
+    var_vector[param_positions_dict["beta"][0]+from_row:param_positions_dict["beta"][0]+to_row] = variance[var_init_loc:var_init_loc+K]
     print("after adding beta: global theta {} - local theta {}".format(param_positions_dict["beta"][1], var_init_loc+K))
     
     if "Phi" in parameter_names:
@@ -323,9 +323,8 @@ def optimisation_dict2paramvectors(optim_vector, param_positions_dict, J, K, d, 
     params_out = dict()
     for param in parameter_names:
         print(param)
-        ipdb.set_trace()
         param_out = optim_vector[param_positions_dict[param][0]:param_positions_dict[param][1]]                
-        params_out[param] = param_out
+        params_out[param] = param_out.tolist()
         
     return params_out
 
@@ -440,7 +439,6 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
                 theta = result["Theta"]
                 all_weights.append(weight[0])
                 all_estimates.append(theta[0])
-    ipdb.set_trace()
     all_weights = np.stack(all_weights)
     all_estimates = np.stack(all_estimates)
     # sum acrocs each coordinate's weight
