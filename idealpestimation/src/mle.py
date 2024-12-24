@@ -206,21 +206,22 @@ def estimate_mle(args):
     from_row = int(subdataset_name.split("_")[1])
     to_row = int(subdataset_name.split("_")[2][:-7])
     # since each batch has N rows
+    
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
-    nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-    nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-    
+        
     # init parameter vector x0
     X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e = initialise_optimisation_vector_sobol(m=16, J=J, K=N, d=d)
     x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
+    nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
+    nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
     mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                             variance_method='jacobian', disp=True, 
                                             optimization_method=optimisation_method, 
                                             data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                             loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
-        
+
     # Place estimates and their variance in the correct positions in the global Theta parameter vector
     theta_global = np.zeros((parameter_space_dim,))
     theta_global_variance = np.zeros((parameter_space_dim,))
@@ -271,19 +272,19 @@ class ProcessManagerSynthetic(ProcessManager):
         # since each batch has N rows
         N = Y.shape[0]
         Y = Y.astype(np.int8).reshape((N, J), order="F")         
-        nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-        nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-        
+                
         # init parameter vector x0
         X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e = initialise_optimisation_vector_sobol(m=16, J=J, K=N, d=d)
         x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
+        nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
+        nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
                                                 data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
-                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
-        params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
-        
+                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)                
+        params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)          
+
         print(subdataset_name)                        
         # Place estimates and their variance in the correct positions in the global Theta parameter vector
         theta_global = np.zeros((parameter_space_dim,))
@@ -317,7 +318,6 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
         niter=None, parameter_space_dim=None, trials=None):
 
-    # ipdb.set_trace()
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
     DIR_top = data_location      
@@ -331,7 +331,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     DIR_out = "{}/{}/estimation/".format(DIR_top, m)
                     pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
                     for dataset_index in range(len(subdatasets_names)):                    
-                        subdataset_name = subdatasets_names[dataset_index]
+                        subdataset_name = subdatasets_names[dataset_index]                        
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                                 parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m)    
                                             
@@ -357,7 +357,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                 DIR_out = "{}/{}/estimation/".format(DIR_top, m)
                 pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                 for dataset_index in range(len(subdatasets_names)):               
-                    subdataset_name = subdatasets_names[dataset_index]
+                    subdataset_name = subdatasets_names[dataset_index]                    
                     args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                             parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m)
                     estimate_mle(args)                  
@@ -388,7 +388,7 @@ if __name__ == "__main__":
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
-    M = 2
+    M = 1
     K = 1000
     J = 100
     sigma_e = 0.5
