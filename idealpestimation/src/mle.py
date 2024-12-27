@@ -124,6 +124,7 @@ def maximum_likelihood_estimator(
                                        loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax)
         result["variance_method"] = variance_method
         result["variance"] = variance_diag
+        result["variance_status"] = variance_status
         if full_hessian:
             result["full_hessian"] = hessian
             if plot_hessian:
@@ -136,7 +137,7 @@ def maximum_likelihood_estimator(
         # Fallback to zero variance if computation fails
         print(f"Variance estimation failed: {e}")
         variance = np.zeros((mle.shape[0], mle.shape[0]))
-        result["variance_method"] = "{}-failed".format(variance_method)
+        result["variance_method"] = "{}".format(variance_method)
         result["variance"] = variance
         result["variance_status"] = variance_status
         
@@ -286,7 +287,7 @@ class ProcessManagerSynthetic(ProcessManager):
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
-                                                data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
+                                                data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)                
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)          
 
