@@ -443,6 +443,9 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
     all_estimates = np.stack(all_estimates)
     # sum acrocs each coordinate's weight
     all_weights_sum = np.sum(all_weights, axis=0)
+
+    ipdb.set_trace()
+    
     all_weights_norm = all_weights/all_weights_sum
     # element-wise multiplication
     weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)

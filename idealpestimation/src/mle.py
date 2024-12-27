@@ -44,9 +44,11 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
             variance = np.linalg.inv(sigma_sq_inv + 1e-8 * np.eye(len(params)))
             hess = hessian(loglikelihood)(params)  
             if np.isnan(variance):
-                raise ArithmeticError
+                # error status
+                return sigma_sq_inv, hess, variance, False
             else:
-                return sigma_sq_inv, hess, variance
+                # success status
+                return sigma_sq_inv, hess, variance, True
         else:
             if full_hessian:
                 # Use Hessian approximation to compute Fisher Information as the sample Hessian                                                  
@@ -69,9 +71,9 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                         else:
                             variance = -np.diag(estimation_result["hess_inv"])
                     else:                            
-                        raise ArithmeticError
+                        return None, None, variance, False
                 else:
-                    return None, None, variance
+                    return None, None, variance, True
     except Exception as e:
         raise ArithmeticError
 
@@ -117,7 +119,7 @@ def maximum_likelihood_estimator(
     mle = result.x          
 
     try:        
-        variance_noninv, hessian, variance_diag = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
+        variance_noninv, hessian, variance_diag, variance_status = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
                                        data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
                                        loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax)
         result["variance_method"] = variance_method
@@ -136,6 +138,7 @@ def maximum_likelihood_estimator(
         variance = np.zeros((mle.shape[0], mle.shape[0]))
         result["variance_method"] = "{}-failed".format(variance_method)
         result["variance"] = variance
+        result["variance_status"] = variance_status
         
     return mle, result
 
@@ -243,6 +246,8 @@ def estimate_mle(args):
     # in optimisation vector, not the global
     grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
     grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
+    grid_and_optim_outcome["mle_estimation_status"] = result.success
+    grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
 
     out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
     with open(out_file, 'a') as f:         
@@ -307,6 +312,8 @@ class ProcessManagerSynthetic(ProcessManager):
         # in optimisation vector, not the global
         grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
         grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
+        grid_and_optim_outcome["mle_estimation_status"] = result.success
+        grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
         
         out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
         self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
@@ -408,15 +415,15 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
     print("Observed data points per data split: {}".format(N*J))        
-    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-    #     data_location=data_location, parallel=parallel, 
-    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
-    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M)
+    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M)
     
-    for m in range(M):
-        data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
-        params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
-        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
-        with open(out_file, 'a') as f:         
-            writer = jsonlines.Writer(f)
-            writer.write(params_out)
+    # for m in range(M):
+    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+    #     params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
+    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+    #     with open(out_file, 'a') as f:         
+    #         writer = jsonlines.Writer(f)
+    #         writer.write(params_out)
