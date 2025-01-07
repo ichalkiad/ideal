@@ -491,6 +491,7 @@ def log_conditional_posterior_x_il(l, i, Y, theta, J, K, d, parameter_names, dst
     sigma_e = params_hat["sigma_e"]
     logpx_il = 0
     for j in range(J):
+        ################################################# log1p
         logpx_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
                         + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logpdf(X[l, i], loc=0, scale=1)
         
