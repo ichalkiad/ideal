@@ -226,27 +226,27 @@ def estimate_mle(args):
                                             loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
 
-    # Place estimates and their variance in the correct positions in the global Theta parameter vector
-    theta_global = np.zeros((parameter_space_dim,))
-    theta_global_variance = np.zeros((parameter_space_dim,))
+    # # Place estimates and their variance in the correct positions in the global Theta parameter vector
+    # theta_global = np.zeros((parameter_space_dim,))
+    # theta_global_variance = np.zeros((parameter_space_dim,))
     if "Phi" not in params_hat.keys():
         params_hat["Phi"] = None
         params_hat["delta"] = None
-    theta_global, theta_global_variance, param_positions_dict_global  = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
-                                                                            params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
-                                                                            params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
-                                                                            params_hat["mu_e"], params_hat["sigma_e"], result["variance"], total_K=K)
+    # theta_global, theta_global_variance, param_positions_dict_global  = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
+    #                                                                         params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
+    #                                                                         params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
+    #                                                                         params_hat["mu_e"], params_hat["sigma_e"], result["variance"], total_K=K)
 
     grid_and_optim_outcome = dict()
     grid_and_optim_outcome["PID"] = [current_pid]        
     grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
     grid_and_optim_outcome["parameter names"] = parameter_names
     grid_and_optim_outcome["local theta"] = [mle.tolist()]
-    grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
-    grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
+    # grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
+    # grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
     # in optimisation vector, not the global
     grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
-    grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
+    # grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
     grid_and_optim_outcome["mle_estimation_status"] = result.success
     grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
 
