@@ -673,10 +673,10 @@ if __name__ == "__main__":
         dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
-    for m in range(M):
-        data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
-        params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
-        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
-        with open(out_file, 'a') as f:         
-            writer = jsonlines.Writer(f)
-            writer.write(params_out)
+    # for m in range(M):
+    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+    #     params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
+    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+    #     with open(out_file, 'a') as f:         
+    #         writer = jsonlines.Writer(f)
+    #         writer.write(params_out)
