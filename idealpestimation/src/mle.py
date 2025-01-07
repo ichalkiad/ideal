@@ -13,6 +13,8 @@ from jax import hessian
 import jax
 import jax.numpy as jnp
 import math
+import random
+from datetime import timedelta
 from idealpestimation.src.parallel_manager import ProcessManager, \
                                                     jsonlines
 from idealpestimation.src.utils import params2optimisation_dict, \
@@ -20,7 +22,8 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                 initialise_optimisation_vector_sobol, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
                                                         get_hessian_diag_jax, get_jacobian, \
-                                                            combine_estimate_variance_rule, get_global_theta
+                                                            combine_estimate_variance_rule, optimisation_dict2paramvectors,\
+                                                            create_constraint_functions
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None):
@@ -84,7 +87,8 @@ def maximum_likelihood_estimator(
     optimization_method='L-BFGS-B',
     data=None, full_hessian=True, diag_hessian_only=True,
     loglikelihood_per_data_point=None, disp=False, niter=None, 
-    jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None, subdataset_name=None):
+    jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None, 
+    subdataset_name=None, param_positions_dict=None):
     """
     Estimate the maximum likelihood parameter and its variance.
 
@@ -101,20 +105,18 @@ def maximum_likelihood_estimator(
         - Maximum likelihood estimate (MLE) of the parameter
         - Variance of the MLE 
     """
-    # Set default initial guess if not provided
-    if initial_guess is None:
-        initial_guess = [0]
     optimize_kwargs = {
         'method': optimization_method,
         'x0': initial_guess,                
         'jac': '3-point'#,
         # 'hess': '2-point'
     }                   
-    # Perform maximum likelihood estimation    
+    # Perform maximum likelihood estimation        
+    bounds, _ = create_constraint_functions(len(initial_guess))    
     if niter is not None:
-        result = minimize(likelihood_function, **optimize_kwargs, options={"disp":disp, "maxiter":niter, "maxls":20})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxls":20})
     else:
-        result = minimize(likelihood_function, **optimize_kwargs, options={"disp":disp, "maxls":20})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxls":20})
     
     mle = result.x          
 
@@ -143,7 +145,7 @@ def maximum_likelihood_estimator(
         
     return mle, result
 
-def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict):
+def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
@@ -166,14 +168,16 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e
-            if np.abs(norm.cdf(phi, loc=errloc, scale=errscale)) < 0.1:
-                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log1p(-norm.cdf(phi, loc=errloc, scale=errscale))
+            phicdf = norm.cdf(phi, loc=errloc, scale=errscale)
+            if np.abs(phicdf) < 0.1:
+                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log1p(-phicdf)
             else:
-                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-norm.cdf(phi, loc=errloc, scale=errscale))
+                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-phicdf)
 
-    return -nll
+    sum_Z_J_vectors = np.sum(Z, axis=1)    
+    return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
 
-def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict):
+def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
@@ -197,18 +201,22 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e
-            if jnp.abs(jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale)) < 0.1:
-                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log1p(-jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale))
+            phicdf = jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale)
+            if jnp.abs(phicdf) < 0.1:
+                print(phicdf)
+                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log1p(-phicdf)
             else:
-                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale))
+                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-phicdf)
 
-    return -nll[0]
+    sum_Z_J_vectors = jnp.sum(Z, axis=1)
+    return -nll[0] + penalty_weight_Z * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
 
 def estimate_mle(args):
 
     current_pid = os.getpid()    
-    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m = args
+    DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
+                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries = args
 
     # load data    
     with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
@@ -219,47 +227,110 @@ def estimate_mle(args):
     
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
+    
+    # init parameter vector x0 - ensure 2**m > retries
+    m_sobol = 15
+    if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
+        raise AttributeError("Generate more Sobol points")
+    X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
+    
+    retry = 0
+    t0 = time.time()
+    while retry < retries:   
+        print("Retry: {}".format(retry))
+
+        Xrem = [random.choice(X_list) for _ in range(N)]
+        X = np.asarray(Xrem).reshape((d, N), order="F")
+        Zrem = [random.choice(Z_list) for _ in range(J)]
+        Z = np.asarray(Zrem).reshape((d, J), order="F")
+        if "Phi" in parameter_names:
+            Phirem = [random.choice(Phi_list) for _ in range(J)]
+            Phi = np.asarray(Phirem).reshape((d, J), order="F")
+        else:
+            Phi = None
+        alpha = np.asarray(random.choice(alpha_list))
+        beta = np.asarray(random.choice(beta_list))
+        gamma = np.random.choice(gamma_list, size=1, replace=False).tolist()[0]
+        if "delta" in parameter_names:
+            delta = np.random.choice(delta_list, size=1, replace=False)
+        else:
+            delta = None
+        mu_e = np.random.choice(mu_e_list, size=1, replace=False).tolist()[0]
+        sigma_e = np.random.choice(sigma_e_list, size=1, replace=False).tolist()[0]
         
-    # init parameter vector x0
-    X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e = initialise_optimisation_vector_sobol(m=16, J=J, K=N, d=d)
-    x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
-    nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-    nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict)
-    mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
-                                            variance_method='jacobian', disp=True, 
-                                            optimization_method=optimisation_method, 
-                                            data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
-                                            loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)          
+        x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
+
+        print(x0)
+
+        nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
+        nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
+        mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
+                                                variance_method='jacobian', disp=True, 
+                                                optimization_method=optimisation_method, 
+                                                data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
+                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
+                                                output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict)          
+        if result.success:
+            break
+        else:
+            for xr in Xrem:
+                X_list.remove(xr)
+            for zr in Zrem:
+                Z_list.remove(zr)
+            if "Phi" in parameter_names:
+                for phir in Phirem:
+                    Phi_list.remove(phir)
+            for ar in alpha:
+                alpha_list.remove(ar)
+            for br in beta:
+                beta_list.remove(br)
+            
+            retry += 1
     params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
+    variance_hat = optimisation_dict2paramvectors(result["variance"], param_positions_dict, J, K, d, parameter_names)
 
-    # # Place estimates and their variance in the correct positions in the global Theta parameter vector
-    # theta_global = np.zeros((parameter_space_dim,))
-    # theta_global_variance = np.zeros((parameter_space_dim,))
-    if "Phi" not in params_hat.keys():
-        params_hat["Phi"] = None
-        params_hat["delta"] = None
-    # theta_global, theta_global_variance, param_positions_dict_global  = get_global_theta(from_row, to_row, parameter_space_dim, J, N, d, parameter_names, 
-    #                                                                         params_hat["X"], params_hat["Z"], params_hat["Phi"], params_hat["alpha"], 
-    #                                                                         params_hat["beta"], params_hat["gamma"], params_hat["delta"], 
-    #                                                                         params_hat["mu_e"], params_hat["sigma_e"], result["variance"], total_K=K)
-
+    ipdb.set_trace()
+    
     grid_and_optim_outcome = dict()
-    grid_and_optim_outcome["PID"] = [current_pid]        
-    grid_and_optim_outcome["timestamp"] = [time.strftime("%Y-%m-%d %H:%M:%S")]    
+    grid_and_optim_outcome["PID"] = current_pid
+    grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
+    time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+    hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+    grid_and_optim_outcome["elapsedtime_hours"] = hours
+    grid_and_optim_outcome["retry"] = retry
     grid_and_optim_outcome["parameter names"] = parameter_names
     grid_and_optim_outcome["local theta"] = [mle.tolist()]
-    # grid_and_optim_outcome["Theta"] = [theta_global.tolist()]
-    # grid_and_optim_outcome["Theta Variance"] = [theta_global_variance.tolist()] 
-    # in optimisation vector, not the global
+    grid_and_optim_outcome["X"] = params_hat["X"]
+    grid_and_optim_outcome["Z"] = params_hat["Z"]
+    if "Phi" in params_hat.keys():
+        grid_and_optim_outcome["Phi"] = params_hat["Phi"]
+    grid_and_optim_outcome["alpha"] = params_hat["alpha"]
+    grid_and_optim_outcome["beta"] = params_hat["beta"]
+    grid_and_optim_outcome["gamma"] = params_hat["gamma"]
+    if "delta" in params_hat.keys():
+        grid_and_optim_outcome["delta"] = params_hat["delta"]
+    grid_and_optim_outcome["mu_e"] = params_hat["mu_e"]
+    grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"]
+
+    grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
+    if "Phi" in params_hat.keys():
+        grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
+    grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
+    grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
+    if "delta" in params_hat.keys():
+        grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]
+    grid_and_optim_outcome["variance_mu_e"] = variance_hat["mu_e"]
+    grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
+    
     grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
-    # grid_and_optim_outcome["param_positions_dict_global"] = param_positions_dict_global
     grid_and_optim_outcome["mle_estimation_status"] = result.success
     grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
 
-    out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
-    with open(out_file, 'a') as f:         
-        writer = jsonlines.Writer(f)
-        writer.write(grid_and_optim_outcome)
+    # out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
+    # with open(out_file, 'a') as f:         
+    #     writer = jsonlines.Writer(f)
+    #     writer.write(grid_and_optim_outcome)
 
 
             
@@ -294,7 +365,8 @@ class ProcessManagerSynthetic(ProcessManager):
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
                                                 data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
-                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, output_dir=DIR_out, subdataset_name=subdataset_name)                
+                                                loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
+                                                output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict)                
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)          
 
         print(subdataset_name)                        
@@ -322,15 +394,15 @@ class ProcessManagerSynthetic(ProcessManager):
         grid_and_optim_outcome["mle_estimation_status"] = result.success
         grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
         
-        out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
-        self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
+        # out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
+        # self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
 
          
 
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
-        niter=None, parameter_space_dim=None, trials=None):
+        niter=None, parameter_space_dim=None, trials=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10):
 
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
@@ -347,7 +419,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     for dataset_index in range(len(subdatasets_names)):                    
                         subdataset_name = subdatasets_names[dataset_index]                        
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m)    
+                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries)    
                                             
                         #####  parallelisation with Parallel Manager #####
                         manager.cleanup_finished_processes()
@@ -373,7 +445,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                 for dataset_index in range(len(subdatasets_names)):               
                     subdataset_name = subdatasets_names[dataset_index]                    
                     args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m)
+                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries)
                     estimate_mle(args)                  
 
     except KeyboardInterrupt:
@@ -392,11 +464,15 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
     
+    jax.default_device = jax.devices("gpu")[0]
     jax.config.update("jax_traceback_filtering", "off")
-    parallel = True
+    parallel = False
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = None
+    penalty_weight_Z = 100.0
+    constant_Z = 0.0
+    retries = 10
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
@@ -405,9 +481,9 @@ if __name__ == "__main__":
     M = 1
     K = 1000
     J = 100
-    sigma_e = 0.5
+    sigma_e_true = 0.5
     d = 2    
-    data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e).replace(".", ""))
+    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))  #/home/ioannischalkiadakis/ideal
     total_running_processes = 30              
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
@@ -425,7 +501,8 @@ if __name__ == "__main__":
     main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M)
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
+        penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
     # for m in range(M):
     #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)

@@ -55,206 +55,6 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 ####################### MLE #############################
 
-def get_global_theta(from_row, to_row, parameter_space_dim, J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e, variance, total_K):
-    """
-    K: size of row split
-    Assume that the parameter order in the optim_vector is: ["X", "Z", "Phi" (optionally), "alpha", "beta", "gamma", "delta" (optionally), "mu_e", "sigma_e"]
-    """
-    param_positions_dict = dict()
-    optim_vector = np.zeros((parameter_space_dim,))
-    var_vector = np.zeros((parameter_space_dim,))
-    k = from_row*d
-    kvar = 0
-    print("global theta start {} - local theta start {}".format(k, kvar))
-    print("total K: {}".format(total_K))
-    print("N: {}".format(K))
-
-    param_positions_dict["X"] = (0, total_K*d)            
-    Xvec = X.reshape((d*K,), order="F").tolist()        
-    optim_vector[from_row*d:to_row*d] = Xvec
-    var_vector[from_row*d:to_row*d] = variance[0:K*d]    
-    print("after adding X: global theta {} - local theta {}".format(to_row*d, K*d))
-    
-    param_positions_dict["Z"] = (total_K*d, total_K*d + J*d)            
-    Zvec = Z.reshape((d*J,), order="F").tolist()         
-    optim_vector[total_K*d:total_K*d + J*d] = Zvec
-    var_vector[total_K*d:total_K*d + J*d] = variance[K*d:K*d+J*d]
-    print("after adding Z: global theta {} - local theta {}".format(total_K*d + J*d, K*d+J*d))
-
-    if "Phi" in parameter_names:
-        param_positions_dict["Phi"] = (total_K*d + J*d, total_K*d + 2*J*d)            
-        Phivec = Phi.reshape((d*J,), order="F").tolist()         
-        optim_vector[total_K*d + J*d:total_K*d + 2*J*d] = Phivec
-        var_vector[total_K*d + J*d:total_K*d + 2*J*d] = variance[K*d+J*d:K*d+2*J*d]
-        k += J*d
-        kvar += J*d       
-        print("after adding Phi: global theta {} - local theta {}".format(total_K*d + 2*J*d, K*d + 2*J*d))
-    
-    if "Phi" in parameter_names:
-        param_positions_dict["beta"] = (total_K*d + 2*J*d, total_K*d + 2*J*d + total_K)               
-        var_init_loc = K*d + 2*J*d
-    else:
-        param_positions_dict["beta"] = (total_K*d + J*d, total_K*d + J*d + total_K)               
-        var_init_loc = K*d + J*d
-    optim_vector[param_positions_dict["beta"][0]+from_row:param_positions_dict["beta"][0]+to_row] = beta            
-    var_vector[param_positions_dict["beta"][0]+from_row:param_positions_dict["beta"][0]+to_row] = variance[var_init_loc:var_init_loc+K]
-    print("after adding beta: global theta {} - local theta {}".format(param_positions_dict["beta"][1], var_init_loc+K))
-    
-    if "Phi" in parameter_names:
-        param_positions_dict["alpha"] = (total_K*d + 2*J*d + total_K, total_K*d + 2*J*d + total_K + J)    
-        var_init_loc = K*d + 2*J*d + K           
-    else:
-        param_positions_dict["alpha"] = (total_K*d + J*d + total_K, total_K*d + J*d + total_K + J)               
-        var_init_loc = K*d + J*d + K
-    optim_vector[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]] = alpha
-    var_vector[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]] = variance[var_init_loc:var_init_loc+J]
-    print("after adding alpha: global theta {} - local theta {}".format(param_positions_dict["alpha"][1], var_init_loc+J))
-
-    if "Phi" in parameter_names:
-        param_positions_dict["gamma"] = (total_K*d + 2*J*d + total_K + J, total_K*d + 2*J*d + total_K + J + 1)   
-        var_init_loc = K*d + 2*J*d + K + J                      
-    else:
-        param_positions_dict["gamma"] = (total_K*d + J*d + total_K + J, total_K*d + J*d + total_K + J + 1)               
-        var_init_loc = K*d + J*d + K + J
-    optim_vector[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]] = gamma
-    var_vector[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]] = variance[var_init_loc:var_init_loc+1]
-    print("after adding gamma: global theta {} - local theta {}".format(param_positions_dict["gamma"][1], var_init_loc+1))
-
-    if "Phi" in parameter_names:
-        param_positions_dict["delta"] = (total_K*d + 2*J*d + total_K + J + 1, total_K*d + 2*J*d + total_K + J + 2)            
-        var_init_loc = K*d + 2*J*d + K + J + 1            
-        optim_vector[param_positions_dict["delta"][0]:param_positions_dict["delta"][1]] = delta
-        var_vector[param_positions_dict["delta"][0]:param_positions_dict["delta"][1]] = variance[var_init_loc:var_init_loc+1]        
-        print("after adding delta: global theta {} - local theta {}".format(param_positions_dict["delta"][1], var_init_loc+1))
-    
-    if "Phi" in parameter_names:
-        param_positions_dict["mu_e"] = (total_K*d + 2*J*d + total_K + J + 2, total_K*d + 2*J*d + total_K + J + 3)      
-        var_init_loc = K*d + 2*J*d + K + J + 2      
-    else:
-        param_positions_dict["mu_e"] = (total_K*d + J*d + total_K + J + 1, total_K*d + J*d + total_K + J + 2)      
-        var_init_loc = K*d + J*d + K + J + 1      
-    optim_vector[param_positions_dict["mu_e"][0]:param_positions_dict["mu_e"][1]] = mu_e
-    var_vector[param_positions_dict["mu_e"][0]:param_positions_dict["mu_e"][1]] = variance[var_init_loc:var_init_loc+1]
-    print("after adding mu_e: global theta {} - local theta {}".format(param_positions_dict["mu_e"][1], var_init_loc+1))
-
-    if "Phi" in parameter_names:
-        param_positions_dict["sigma_e"] = (total_K*d + 2*J*d + total_K + J + 3, total_K*d + 2*J*d + total_K + J + 4)      
-        var_init_loc = K*d + 2*J*d + K + J + 3           
-    else:
-        param_positions_dict["sigma_e"] = (total_K*d + J*d + total_K + J + 2, total_K*d + J*d + total_K + J + 3)      
-        var_init_loc = K*d + J*d + K + J + 2      
-    optim_vector[param_positions_dict["sigma_e"][0]:param_positions_dict["sigma_e"][1]] = mu_e
-    var_vector[param_positions_dict["sigma_e"][0]:param_positions_dict["sigma_e"][1]] = variance[var_init_loc:var_init_loc+1]
-    print("after adding sigma_e: global theta {} - local theta {}".format(param_positions_dict["sigma_e"][1], var_init_loc+1))
-
-
-
-    # for param in parameter_names:
-        # if param == "X":
-        #     param_positions_dict[param] = (0, total_K*d)            
-        #     Xvec = X.reshape((d*K,), order="F").tolist()        
-        #     optim_vector[k:k+K*d] = Xvec
-        #     var_vector[k:k+K*d] = variance[kvar:kvar+K*d]
-        #     k = total_K*d    
-        #     kvar += K*d
-
-        #     print("after adding X: global theta {} - local theta {}".format(k, kvar))
-
-        # elif param in ["Z"]:
-        #     param_positions_dict[param] = (total_K*d, total_K*d + J*d)            
-        #     Zvec = Z.reshape((d*J,), order="F").tolist()         
-        #     optim_vector[k:k + J*d] = Zvec
-        #     var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
-        #     k += J*d
-        #     kvar += J*d
-
-        #     print("after adding Z: global theta {} - local theta {}".format(k, kvar))
-
-        # elif param in ["Phi"]:            
-        #     param_positions_dict[param] = (total_K*d + J*d, total_K*d + J*d + J*d)            
-        #     Phivec = Phi.reshape((d*J,), order="F").tolist()         
-        #     optim_vector[k:k + J*d] = Phivec
-        #     var_vector[k:k + J*d] = variance[kvar:kvar+J*d]
-        #     k += J*d
-        #     kvar += J*d       
-
-        #     print("after adding Phi: global theta {} - local theta {}".format(k, kvar))
-   
-        # elif param == "beta":
-        #     if "Phi" in parameter_names:
-        #         param_positions_dict[param] = (total_K*d + J*d + J*d, total_K*d + J*d + J*d + total_K)               
-        #     else:
-        #         param_positions_dict[param] = (total_K*d + J*d, total_K*d + J*d + total_K)               
-        #     optim_vector[k+from_row:k + from_row + K] = beta            
-        #     var_vector[k+from_row:k + from_row + K] = variance[kvar:kvar+K]
-        #     k += total_K    
-        #     kvar += K
-
-        #     print("after adding beta: global theta {} - local theta {}".format(k, kvar))
-
-        # elif param == "alpha":
-        #     if "Phi" in parameter_names:
-        #         param_positions_dict[param] = (total_K*d + J*d + J*d + total_K, total_K*d + J*d + J*d + total_K + J)               
-        #     else:
-        #         param_positions_dict[param] = (total_K*d + J*d + total_K, total_K*d + J*d + total_K + J)               
-        #     optim_vector[k:k + J] = alpha
-        #     var_vector[k:k + J] = variance[kvar:kvar+J]
-        #     k += J    
-        #     kvar += J
-
-        #     print("after adding alpha: global theta {} - local theta {}".format(k, kvar))
-
-        
-        # elif param == "gamma":
-        #     if "Phi" in parameter_names:
-        #         param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J, total_K*d + J*d + J*d + total_K + J + 1)                        
-        #     else:
-        #         param_positions_dict[param] = (total_K*d + J*d + total_K + J, total_K*d + J*d + total_K + J + 1)               
-        #     optim_vector[k:k + 1] = gamma
-        #     var_vector[k:k + 1] = variance[kvar:kvar+1]
-        #     k += 1
-        #     kvar += 1
-
-        #     print("after adding gamma: global theta {} - local theta {}".format(k, kvar))
-
-        # elif param == "delta":
-        #     if "Phi" in parameter_names:
-        #         param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J + 1, total_K*d + J*d + J*d + total_K + J + 2)            
-        #     else:
-        #         param_positions_dict[param] = (total_K*d + J*d + total_K + J + 1, total_K*d + J*d + total_K + J + 2) 
-        #     optim_vector[k:k + 1] = delta
-        #     var_vector[k:k + 1] = variance[kvar:kvar+1]
-        #     k += 1
-        #     kvar += 1
-
-        #     print("after adding delta: global theta {} - local theta {}".format(k, kvar))
-
-        # elif param == "mu_e":
-        #     if "Phi" in parameter_names:
-        #         param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J + 2, total_K*d + J*d + J*d + total_K + J + 3)            
-        #     else:
-        #         param_positions_dict[param] = (total_K*d + J*d + total_K + J + 2, total_K*d + J*d + total_K + J + 3) 
-        #     optim_vector[k:k + 1] = mu_e
-        #     var_vector[k:k + 1] = variance[kvar:kvar+1]
-        #     k += 1
-        #     kvar += 1
-
-        #     print("after adding mu_e: global theta {} - local theta {}".format(k, kvar))
-
-        # elif param == "sigma_e":
-            # if "Phi" in parameter_names:
-            #     param_positions_dict[param] = (total_K*d + J*d + J*d + total_K + J + 3, total_K*d + J*d + J*d + total_K + J + 4)            
-            # else:
-            #     param_positions_dict[param] = (total_K*d + J*d + total_K + J + 3, total_K*d + J*d + total_K + J + 4) 
-            # optim_vector[k:k + 1] = sigma_e
-            # var_vector[k:k + 1] = variance[kvar:kvar+1]
-            # k += 1
-            # kvar += 1
-        
-            # print("after adding sigma_e: global theta {} - local theta {}".format(k, kvar))
-
-    return optim_vector, var_vector, param_positions_dict 
-
 def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e):
     
     param_positions_dict = dict()
@@ -329,43 +129,61 @@ def optimisation_dict2paramvectors(optim_vector, param_positions_dict, J, K, d, 
     return params_out
 
 
+def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0):
+    
+    # # for scale_e
+    # def positive_constraints(x):
+    #     """Constraint: scale_e should be positive - last entry in the optimisation vector"""
+    #     return x[-1]    
+    # def sum_zero_constraint(x):
+    #     """Constraint: Sum of Z's should be a constant - default 0, i.e. balanced politician set"""
+    #     return np.sum(x[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]])
+    bounds = [(None, None)]*(n-1)
+    bounds.append((0.0, None))
+    
+    return bounds, None
+
+
 def initialise_optimisation_vector_sobol(m=16, J=2, K=2, d=1):
 
     sobol_generators = dict()
-    sampler = qmc.Sobol(d=1, scramble=False)   
-    sample = sampler.random_base2(m=2)                               
-    gamma = float(sample[0])    
-    delta = float(sample[1])
-    sobol_generators["gammadelta"] = [sampler]
+    # sampler = qmc.Sobol(d=1, scramble=False)   
+    # sample = sampler.random_base2(m=m).flatten()
+    # gamma = sample[:int(len(sample)/2)]
+    # delta = sample[int(len(sample)/2):]
+    # sobol_generators["gammadelta"] = [sampler]
+    
+    # gamma-delta: unidimensional parameters, generate uniform grid
+    gamma = np.linspace(-2, 2, 100).tolist()
+    delta = np.linspace(-2, 2, 100).tolist()
     
     # sampler = qmc.Sobol(d=d, scramble=False)   
     # sample = sampler.random_base2(m=2)                               
     # c = sample[0]    
     # sobol_generators["c"] = [sampler]
 
+    # K will be quite high dimensional so better use Sobol sequence
     sampler = qmc.Sobol(d=K, scramble=False)   
-    sample = sampler.random_base2(m=2)                               
-    beta = sample[0]
+    sample = sampler.random_base2(m=m)                               
+    beta = sample.tolist()
     sobol_generators["beta"] = [sampler]
 
+    # J will be quite high dimensional so better use Sobol sequence
     sampler = qmc.Sobol(d=J, scramble=False)   
-    sample = sampler.random_base2(m=2)                               
-    alpha = sample[0]    
+    sample = sampler.random_base2(m=m)                               
+    alpha = sample.tolist()
     sobol_generators["alpha"] = [sampler]
 
+    # Could also use uniform grid, given that d=2
     sampler = qmc.Sobol(d=d, scramble=False)   
-    sample = sampler.random_base2(m=math.ceil(np.log2(J)))                               
-    Phi = sample[:J, :]
-    sample = sampler.random_base2(m=math.ceil(np.log2(J)))                               
-    Z = sample[:J, :]
-    sobol_generators["PhiZ"] = [sampler]
-
-    sampler = qmc.Sobol(d=d, scramble=False)   
-    sample = sampler.random_base2(m=math.ceil(np.log2(K)))                               
-    X = sample[:K, :]
+    sample = sampler.random_base2(m=m)
+    Phi = sample[:int(len(sample)/3), :].tolist()    
+    Z = sample[int(len(sample)/3):2*int(len(sample)/3), :].tolist()    
+    X = sample[2*int(len(sample)/3):, :].tolist()
+    sobol_generators["XZPhi"] = [sampler]
             
-    mu_e = 0
-    sigma_e = 1
+    mu_e = np.linspace(-1, 1, 100).tolist()
+    sigma_e = np.linspace(0.1, 2, 100).tolist()
 
     return X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e
 
