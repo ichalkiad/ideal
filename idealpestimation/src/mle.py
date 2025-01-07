@@ -166,7 +166,10 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e
-            nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-norm.cdf(phi, loc=errloc, scale=errscale))
+            if np.abs(norm.cdf(phi, loc=errloc, scale=errscale)) < 0.1:
+                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log1p(-norm.cdf(phi, loc=errloc, scale=errscale))
+            else:
+                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-norm.cdf(phi, loc=errloc, scale=errscale))
 
     return -nll
 
@@ -194,7 +197,10 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e
-            nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale))
+            if jnp.abs(jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale)) < 0.1:
+                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log1p(-jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale))
+            else:
+                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale))
 
     return -nll[0]
 
