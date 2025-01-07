@@ -229,39 +229,54 @@ def estimate_mle(args):
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
     
     # init parameter vector x0 - ensure 2**m > retries
-    m_sobol = 15
+    m_sobol = 12
     if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
         raise AttributeError("Generate more Sobol points")
     X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
-    
+    xidx_all = np.arange(0, len(X_list), 1)
+    zidx_all = np.arange(0, len(Z_list), 1)
+    if "Phi" in parameter_names:
+        phiidx_all = np.arange(0, len(Phi_list), 1)
+    alphaidx_all = np.arange(0, len(alpha_list), 1)    
+    betaidx_all = np.arange(0, len(beta_list), 1)    
+    gammaidx_all = np.arange(0, len(gamma_list), 1)
+    if "delta" in parameter_names:
+        deltaidx_all = np.arange(0, len(delta_list), 1)    
+    mueidx_all = np.arange(0, len(mu_e_list), 1)    
+    sigmaeidx_all = np.arange(0, len(sigma_e_list), 1)   
+
     retry = 0
     t0 = time.time()
     while retry < retries:   
         print("Retry: {}".format(retry))
 
-        xidx = np.random.randint(low=0, high=len(X_list), size=N)
+        xidx = np.random.choice(xidx_all, size=N, replace=False)
         Xrem = [X_list[ii] for ii in xidx]
         X = np.asarray(Xrem).reshape((d, N), order="F")
-        zidx = np.random.randint(low=0, high=len(Z_list), size=J)
+        zidx = np.random.choice(zidx_all, size=J, replace=False)
         Zrem = [Z_list[ii] for ii in zidx]
         Z = np.asarray(Zrem).reshape((d, J), order="F")
         if "Phi" in parameter_names:
-            phiidx = np.random.randint(low=0, high=len(Phi_list), size=J)
+            phiidx = np.random.choice(phiidx_all, size=J, replace=False)
             Phirem = [Phi_list[ii] for ii in phiidx]
             Phi = np.asarray(Phirem).reshape((d, J), order="F")
         else:
             Phi = None
-        alphaidx = np.random.randint(low=0, high=len(alpha_list), size=1)
+        alphaidx = np.random.choice(alphaidx_all, size=1, replace=False)
         alpha = np.asarray(alpha_list[alphaidx[0]])
-        betaidx = np.random.randint(low=0, high=len(beta_list), size=1)
+        betaidx = np.random.choice(betaidx_all, size=1, replace=False)
         beta = np.asarray(beta_list[betaidx[0]])
-        gamma = np.random.choice(gamma_list, size=1, replace=False).tolist()[0]                
+        gammaidx = np.random.choice(gammaidx_all, size=1, replace=False)
+        gamma = gamma_list[gammaidx[0]]
         if "delta" in parameter_names:
-            delta = np.random.choice(delta_list, size=1, replace=False)
+            deltaidx = np.random.choice(deltaidx_all, size=1, replace=False)
+            delta = delta_list[deltaidx[0]]
         else:
-            delta = None
-        mu_e = np.random.choice(mu_e_list, size=1, replace=False).tolist()[0]
-        sigma_e = np.random.choice(sigma_e_list, size=1, replace=False).tolist()[0]
+            delta = None        
+        mueidx = np.random.choice(mueidx_all, size=1, replace=False)
+        mu_e = mu_e_list[mueidx[0]]
+        sigmaeidx = np.random.choice(sigmaeidx_all, size=1, replace=False)
+        sigma_e = sigma_e_list[sigmaeidx[0]]
         
         x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
         # print(x0)
@@ -277,144 +292,19 @@ def estimate_mle(args):
             break
         else:                     
             for xr in xidx:
-                del X_list[xr]
+                del xidx_all[xr]
             for zr in zidx:
-                del Z_list[zr]
+                del zidx_all[zr]
             if "Phi" in parameter_names:
                 for phir in phiidx:
-                    del Phi_list[phir]
-            del alpha_list[alphaidx[0]]
-            del beta_list[betaidx[0]]            
+                    del phiidx_all[phir]
+            del alphaidx_all[alphaidx[0]]
+            del betaidx_all[betaidx[0]]            
+            del gammaidx_all[gammaidx[0]]            
+            del deltaidx_all[deltaidx[0]]            
             retry += 1
 
-    params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
-    variance_hat = optimisation_dict2paramvectors(result["variance"], param_positions_dict, J, K, d, parameter_names)
-    
-    grid_and_optim_outcome = dict()
-    grid_and_optim_outcome["PID"] = current_pid
-    grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-    grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-    time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
-    hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
-    grid_and_optim_outcome["elapsedtime_hours"] = hours
-    grid_and_optim_outcome["retry"] = retry
-    grid_and_optim_outcome["parameter names"] = parameter_names
-    grid_and_optim_outcome["local theta"] = [mle.tolist()]
-    grid_and_optim_outcome["X"] = params_hat["X"]
-    grid_and_optim_outcome["Z"] = params_hat["Z"]
-    if "Phi" in params_hat.keys():
-        grid_and_optim_outcome["Phi"] = params_hat["Phi"]
-    grid_and_optim_outcome["alpha"] = params_hat["alpha"]
-    grid_and_optim_outcome["beta"] = params_hat["beta"]
-    grid_and_optim_outcome["gamma"] = params_hat["gamma"]
-    if "delta" in params_hat.keys():
-        grid_and_optim_outcome["delta"] = params_hat["delta"]
-    grid_and_optim_outcome["mu_e"] = params_hat["mu_e"]
-    grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"]
-
-    grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
-    if "Phi" in params_hat.keys():
-        grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
-    grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
-    grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
-    if "delta" in params_hat.keys():
-        grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]
-    grid_and_optim_outcome["variance_mu_e"] = variance_hat["mu_e"]
-    grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
-    
-    grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
-    grid_and_optim_outcome["mle_estimation_status"] = result.success
-    grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
-
-    out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
-    with open(out_file, 'a') as f:         
-        writer = jsonlines.Writer(f)
-        writer.write(grid_and_optim_outcome)
-
-
-            
-class ProcessManagerSynthetic(ProcessManager):
-    def __init__(self, max_processes):
-        super().__init__(max_processes)
-    
-    def worker_process(self, args):
-
-        current_pid = os.getpid()
-        with self.execution_counter.get_lock():
-            self.execution_counter.value += 1
-            self.shared_dict[current_pid] = self.execution_counter.value
-        
-        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
-                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries = args
-
-        # load data    
-        with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
-            Y = pickle.load(f)
-        from_row = int(subdataset_name.split("_")[1])
-        to_row = int(subdataset_name.split("_")[2][:-7])
-        # since each batch has N rows
-        N = Y.shape[0]
-        Y = Y.astype(np.int8).reshape((N, J), order="F")         
-                
-        # init parameter vector x0 - ensure 2**m > retries
-        m_sobol = 15
-        if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
-            raise AttributeError("Generate more Sobol points")
-        X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
-        
-        retry = 0
-        t0 = time.time()
-        while retry < retries:   
-            print("Retry: {}".format(retry))
-
-            xidx = np.random.randint(low=0, high=len(X_list), size=N)
-            Xrem = [X_list[ii] for ii in xidx]
-            X = np.asarray(Xrem).reshape((d, N), order="F")
-            zidx = np.random.randint(low=0, high=len(Z_list), size=J)
-            Zrem = [Z_list[ii] for ii in zidx]
-            Z = np.asarray(Zrem).reshape((d, J), order="F")
-            if "Phi" in parameter_names:
-                phiidx = np.random.randint(low=0, high=len(Phi_list), size=J)
-                Phirem = [Phi_list[ii] for ii in phiidx]
-                Phi = np.asarray(Phirem).reshape((d, J), order="F")
-            else:
-                Phi = None
-            alphaidx = np.random.randint(low=0, high=len(alpha_list), size=1)
-            alpha = np.asarray(alpha_list[alphaidx[0]])
-            betaidx = np.random.randint(low=0, high=len(beta_list), size=1)
-            beta = np.asarray(beta_list[betaidx[0]])
-            gamma = np.random.choice(gamma_list, size=1, replace=False).tolist()[0]                
-            if "delta" in parameter_names:
-                delta = np.random.choice(delta_list, size=1, replace=False)
-            else:
-                delta = None
-            mu_e = np.random.choice(mu_e_list, size=1, replace=False).tolist()[0]
-            sigma_e = np.random.choice(sigma_e_list, size=1, replace=False).tolist()[0]
-            
-            x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
-            # print(x0)
-            nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
-            nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
-            mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
-                                                    variance_method='jacobian', disp=True, 
-                                                    optimization_method=optimisation_method, 
-                                                    data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
-                                                    loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
-                                                    output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict)          
-            if result.success:
-                break
-            else:                     
-                for xr in xidx:
-                    del X_list[xr]
-                for zr in zidx:
-                    del Z_list[zr]
-                if "Phi" in parameter_names:
-                    for phir in phiidx:
-                        del Phi_list[phir]
-                del alpha_list[alphaidx[0]]
-                del beta_list[betaidx[0]]            
-                retry += 1
-
+    if result.success:
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         variance_hat = optimisation_dict2paramvectors(result["variance"], param_positions_dict, J, K, d, parameter_names)
         
@@ -453,6 +343,225 @@ class ProcessManagerSynthetic(ProcessManager):
         grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
         grid_and_optim_outcome["mle_estimation_status"] = result.success
         grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
+    else:
+        grid_and_optim_outcome = dict()
+        grid_and_optim_outcome["PID"] = current_pid
+        grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
+        time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+        hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+        grid_and_optim_outcome["elapsedtime_hours"] = hours
+        grid_and_optim_outcome["retry"] = retry
+        grid_and_optim_outcome["parameter names"] = parameter_names
+        grid_and_optim_outcome["local theta"] = None
+        grid_and_optim_outcome["X"] = None
+        grid_and_optim_outcome["Z"] = None
+        if "Phi" in params_hat.keys():
+            grid_and_optim_outcome["Phi"] = None
+        grid_and_optim_outcome["alpha"] = None
+        grid_and_optim_outcome["beta"] = None
+        grid_and_optim_outcome["gamma"] = None
+        if "delta" in params_hat.keys():
+            grid_and_optim_outcome["delta"] = None
+        grid_and_optim_outcome["mu_e"] = None
+        grid_and_optim_outcome["sigma_e"] = None
+
+        grid_and_optim_outcome["variance_Z"] = None
+        if "Phi" in params_hat.keys():
+            grid_and_optim_outcome["variance_Phi"] = None
+        grid_and_optim_outcome["variance_alpha"] = None
+        grid_and_optim_outcome["variance_gamma"] = None
+        if "delta" in params_hat.keys():
+            grid_and_optim_outcome["variance_delta"] = None
+        grid_and_optim_outcome["variance_mu_e"] = None
+        grid_and_optim_outcome["variance_sigma_e"] = None
+        
+        grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
+        grid_and_optim_outcome["mle_estimation_status"] = result.success
+        grid_and_optim_outcome["variance_estimation_status"] = None
+
+
+    out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
+    with open(out_file, 'a') as f:         
+        writer = jsonlines.Writer(f)
+        writer.write(grid_and_optim_outcome)
+
+
+            
+class ProcessManagerSynthetic(ProcessManager):
+    def __init__(self, max_processes):
+        super().__init__(max_processes)
+    
+    def worker_process(self, args):
+
+        current_pid = os.getpid()
+        with self.execution_counter.get_lock():
+            self.execution_counter.value += 1
+            self.shared_dict[current_pid] = self.execution_counter.value
+        
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
+                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries = args
+
+        # load data    
+        with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
+            Y = pickle.load(f)
+        from_row = int(subdataset_name.split("_")[1])
+        to_row = int(subdataset_name.split("_")[2][:-7])
+        # since each batch has N rows
+        N = Y.shape[0]
+        Y = Y.astype(np.int8).reshape((N, J), order="F")         
+                
+        # init parameter vector x0 - ensure 2**m > retries
+        m_sobol = 12
+        if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
+            raise AttributeError("Generate more Sobol points")
+        X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
+        xidx_all = np.arange(0, len(X_list), 1)
+        zidx_all = np.arange(0, len(Z_list), 1)
+        if "Phi" in parameter_names:
+            phiidx_all = np.arange(0, len(Phi_list), 1)
+        alphaidx_all = np.arange(0, len(alpha_list), 1)    
+        betaidx_all = np.arange(0, len(beta_list), 1)    
+        gammaidx_all = np.arange(0, len(gamma_list), 1)
+        if "delta" in parameter_names:
+            deltaidx_all = np.arange(0, len(delta_list), 1)    
+        mueidx_all = np.arange(0, len(mu_e_list), 1)    
+        sigmaeidx_all = np.arange(0, len(sigma_e_list), 1)   
+
+        retry = 0
+        t0 = time.time()
+        while retry < retries:   
+            print("Retry: {}".format(retry))
+
+            xidx = np.random.choice(xidx_all, size=N, replace=False)
+            Xrem = [X_list[ii] for ii in xidx]
+            X = np.asarray(Xrem).reshape((d, N), order="F")
+            zidx = np.random.choice(zidx_all, size=J, replace=False)
+            Zrem = [Z_list[ii] for ii in zidx]
+            Z = np.asarray(Zrem).reshape((d, J), order="F")
+            if "Phi" in parameter_names:
+                phiidx = np.random.choice(phiidx_all, size=J, replace=False)
+                Phirem = [Phi_list[ii] for ii in phiidx]
+                Phi = np.asarray(Phirem).reshape((d, J), order="F")
+            else:
+                Phi = None
+            alphaidx = np.random.choice(alphaidx_all, size=1, replace=False)
+            alpha = np.asarray(alpha_list[alphaidx[0]])
+            betaidx = np.random.choice(betaidx_all, size=1, replace=False)
+            beta = np.asarray(beta_list[betaidx[0]])
+            gammaidx = np.random.choice(gammaidx_all, size=1, replace=False)
+            gamma = gamma_list[gammaidx[0]]
+            if "delta" in parameter_names:
+                deltaidx = np.random.choice(deltaidx_all, size=1, replace=False)
+                delta = delta_list[deltaidx[0]]
+            else:
+                delta = None        
+            mueidx = np.random.choice(mueidx_all, size=1, replace=False)
+            mu_e = mu_e_list[mueidx[0]]
+            sigmaeidx = np.random.choice(sigmaeidx_all, size=1, replace=False)
+            sigma_e = sigma_e_list[sigmaeidx[0]]
+            
+            x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
+            # print(x0)
+            nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
+            nloglik_jax = lambda x: negative_loglik_jax(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
+            mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
+                                                    variance_method='jacobian', disp=True, 
+                                                    optimization_method=optimisation_method, 
+                                                    data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
+                                                    loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
+                                                    output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict)          
+            if result.success:
+                break
+            else:                     
+                for xr in xidx:
+                    del xidx_all[xr]
+                for zr in zidx:
+                    del zidx_all[zr]
+                if "Phi" in parameter_names:
+                    for phir in phiidx:
+                        del phiidx_all[phir]
+                del alphaidx_all[alphaidx[0]]
+                del betaidx_all[betaidx[0]]            
+                del gammaidx_all[gammaidx[0]]            
+                del deltaidx_all[deltaidx[0]]            
+                retry += 1
+        
+        if result.success:
+            params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
+            variance_hat = optimisation_dict2paramvectors(result["variance"], param_positions_dict, J, K, d, parameter_names)
+            
+            grid_and_optim_outcome = dict()
+            grid_and_optim_outcome["PID"] = current_pid
+            grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
+            time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+            grid_and_optim_outcome["elapsedtime_hours"] = hours
+            grid_and_optim_outcome["retry"] = retry
+            grid_and_optim_outcome["parameter names"] = parameter_names
+            grid_and_optim_outcome["local theta"] = [mle.tolist()]
+            grid_and_optim_outcome["X"] = params_hat["X"]
+            grid_and_optim_outcome["Z"] = params_hat["Z"]
+            if "Phi" in params_hat.keys():
+                grid_and_optim_outcome["Phi"] = params_hat["Phi"]
+            grid_and_optim_outcome["alpha"] = params_hat["alpha"]
+            grid_and_optim_outcome["beta"] = params_hat["beta"]
+            grid_and_optim_outcome["gamma"] = params_hat["gamma"]
+            if "delta" in params_hat.keys():
+                grid_and_optim_outcome["delta"] = params_hat["delta"]
+            grid_and_optim_outcome["mu_e"] = params_hat["mu_e"]
+            grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"]
+
+            grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
+            if "Phi" in params_hat.keys():
+                grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
+            grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
+            grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
+            if "delta" in params_hat.keys():
+                grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]
+            grid_and_optim_outcome["variance_mu_e"] = variance_hat["mu_e"]
+            grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
+            
+            grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
+            grid_and_optim_outcome["mle_estimation_status"] = result.success
+            grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
+        else:
+            grid_and_optim_outcome = dict()
+            grid_and_optim_outcome["PID"] = current_pid
+            grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
+            time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+            grid_and_optim_outcome["elapsedtime_hours"] = hours
+            grid_and_optim_outcome["retry"] = retry
+            grid_and_optim_outcome["parameter names"] = parameter_names
+            grid_and_optim_outcome["local theta"] = None
+            grid_and_optim_outcome["X"] = None
+            grid_and_optim_outcome["Z"] = None
+            if "Phi" in params_hat.keys():
+                grid_and_optim_outcome["Phi"] = None
+            grid_and_optim_outcome["alpha"] = None
+            grid_and_optim_outcome["beta"] = None
+            grid_and_optim_outcome["gamma"] = None
+            if "delta" in params_hat.keys():
+                grid_and_optim_outcome["delta"] = None
+            grid_and_optim_outcome["mu_e"] = None
+            grid_and_optim_outcome["sigma_e"] = None
+
+            grid_and_optim_outcome["variance_Z"] = None
+            if "Phi" in params_hat.keys():
+                grid_and_optim_outcome["variance_Phi"] = None
+            grid_and_optim_outcome["variance_alpha"] = None
+            grid_and_optim_outcome["variance_gamma"] = None
+            if "delta" in params_hat.keys():
+                grid_and_optim_outcome["variance_delta"] = None
+            grid_and_optim_outcome["variance_mu_e"] = None
+            grid_and_optim_outcome["variance_sigma_e"] = None
+            
+            grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
+            grid_and_optim_outcome["mle_estimation_status"] = result.success
+            grid_and_optim_outcome["variance_estimation_status"] = None
             
         out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
         self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
@@ -564,10 +673,10 @@ if __name__ == "__main__":
         dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
-    # for m in range(M):
-    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
-    #     params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
-    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
-    #     with open(out_file, 'a') as f:         
-    #         writer = jsonlines.Writer(f)
-    #         writer.write(params_out)
+    for m in range(M):
+        data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+        params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
+        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out)
