@@ -344,7 +344,8 @@ class ProcessManagerSynthetic(ProcessManager):
             self.execution_counter.value += 1
             self.shared_dict[current_pid] = self.execution_counter.value
         
-        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m = args
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
+                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries = args
 
         # load data    
         with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
