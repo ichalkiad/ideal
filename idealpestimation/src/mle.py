@@ -652,7 +652,7 @@ if __name__ == "__main__":
     
     jax.default_device = jax.devices("cpu")[0]
     jax.config.update("jax_traceback_filtering", "off")
-    parallel = False
+    parallel = True
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = None
