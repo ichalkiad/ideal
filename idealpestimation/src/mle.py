@@ -71,7 +71,7 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                 if np.any(np.isnan(variance)):                                
                     raise ArithmeticError
                 else:
-                    return variance, hess, np.diag(variance)
+                    return variance, hess, np.diag(variance), True
             if diag_hessian_only:   
                 if parallel:
                     variance = np.diag(estimation_result.hess_inv * np.eye(len(params)))
@@ -657,7 +657,7 @@ if __name__ == "__main__":
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = None
-    penalty_weight_Z = 500.0
+    penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 10
     # In parameter names keep the order fixed as is
