@@ -233,17 +233,17 @@ def estimate_mle(args):
     if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
         raise AttributeError("Generate more Sobol points")
     X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
-    xidx_all = np.arange(0, len(X_list), 1)
-    zidx_all = np.arange(0, len(Z_list), 1)
+    xidx_all = np.arange(0, len(X_list), 1).tolist()
+    zidx_all = np.arange(0, len(Z_list), 1).tolist()
     if "Phi" in parameter_names:
-        phiidx_all = np.arange(0, len(Phi_list), 1)
-    alphaidx_all = np.arange(0, len(alpha_list), 1)    
-    betaidx_all = np.arange(0, len(beta_list), 1)    
-    gammaidx_all = np.arange(0, len(gamma_list), 1)
+        phiidx_all = np.arange(0, len(Phi_list), 1).tolist()
+    alphaidx_all = np.arange(0, len(alpha_list), 1).tolist()    
+    betaidx_all = np.arange(0, len(beta_list), 1).tolist()    
+    gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
     if "delta" in parameter_names:
-        deltaidx_all = np.arange(0, len(delta_list), 1)    
-    mueidx_all = np.arange(0, len(mu_e_list), 1)    
-    sigmaeidx_all = np.arange(0, len(sigma_e_list), 1)   
+        deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
+    mueidx_all = np.arange(0, len(mu_e_list), 1).tolist()    
+    sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()   
 
     retry = 0
     t0 = time.time()
@@ -416,17 +416,17 @@ class ProcessManagerSynthetic(ProcessManager):
         if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
             raise AttributeError("Generate more Sobol points")
         X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
-        xidx_all = np.arange(0, len(X_list), 1)
-        zidx_all = np.arange(0, len(Z_list), 1)
+        xidx_all = np.arange(0, len(X_list), 1).tolist()
+        zidx_all = np.arange(0, len(Z_list), 1).tolist()
         if "Phi" in parameter_names:
-            phiidx_all = np.arange(0, len(Phi_list), 1)
-        alphaidx_all = np.arange(0, len(alpha_list), 1)    
-        betaidx_all = np.arange(0, len(beta_list), 1)    
-        gammaidx_all = np.arange(0, len(gamma_list), 1)
+            phiidx_all = np.arange(0, len(Phi_list), 1).tolist()
+        alphaidx_all = np.arange(0, len(alpha_list), 1).tolist()    
+        betaidx_all = np.arange(0, len(beta_list), 1).tolist()    
+        gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
         if "delta" in parameter_names:
-            deltaidx_all = np.arange(0, len(delta_list), 1)    
-        mueidx_all = np.arange(0, len(mu_e_list), 1)    
-        sigmaeidx_all = np.arange(0, len(sigma_e_list), 1)   
+            deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
+        mueidx_all = np.arange(0, len(mu_e_list), 1).tolist()    
+        sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()   
 
         retry = 0
         t0 = time.time()
