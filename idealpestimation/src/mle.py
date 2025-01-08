@@ -26,8 +26,9 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                             create_constraint_functions
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
-                        data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None):
+                        data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
 
+    # ipdb.set_trace()
     params = estimation_result.x        
     try:                        
         if params.shape[0] == 1:
@@ -45,7 +46,11 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
             # Compute variance as the inverse of the Fisher Information
             # Add small regularization to prevent singularity
             variance = np.linalg.inv(sigma_sq_inv + 1e-8 * np.eye(len(params)))
-            hess = hessian(loglikelihood)(params)  
+            if parallel:
+                hess = np.linalg.inv(estimation_result.hess_inv * np.ones(len(params)) + 1e-8 * np.eye(len(params)))
+            else:
+                # due to JAX incompatibility with Python's multiprocessing
+                hess = hessian(loglikelihood)(params)  
             if np.isnan(variance):
                 # error status
                 return sigma_sq_inv, hess, variance, False
@@ -54,19 +59,26 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                 return sigma_sq_inv, hess, variance, True
         else:
             if full_hessian:
-                # Use Hessian approximation to compute Fisher Information as the sample Hessian                                                  
-                params_jax = jnp.asarray(params)                  
-                hess = np.asarray(hessian(nloglik_jax)(params_jax)                                     )
-                # Add small regularization to prevent singularity
-                variance = -np.linalg.inv(hess + 1e-8 * np.eye(len(params)))            
+                if parallel:                    
+                    hess = np.linalg.inv(estimation_result.hess_inv * np.ones(len(params)) + 1e-8 * np.eye(len(params)))                    
+                    variance = estimation_result.hess_inv * np.ones(len(params))
+                else:
+                    # Use Hessian approximation to compute Fisher Information as the sample Hessian                                                  
+                    params_jax = jnp.asarray(params)                  
+                    hess = np.asarray(hessian(nloglik_jax)(params_jax)                                     )
+                    # Add small regularization to prevent singularity
+                    variance = -np.linalg.inv(hess + 1e-8 * np.eye(len(params)))            
                 if np.any(np.isnan(variance)):                                
                     raise ArithmeticError
                 else:
                     return variance, hess, np.diag(variance)
-            if diag_hessian_only:                
-                params_jax = jnp.asarray(params)                  
-                hess_jax = get_hessian_diag_jax(nloglik_jax, params_jax)                                     
-                variance = -1/np.asarray(hess_jax)            
+            if diag_hessian_only:   
+                if parallel:
+                    variance = np.diag(estimation_result.hess_inv * np.eye(len(params)))
+                else:             
+                    params_jax = jnp.asarray(params)                  
+                    hess_jax = get_hessian_diag_jax(nloglik_jax, params_jax)                                     
+                    variance = -1/np.asarray(hess_jax)            
                 if np.any(np.isnan(variance)):    
                     if hasattr(estimation_result, 'hess_inv') and estimation_result["hess_inv"] is not None:
                         if not isinstance(estimation_result["hess_inv"], np.ndarray):
@@ -88,7 +100,7 @@ def maximum_likelihood_estimator(
     data=None, full_hessian=True, diag_hessian_only=True,
     loglikelihood_per_data_point=None, disp=False, niter=None, 
     jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None, 
-    subdataset_name=None, param_positions_dict=None):
+    subdataset_name=None, param_positions_dict=None, parallel=False):
     """
     Estimate the maximum likelihood parameter and its variance.
 
@@ -123,7 +135,8 @@ def maximum_likelihood_estimator(
     try:        
         variance_noninv, hessian, variance_diag, variance_status = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
                                        data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
-                                       loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax)
+                                       loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax, parallel=parallel)
+        # ipdb.set_trace()
         result["variance_method"] = variance_method
         result["variance"] = variance_diag
         result["variance_status"] = variance_status
@@ -216,7 +229,7 @@ def estimate_mle(args):
 
     current_pid = os.getpid()    
     DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
-                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries = args
+                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel = args
 
     # load data    
     with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
@@ -287,7 +300,7 @@ def estimate_mle(args):
                                                 optimization_method=optimisation_method, 
                                                 data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
-                                                output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict)          
+                                                output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
         if result.success:
             break
         else:                     
@@ -400,7 +413,7 @@ class ProcessManagerSynthetic(ProcessManager):
             self.shared_dict[current_pid] = self.execution_counter.value
         
         DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
-                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries = args
+                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel = args
 
         # load data    
         with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
@@ -470,7 +483,7 @@ class ProcessManagerSynthetic(ProcessManager):
                                                     optimization_method=optimisation_method, 
                                                     data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                                     loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
-                                                    output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict)          
+                                                    output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
             if result.success:
                 break
             else:                     
@@ -588,7 +601,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     for dataset_index in range(len(subdatasets_names)):                    
                         subdataset_name = subdatasets_names[dataset_index]                        
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries)    
+                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)    
                                             
                         #####  parallelisation with Parallel Manager #####
                         manager.cleanup_finished_processes()
@@ -614,7 +627,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                 for dataset_index in range(len(subdatasets_names)):               
                     subdataset_name = subdatasets_names[dataset_index]                    
                     args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries)
+                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)
                     estimate_mle(args)                  
 
     except KeyboardInterrupt:
@@ -632,10 +645,14 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
 
 if __name__ == "__main__":
+
+    seed_value = 8125
+    random.seed(seed_value)
+    np.random.seed(seed_value)
     
     jax.default_device = jax.devices("cpu")[0]
     jax.config.update("jax_traceback_filtering", "off")
-    parallel = True
+    parallel = False
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = None
