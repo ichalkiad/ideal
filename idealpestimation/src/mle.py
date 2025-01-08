@@ -23,7 +23,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
-                                                            create_constraint_functions
+                                                            create_constraint_functions, p_ij_arg
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
@@ -160,32 +160,21 @@ def maximum_likelihood_estimator(
 
 def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z):
 
-    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
-    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
-    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")      
-    if "Phi" in params_hat.keys(): 
-        Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
-        delta = params_hat["delta"]
-    else:
-        Phi = np.zeros(Z.shape)
-        delta = 0
-    alpha = params_hat["alpha"]
-    beta = params_hat["beta"]
-    # c = params_hat["c"]
-    gamma = params_hat["gamma"]    
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")    
     nll = 0
     for i in range(K):
         for j in range(J):
-            phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+            pij_arg = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
             errscale = sigma_e
             errloc = mu_e
-            phicdf = norm.cdf(phi, loc=errloc, scale=errscale)
-            if np.abs(phicdf) < 0.1:
-                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log1p(-phicdf)
+            phicdf = norm.cdf(pij_arg, loc=errloc, scale=errscale)
+            if np.abs(phicdf) < 0.0001:                
+                nll += Y[i, j]*norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log1p(-phicdf)
             else:
-                nll += Y[i, j]*norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-phicdf)
+                nll += Y[i, j]*norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-phicdf)
 
     sum_Z_J_vectors = np.sum(Z, axis=1)    
     return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
@@ -211,15 +200,14 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     dst_func = lambda x, y: jnp.sum((x-y)**2)
     for i in range(K):
         for j in range(J):
-            phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+            pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e
-            phicdf = jax.scipy.stats.norm.cdf(phi, loc=errloc, scale=errscale)
-            if jnp.abs(phicdf) < 0.1:
-                print(phicdf)
-                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log1p(-phicdf)
+            phicdf = jax.scipy.stats.norm.cdf(pij_arg, loc=errloc, scale=errscale)
+            if jnp.abs(phicdf) < 0.0001:                
+                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log1p(-phicdf)
             else:
-                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(phi, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-phicdf)
+                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-phicdf)
 
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + penalty_weight_Z * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
@@ -301,23 +289,26 @@ def estimate_mle(args):
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
-                                                data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
+                                                data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                 output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
         if result.success:
             break
-        else:                     
+        else:              
             for xr in xidx:
-                del xidx_all[xr]
+                xidx_all.remove(xr)                
             for zr in zidx:
-                del zidx_all[zr]
+                zidx_all.remove(zr)                
             if "Phi" in parameter_names:
                 for phir in phiidx:
-                    del phiidx_all[phir]
-            del alphaidx_all[alphaidx[0]]
-            del betaidx_all[betaidx[0]]            
-            del gammaidx_all[gammaidx[0]]            
-            del deltaidx_all[deltaidx[0]]            
+                    phiidx_all.remove(phir)
+            alphaidx_all.remove(alphaidx[0])
+            betaidx_all.remove(betaidx[0])
+            gammaidx_all.remove(gammaidx[0])
+            if "delta" in parameter_names:
+                deltaidx_all.remove(deltaidx[0])
+            mueidx_all.remove(mueidx[0])
+            sigmaeidx_all.remove(sigmaeidx[0])
             retry += 1
 
     if result.success:
@@ -487,23 +478,26 @@ class ProcessManagerSynthetic(ProcessManager):
             mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                     variance_method='jacobian', disp=True, 
                                                     optimization_method=optimisation_method, 
-                                                    data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
+                                                    data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                     loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                     output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
             if result.success:
                 break
             else:                     
                 for xr in xidx:
-                    del xidx_all[xr]
+                    xidx_all.remove(xr)                
                 for zr in zidx:
-                    del zidx_all[zr]
+                    zidx_all.remove(zr)                
                 if "Phi" in parameter_names:
                     for phir in phiidx:
-                        del phiidx_all[phir]
-                del alphaidx_all[alphaidx[0]]
-                del betaidx_all[betaidx[0]]            
-                del gammaidx_all[gammaidx[0]]            
-                del deltaidx_all[deltaidx[0]]            
+                        phiidx_all.remove(phir)
+                alphaidx_all.remove(alphaidx[0])
+                betaidx_all.remove(betaidx[0])
+                gammaidx_all.remove(gammaidx[0])
+                if "delta" in parameter_names:
+                    deltaidx_all.remove(deltaidx[0])
+                mueidx_all.remove(mueidx[0])
+                sigmaeidx_all.remove(sigmaeidx[0])    
                 retry += 1
         
         if result.success:
@@ -652,18 +646,18 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-    seed_value = 8125
+    seed_value = 9125
     random.seed(seed_value)
     np.random.seed(seed_value)
     
     parallel = True
     if not parallel:
-        jax.default_device = jax.devices("cpu")[0]
+        jax.default_device = jax.devices("gpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = None
-    penalty_weight_Z = 50.0
+    penalty_weight_Z = 500.0
     constant_Z = 0.0
     retries = 10
     # In parameter names keep the order fixed as is
