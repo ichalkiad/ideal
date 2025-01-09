@@ -28,7 +28,6 @@ from idealpestimation.src.utils import params2optimisation_dict, \
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
 
-    # ipdb.set_trace()
     params = estimation_result.x        
     try:                        
         if params.shape[0] == 1:
@@ -132,29 +131,34 @@ def maximum_likelihood_estimator(
     
     mle = result.x          
 
-    try:        
-        variance_noninv, hessian, variance_diag, variance_status = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
-                                       data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
-                                       loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax, parallel=parallel)
-        # ipdb.set_trace()
-        result["variance_method"] = variance_method
-        result["variance"] = variance_diag
-        result["variance_status"] = variance_status
-        if full_hessian:
-            result["full_hessian"] = hessian
-            if plot_hessian:
-                fig = visualise_hessian(hessian)
-                fix_plot_layout_and_save(fig, "{}/hessian_{}_{}.html".format(output_dir, subdataset_name, datetime.now().strftime("%Y-%m-%d")),
-                                        xaxis_title="", yaxis_title="", title="Full Hessian matrix estimate", showgrid=False, showlegend=False,
-                                        print_png=True, print_html=True, print_pdf=False)
-                
-    except ArithmeticError as e:            
-        # Fallback to zero variance if computation fails
-        print(f"Variance estimation failed: {e}")
-        variance = np.zeros((mle.shape[0], mle.shape[0]))
-        result["variance_method"] = "{}".format(variance_method)
-        result["variance"] = variance
-        result["variance_status"] = variance_status
+    if result.success:
+        try:        
+            variance_noninv, hessian, variance_diag, variance_status = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
+                                        data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
+                                        loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax, parallel=parallel)
+            result["variance_method"] = variance_method
+            result["variance_diag"] = variance_diag
+            result["variance_status"] = variance_status
+            if full_hessian:
+                result["full_hessian"] = hessian
+                if plot_hessian:
+                    fig = visualise_hessian(hessian)
+                    fix_plot_layout_and_save(fig, "{}/hessian_{}_{}.html".format(output_dir, subdataset_name.replace(".pickle", ""), datetime.now().strftime("%Y-%m-%d")),
+                                            xaxis_title="", yaxis_title="", title="Full Hessian matrix estimate", showgrid=False, showlegend=False,
+                                            print_png=True, print_html=True, print_pdf=False)
+                    
+        except ArithmeticError as e:            
+            # Fallback to zero variance if computation fails
+            print(f"Variance estimation failed: {e}")
+            variance_diag = np.zeros((mle.shape[0],))
+            result["variance_method"] = "{}".format(variance_method)
+            result["variance_diag"] = variance_diag
+            result["variance_status"] = variance_status
+    else:
+        result["variance_method"] = None
+        result["variance_diag"] = np.zeros((mle.shape[0],))
+        result["variance_status"] = False
+
         
     return mle, result
 
@@ -171,7 +175,7 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
             errscale = sigma_e
             errloc = mu_e
             phicdf = norm.cdf(pij_arg, loc=errloc, scale=errscale)
-            if np.abs(phicdf) < 0.0001:                
+            if np.abs(phicdf) < 1e-10:                
                 nll += Y[i, j]*norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log1p(-phicdf)
             else:
                 nll += Y[i, j]*norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-phicdf)
@@ -204,7 +208,7 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
             errscale = sigma_e
             errloc = mu_e
             phicdf = jax.scipy.stats.norm.cdf(pij_arg, loc=errloc, scale=errscale)
-            if jnp.abs(phicdf) < 0.0001:                
+            if jnp.abs(phicdf) < 1e-10:                
                 nll += Y[i, j]*jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log1p(-phicdf)
             else:
                 nll += Y[i, j]*jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-phicdf)
@@ -220,12 +224,11 @@ def estimate_mle(args):
                                                                             parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel = args
 
     # load data    
-    with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
+    with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f:
         Y = pickle.load(f)
     from_row = int(subdataset_name.split("_")[1])
-    to_row = int(subdataset_name.split("_")[2][:-7])
-    # since each batch has N rows
-    
+    to_row = int(subdataset_name.split("_")[2])
+    # since each batch has N rows    
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
     
@@ -292,6 +295,7 @@ def estimate_mle(args):
                                                 data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                 output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
+        
         if result.success:
             break
         else:              
@@ -313,30 +317,29 @@ def estimate_mle(args):
 
     if result.success:
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
-        variance_hat = optimisation_dict2paramvectors(result["variance"], param_positions_dict, J, K, d, parameter_names)
-        
+        variance_hat = optimisation_dict2paramvectors(result["variance_diag"], param_positions_dict, J, K, d, parameter_names) 
+
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
         grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-        time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
         hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
         grid_and_optim_outcome["parameter names"] = parameter_names
         grid_and_optim_outcome["local theta"] = [mle.tolist()]
-        grid_and_optim_outcome["X"] = params_hat["X"]
-        grid_and_optim_outcome["Z"] = params_hat["Z"]
+        grid_and_optim_outcome["X"] = params_hat["X"].reshape((d*N,), order="F").tolist()  
+        grid_and_optim_outcome["Z"] = params_hat["Z"].reshape((d*J,), order="F").tolist()     
         if "Phi" in params_hat.keys():
-            grid_and_optim_outcome["Phi"] = params_hat["Phi"]
-        grid_and_optim_outcome["alpha"] = params_hat["alpha"]
-        grid_and_optim_outcome["beta"] = params_hat["beta"]
-        grid_and_optim_outcome["gamma"] = params_hat["gamma"]
+            grid_and_optim_outcome["Phi"] = params_hat["Phi"].reshape((d*J,), order="F").tolist() 
+        grid_and_optim_outcome["alpha"] = params_hat["alpha"].tolist() 
+        grid_and_optim_outcome["beta"] = params_hat["beta"].tolist() 
+        grid_and_optim_outcome["gamma"] = params_hat["gamma"].tolist()[0]
         if "delta" in params_hat.keys():
-            grid_and_optim_outcome["delta"] = params_hat["delta"]
-        grid_and_optim_outcome["mu_e"] = params_hat["mu_e"]
-        grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"]
-
+            grid_and_optim_outcome["delta"] = params_hat["delta"].tolist()[0]
+        grid_and_optim_outcome["mu_e"] = params_hat["mu_e"].tolist()[0]
+        grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"].tolist()[0]
         grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
         if "Phi" in params_hat.keys():
             grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
@@ -355,7 +358,7 @@ def estimate_mle(args):
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
         grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-        time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
         hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
@@ -363,22 +366,22 @@ def estimate_mle(args):
         grid_and_optim_outcome["local theta"] = None
         grid_and_optim_outcome["X"] = None
         grid_and_optim_outcome["Z"] = None
-        if "Phi" in params_hat.keys():
+        if "Phi" in parameter_names:
             grid_and_optim_outcome["Phi"] = None
         grid_and_optim_outcome["alpha"] = None
         grid_and_optim_outcome["beta"] = None
         grid_and_optim_outcome["gamma"] = None
-        if "delta" in params_hat.keys():
+        if "delta" in parameter_names:
             grid_and_optim_outcome["delta"] = None
         grid_and_optim_outcome["mu_e"] = None
         grid_and_optim_outcome["sigma_e"] = None
 
         grid_and_optim_outcome["variance_Z"] = None
-        if "Phi" in params_hat.keys():
+        if "Phi" in parameter_names:
             grid_and_optim_outcome["variance_Phi"] = None
         grid_and_optim_outcome["variance_alpha"] = None
         grid_and_optim_outcome["variance_gamma"] = None
-        if "delta" in params_hat.keys():
+        if "delta" in parameter_names:
             grid_and_optim_outcome["variance_delta"] = None
         grid_and_optim_outcome["variance_mu_e"] = None
         grid_and_optim_outcome["variance_sigma_e"] = None
@@ -410,10 +413,10 @@ class ProcessManagerSynthetic(ProcessManager):
                                                                             parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel = args
 
         # load data    
-        with open("{}/{}/{}".format(data_location, m, subdataset_name), "rb") as f:
+        with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f:
             Y = pickle.load(f)
         from_row = int(subdataset_name.split("_")[1])
-        to_row = int(subdataset_name.split("_")[2][:-7])
+        to_row = int(subdataset_name.split("_")[2])
         # since each batch has N rows
         N = Y.shape[0]
         Y = Y.astype(np.int8).reshape((N, J), order="F")         
@@ -502,30 +505,29 @@ class ProcessManagerSynthetic(ProcessManager):
         
         if result.success:
             params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
-            variance_hat = optimisation_dict2paramvectors(result["variance"], param_positions_dict, J, K, d, parameter_names)
-            
+            variance_hat = optimisation_dict2paramvectors(result["variance_diag"], param_positions_dict, J, K, d, parameter_names) 
+
             grid_and_optim_outcome = dict()
             grid_and_optim_outcome["PID"] = current_pid
             grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
             grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
             hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
             grid_and_optim_outcome["elapsedtime_hours"] = hours
             grid_and_optim_outcome["retry"] = retry
             grid_and_optim_outcome["parameter names"] = parameter_names
             grid_and_optim_outcome["local theta"] = [mle.tolist()]
-            grid_and_optim_outcome["X"] = params_hat["X"]
-            grid_and_optim_outcome["Z"] = params_hat["Z"]
+            grid_and_optim_outcome["X"] = params_hat["X"].reshape((d*N,), order="F").tolist()  
+            grid_and_optim_outcome["Z"] = params_hat["Z"].reshape((d*J,), order="F").tolist()     
             if "Phi" in params_hat.keys():
-                grid_and_optim_outcome["Phi"] = params_hat["Phi"]
-            grid_and_optim_outcome["alpha"] = params_hat["alpha"]
-            grid_and_optim_outcome["beta"] = params_hat["beta"]
-            grid_and_optim_outcome["gamma"] = params_hat["gamma"]
+                grid_and_optim_outcome["Phi"] = params_hat["Phi"].reshape((d*J,), order="F").tolist() 
+            grid_and_optim_outcome["alpha"] = params_hat["alpha"].tolist() 
+            grid_and_optim_outcome["beta"] = params_hat["beta"].tolist() 
+            grid_and_optim_outcome["gamma"] = params_hat["gamma"].tolist()[0]
             if "delta" in params_hat.keys():
-                grid_and_optim_outcome["delta"] = params_hat["delta"]
-            grid_and_optim_outcome["mu_e"] = params_hat["mu_e"]
-            grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"]
-
+                grid_and_optim_outcome["delta"] = params_hat["delta"].tolist()[0]
+            grid_and_optim_outcome["mu_e"] = params_hat["mu_e"].tolist()[0]
+            grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"].tolist()[0]
             grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
             if "Phi" in params_hat.keys():
                 grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
@@ -544,7 +546,7 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome["PID"] = current_pid
             grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
             grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
             hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
             grid_and_optim_outcome["elapsedtime_hours"] = hours
             grid_and_optim_outcome["retry"] = retry
@@ -595,11 +597,11 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             while True:
                 for m in range(trials):
                     path = pathlib.Path("{}/{}".format(data_location, m))  
-                    subdatasets_names = [file.name for file in path.iterdir() if file.is_file() and "dataset_" in file.name]
-                    DIR_out = "{}/{}/estimation/".format(DIR_top, m)
-                    pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
+                    subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
                     for dataset_index in range(len(subdatasets_names)):                    
                         subdataset_name = subdatasets_names[dataset_index]                        
+                        DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name)
+                        pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                                 parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)    
                                             
@@ -621,11 +623,11 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
         else:
             for m in range(trials):
                 path = pathlib.Path("{}/{}".format(data_location, m))  
-                subdatasets_names = [file.name for file in path.iterdir() if file.is_file() and "dataset_" in file.name]
-                DIR_out = "{}/{}/estimation/".format(DIR_top, m)
-                pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
+                subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                 for dataset_index in range(len(subdatasets_names)):               
                     subdataset_name = subdatasets_names[dataset_index]                    
+                    DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name)
+                    pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                     args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                             parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)
                     estimate_mle(args)                  
@@ -666,8 +668,8 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
     M = 1
-    K = 1000
-    J = 100
+    K = 500
+    J = 50
     sigma_e_true = 0.5
     d = 2    
     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))  #/home/ioannischalkiadakis/ideal
@@ -692,8 +694,8 @@ if __name__ == "__main__":
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
     # for m in range(M):
-    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
-    #     params_out = combine_estimate_variance_rule("{}/estimation/".format(data_location), J, K, d, parameter_names)    
+    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+    #     params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
     #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
     #     with open(out_file, 'a') as f:         
     #         writer = jsonlines.Writer(f)
