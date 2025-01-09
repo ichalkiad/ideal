@@ -554,22 +554,22 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome["local theta"] = None
             grid_and_optim_outcome["X"] = None
             grid_and_optim_outcome["Z"] = None
-            if "Phi" in params_hat.keys():
+            if "Phi" in parameter_names:
                 grid_and_optim_outcome["Phi"] = None
             grid_and_optim_outcome["alpha"] = None
             grid_and_optim_outcome["beta"] = None
             grid_and_optim_outcome["gamma"] = None
-            if "delta" in params_hat.keys():
+            if "delta" in parameter_names:
                 grid_and_optim_outcome["delta"] = None
             grid_and_optim_outcome["mu_e"] = None
             grid_and_optim_outcome["sigma_e"] = None
 
             grid_and_optim_outcome["variance_Z"] = None
-            if "Phi" in params_hat.keys():
+            if "Phi" in parameter_names:
                 grid_and_optim_outcome["variance_Phi"] = None
             grid_and_optim_outcome["variance_alpha"] = None
             grid_and_optim_outcome["variance_gamma"] = None
-            if "delta" in params_hat.keys():
+            if "delta" in parameter_names:
                 grid_and_optim_outcome["variance_delta"] = None
             grid_and_optim_outcome["variance_mu_e"] = None
             grid_and_optim_outcome["variance_sigma_e"] = None
@@ -577,7 +577,7 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
             grid_and_optim_outcome["mle_estimation_status"] = result.success
             grid_and_optim_outcome["variance_estimation_status"] = None
-            
+                
         out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
         self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
 
@@ -652,7 +652,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
     
-    parallel = True
+    parallel = False
     if not parallel:
         jax.default_device = jax.devices("gpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
@@ -668,11 +668,11 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
     M = 1
-    K = 500
-    J = 50
+    K = 50
+    J = 20
     sigma_e_true = 0.5
     d = 2    
-    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))  #/home/ioannischalkiadakis/ideal
+    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30              
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
@@ -694,7 +694,8 @@ if __name__ == "__main__":
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
     # for m in range(M):
-    #     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+    #     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+    #     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
     #     params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
     #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
     #     with open(out_file, 'a') as f:         

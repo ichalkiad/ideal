@@ -4,7 +4,7 @@ import math
 import numpy as np
 import math
 import pathlib
-from scipy.stats import norm
+from scipy.stats import norm, multivariate_normal
 import plotly.graph_objs as go
 import plotly.io as pio
 import jax.numpy as jnp
@@ -13,7 +13,7 @@ import jsonlines
 from scipy.optimize import approx_fprime
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
-                             print_png=True, print_html=True, print_pdf=True):
+                            print_png=True, print_html=True, print_pdf=True):
         fig.update_xaxes(showline=True, linewidth=2, linecolor='black')
         fig.update_yaxes(showline=True, linewidth=2, linecolor='black')
         fig.update_layout(title=title, plot_bgcolor='rgb(255,255,255)',
@@ -147,7 +147,7 @@ def initialise_optimisation_vector_sobol(m=16, J=2, K=2, d=1):
 
     sobol_generators = dict()
     # sampler = qmc.Sobol(d=1, scramble=False)   
-    # sample = sampler.random_base2(m=m).flatten()
+    # sample = sampler.random_base2(m=m)
     # gamma = sample[:int(len(sample)/2)]
     # delta = sample[int(len(sample)/2):]
     # sobol_generators["gammadelta"] = [sampler]
@@ -259,31 +259,33 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
         weighted_estimate = None
         all_weights = []
         all_estimates = []
-        subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
+        subdatasets_names = ["dataset_102_136"] #[file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
         for dataset_index in range(len(subdatasets_names)):                    
             subdataset_name = subdatasets_names[dataset_index]                        
-            DIR_out = "{}/{}/estimation/".format(DIR_out, subdataset_name)
+            DIR_read = "{}/{}/estimation/".format(DIR_out, subdataset_name)
+            path = pathlib.Path(DIR_read)  
             estimates_names = [file.name for file in path.iterdir() if file.is_file() and "estimationresult_dataset" in file.name]
             for estim in estimates_names:
-                with jsonlines.open("{}/{}".format(DIR_out, estim), mode="r") as f: 
+                with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
                     for result in f.iter(type=dict, skip_invalid=True):                                      
                         if param in ["X", "beta"]:
                             # single estimate per data split
                             theta = result[param]
                             namesplit = estim.split("_")
-                            start = int(namesplit[2])
-                            end   = int(namesplit[3].replace(".jsonl", ""))
+                            start = int(namesplit[2])*d
+                            end   = int(namesplit[3].replace(".jsonl", ""))*d
                             params_out[param][:, start:end] = theta
-                        else:
+                        else:                            
                             weight = result["variance_{}".format(param)]
                             theta = result[param]
-                            all_weights.append(weight[0])
-                            all_estimates.append(theta[0])
+                            all_weights.append(weight)
+                            all_estimates.append(theta)
         if param == "X":
             params_out[param] = params_out[param].reshape((d*K,), order="F").tolist()    
         elif param == "beta":
             params_out[param] = params_out[param].reshape((K,), order="F").tolist()    
         else:
+            ipdb.set_trace()
             all_weights = np.stack(all_weights)
             all_estimates = np.stack(all_estimates)
             # sum acrocs each coordinate's weight
@@ -293,7 +295,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
             # element-wise multiplication
             weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
             params_out[param] = weighted_estimate
-    
+    ipdb.set_trace()
     return params_out
 
 ####################### MLE #############################
@@ -330,36 +332,45 @@ def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, d
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                         
     X[:, i] = xi
+    theta[param_positions_dict["X"][0]:param_positions_dict["X"][1]] = X.reshape((d*K,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     logpx_i = 0
+    for j in range(J):
+        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
+        phicdf = norm.cdf(pij, loc=mu_e, scale=sigma_e)        
+        if np.abs(phicdf) < 1e-10:
+            # print(phicdf)
+            logpx_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log1p(-phicdf) + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x)
+        else:
+            logpx_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log(1-phicdf) + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x)
+             
+    return logpx_i**gamma
+
+def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1):
+    # l denotes the coordinate of vector x_i
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                         
+    X[l, i] = x_il
+    theta[param_positions_dict["X"][0]:param_positions_dict["X"][1]] = X.reshape((d*K,), order="F")
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    logpx_il = 0
     for j in range(J):
         pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
         phicdf = norm.cdf(pij, loc=mu_e, scale=sigma_e)
         if np.abs(phicdf) < 1e-10:
             print(phicdf)
-            logpx_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*np.log1p(-phicdf) + norm.logpdf(xi, loc=prior_loc_x, scale=prior_scale_x)
+            logpx_il += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log1p(-phicdf) + norm.logpdf(x_il, loc=prior_loc_x, scale=prior_scale_x)
         else:
-            logpx_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*np.log(1-phicdf) + norm.logpdf(xi, loc=prior_loc_x, scale=prior_scale_x)
+            logpx_il += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log(1-phicdf) + norm.logpdf(x_il, loc=prior_loc_x, scale=prior_scale_x)
              
-    return logpx_i**gamma
-
-def log_conditional_posterior_x_il(l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
-    # l denotes the coordinate of vector x_i
-
-    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
-    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                         
-    mu_e = params_hat["mu_e"]
-    sigma_e = params_hat["sigma_e"]
-    logpx_il = 0
-    for j in range(J):
-        ################################################# log1p
-        logpx_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logpdf(X[l, i], loc=0, scale=1)
-        
-    return logpx_il
+    return logpx_il**gamma
 
 
 def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1):
@@ -367,6 +378,7 @@ def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_name
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")                         
     Phi[:, i] = phii
+    theta[param_positions_dict["Phi"][0]:param_positions_dict["Phi"][1]] = Phi.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     logpphi_i = 0
@@ -376,27 +388,36 @@ def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_name
         if np.abs(phicdf) < 1e-10:
             print(phicdf)
             logpphi_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*np.log1p(-phicdf) + norm.logpdf(phii, loc=prior_loc_phi, scale=prior_scale_phi)
+                        + (1-Y[i, j])*np.log1p(-phicdf) + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi)
         else:
             logpphi_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*np.log(1-phicdf) + norm.logpdf(phii, loc=prior_loc_phi, scale=prior_scale_phi)
+                        + (1-Y[i, j])*np.log(1-phicdf) + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi)
              
     return logpphi_i**gamma
 
 
-def log_conditional_posterior_phi_jl(l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
-    # l denotes the coordinate of vector phi_j
+def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1):
+    # l denotes the coordinate of vector phi_i
+
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")                         
+    Phi[l, i] = phi_il
+    theta[param_positions_dict["Phi"][0]:param_positions_dict["Phi"][1]] = Phi.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     logpphi_il = 0
-    for i in range(K):
-        logpphi_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logpdf(Phi[l, j], loc=0, scale=1)
-        
-    return logpphi_il
-
+    for j in range(J):
+        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
+        phicdf = norm.cdf(pij, loc=mu_e, scale=sigma_e)
+        if np.abs(phicdf) < 1e-10:
+            print(phicdf)
+            logpphi_il += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log1p(-phicdf) + norm.logpdf(phi_il, loc=prior_loc_x, scale=prior_scale_x)
+        else:
+            logpphi_il += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log(1-phicdf) + norm.logpdf(phi_il, loc=prior_loc_x, scale=prior_scale_x)
+             
+    return logpphi_il**gamma
 
 def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                     prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100):
@@ -404,6 +425,7 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
     Z[:, i] = zi
+    theta[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]] = Z.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     logpz_i = 0
@@ -413,35 +435,49 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
         if np.abs(phicdf) < 1e-10:
             print(phicdf)
             logpz_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*np.log1p(-phicdf) + norm.logpdf(zi, loc=prior_loc_z, scale=prior_scale_z)
+                        + (1-Y[i, j])*np.log1p(-phicdf) + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z)
         else:
             logpz_i += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*np.log(1-phicdf) + norm.logpdf(zi, loc=prior_loc_z, scale=prior_scale_z)
+                        + (1-Y[i, j])*np.log(1-phicdf) + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z)
     
-    sum_Z_J_vectors = np.sum(Z, axis=1)    
-    obj = logpz_i + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+    if abs(penalty_weight_Z) > 1e-10:
+        sum_Z_J_vectors = np.sum(Z, axis=1)    
+        obj = logpz_i + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+    else:
+        obj = logpz_i
 
     return obj**gamma
 
 
-def log_conditional_posterior_z_jl(l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
+def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, 
+                                   prior_scale_x=1, gamma=1, constant_Z=0, penalty_weight_Z=100):
+    # l denotes the coordinate of vector z_i
 
-    # ADD kronecker delta constraint in minimization?
-
-    # l denotes the coordinate of vector z_j
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
+    Z[l, i] = z_il
+    theta[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]] = Z.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     logpz_il = 0
-    for i in range(K):
-        logpz_il += Y[i, j]*norm.logcdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e) \
-                        + (1-Y[i, j])*(np.log(1-norm.cdf(p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict), loc=mu_e, scale=sigma_e))) + norm.logpdf(Z[l, j], loc=0, scale=1)
-        
-    return logpz_il
+    for j in range(J):
+        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
+        phicdf = norm.cdf(pij, loc=mu_e, scale=sigma_e)
+        if np.abs(phicdf) < 1e-10:
+            print(phicdf)
+            logpz_il += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log1p(-phicdf) + norm.logpdf(z_il, loc=prior_loc_x, scale=prior_scale_x)
+        else:
+            logpz_il += Y[i, j]*norm.logcdf(pij, loc=mu_e, scale=sigma_e) \
+                        + (1-Y[i, j])*np.log(1-phicdf) + norm.logpdf(z_il, loc=prior_loc_x, scale=prior_scale_x)
+             
+    if abs(penalty_weight_Z) > 1e-10:
+        sum_Z_J_vectors = np.sum(Z, axis=1)    
+        obj = logpz_il + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+    else:
+        obj = logpz_il
 
-
-
+    return obj**gamma
 
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1):
@@ -466,7 +502,6 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
                             + (1-Y[i, j])*np.log(1-phicdf) + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
              
     return logpalpha_j**gamma
-
 
 def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1):
     
