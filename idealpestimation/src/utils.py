@@ -249,18 +249,17 @@ def get_hessian_diag_jax(f, x):
     
 def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
 
-    path = pathlib.Path(DIR_out)
-    
-    ipdb.set_trace()
-
     params_out = dict()
-    params_out["X"] = np.zeros((d, K))
-    params_out["beta"] = np.zeros((1, K))    
-    for param in parameter_names:        
+    params_out["X"] = np.zeros((d*K,))
+    params_out["beta"] = np.zeros((K,))    
+    for param in parameter_names:             
         weighted_estimate = None
+        weight = None
+        theta = None
         all_weights = []
         all_estimates = []
-        subdatasets_names = ["dataset_102_136"] #[file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
+        path = pathlib.Path(DIR_out)  
+        subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
         for dataset_index in range(len(subdatasets_names)):                    
             subdataset_name = subdatasets_names[dataset_index]                        
             DIR_read = "{}/{}/estimation/".format(DIR_out, subdataset_name)
@@ -268,35 +267,37 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
             estimates_names = [file.name for file in path.iterdir() if file.is_file() and "estimationresult_dataset" in file.name]
             for estim in estimates_names:
                 with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
-                    for result in f.iter(type=dict, skip_invalid=True):                                      
+                    for result in f.iter(type=dict, skip_invalid=True):                                                              
                         if param in ["X", "beta"]:
                             # single estimate per data split
                             theta = result[param]
                             namesplit = estim.split("_")
-                            start = int(namesplit[2])*d
-                            end   = int(namesplit[3].replace(".jsonl", ""))*d
-                            params_out[param][:, start:end] = theta
+                            start = int(namesplit[2])
+                            end   = int(namesplit[3].replace(".jsonl", ""))
+                            if param == "X":
+                                params_out[param][start*d:end*d] = theta
+                            else:
+                                params_out[param][start:end] = theta
                         else:                            
-                            weight = result["variance_{}".format(param)]
+                            weight = result["variance_{}".format(param)]                            
                             theta = result[param]
                             all_weights.append(weight)
                             all_estimates.append(theta)
-        if param == "X":
-            params_out[param] = params_out[param].reshape((d*K,), order="F").tolist()    
-        elif param == "beta":
-            params_out[param] = params_out[param].reshape((K,), order="F").tolist()    
-        else:
-            ipdb.set_trace()
+        if param in ["X", "beta"]:
+            params_out[param] = params_out[param]        
+        else:                
             all_weights = np.stack(all_weights)
+            if param not in ["Z", "Phi", "alpha"]:
+                all_weights = all_weights.flatten()
             all_estimates = np.stack(all_estimates)
             # sum acrocs each coordinate's weight
             all_weights_sum = np.sum(all_weights, axis=0)
             all_weights_norm = all_weights/all_weights_sum
-            assert np.sum(all_weights_norm, axis=0)==np.ones(all_weights_sum.shape)
+            assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
             # element-wise multiplication
             weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
             params_out[param] = weighted_estimate
-    ipdb.set_trace()
+    
     return params_out
 
 ####################### MLE #############################
@@ -308,8 +309,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
 def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
     """
     Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
-    """
-    
+    """    
     if log_cdfx < -0.693:  #log(0.5)
         # If CDF(x) < 0.5, direct computation is stable  
         if use_jax:

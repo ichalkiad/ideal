@@ -313,8 +313,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
-    
-    ipdb.set_trace()
 
     gamma = 1
     delta_theta = np.inf
@@ -340,7 +338,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
                             theta_curr = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)                                                            
                     else:
                         theta_curr = optimise_posterior_vector(param, None, Y, gamma, theta_curr, param_positions_dict, L, args)                                                            
-                    ipdb.set_trace()
+                    # ipdb.set_trace()
             gamma += delta_n
         if L is not None:
             L = L - 1
@@ -426,7 +424,7 @@ if __name__ == "__main__":
     niter = 10
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    elementwise = True
+    elementwise = False
     evaluate_posterior = True
     retries = 10
     # In parameter names keep the order fixed as is
@@ -456,88 +454,88 @@ if __name__ == "__main__":
     sigma_e_true = 1      
     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    total_running_processes = 100                 
+    total_running_processes = 200                 
     # full, with status quo
     # parameter_space_dim = (K+2*J)*d + J + K + 4
     # no status quo
     parameter_space_dim = (K+J)*d + J + K + 3
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
-    # main(J=J, K=K, d=d, N=annealing_schedule, total_running_processes=total_running_processes, 
-    #     data_location=data_location, parallel=parallel, 
-    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
-    #     dst_func=dst_func, parameter_space_dim=parameter_space_dim, trials=M, 
-    #     penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, 
-    #     elementwise=elementwise, evaluate_posterior=evaluate_posterior, delta_n=delta_n, L=niter, tol=tol, 
-    #     prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, 
-    #     prior_loc_phi=prior_loc_phi, prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-    #     prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, gridpoints_num=gridpoints_num)
+    main(J=J, K=K, d=d, N=annealing_schedule, total_running_processes=total_running_processes, 
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, parameter_space_dim=parameter_space_dim, trials=M, 
+        penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, 
+        elementwise=elementwise, evaluate_posterior=evaluate_posterior, delta_n=delta_n, L=niter, tol=tol, 
+        prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, 
+        prior_loc_phi=prior_loc_phi, prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, gridpoints_num=gridpoints_num)
 
 
-    args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, annealing_schedule, delta_n, niter, tol,                     
-                    parameter_space_dim, 0, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
-                    prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num) 
-    with open("{}/{}/Y.pickle".format(data_location, 0), "rb") as f:
-            Y = pickle.load(f)
-    Y = Y.astype(np.int8).reshape((K, J), order="F")    
-    param_positions_dict = dict()            
-    k = 0
-    for param in parameter_names:
-        if param == "X":
-            param_positions_dict[param] = (k, k + K*d)                       
-            k += K*d    
-        elif param in ["Z"]:
-            param_positions_dict[param] = (k, k + J*d)                                
-            k += J*d
-        elif param in ["Phi"]:            
-            param_positions_dict[param] = (k, k + J*d)                                
-            k += J*d
-        elif param == "beta":
-            param_positions_dict[param] = (k, k + K)                                   
-            k += K    
-        elif param == "alpha":
-            param_positions_dict[param] = (k, k + J)                                       
-            k += J    
-        elif param == "gamma":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-        elif param == "delta":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-        elif param == "mu_e":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-        elif param == "sigma_e":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-    theta_curr = np.zeros((parameter_space_dim,))
-    with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), "r") as f:
-        for result in f.iter(type=dict, skip_invalid=True):
-            for param in parameter_names:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
-    outdir = "{}/posterior_plots/".format(data_location)
-    pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
+    # args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, annealing_schedule, delta_n, niter, tol,                     
+    #                 parameter_space_dim, 0, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
+    #                 prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num) 
+    # with open("{}/{}/Y.pickle".format(data_location, 0), "rb") as f:
+    #         Y = pickle.load(f)
+    # Y = Y.astype(np.int8).reshape((K, J), order="F")    
+    # param_positions_dict = dict()            
+    # k = 0
+    # for param in parameter_names:
+    #     if param == "X":
+    #         param_positions_dict[param] = (k, k + K*d)                       
+    #         k += K*d    
+    #     elif param in ["Z"]:
+    #         param_positions_dict[param] = (k, k + J*d)                                
+    #         k += J*d
+    #     elif param in ["Phi"]:            
+    #         param_positions_dict[param] = (k, k + J*d)                                
+    #         k += J*d
+    #     elif param == "beta":
+    #         param_positions_dict[param] = (k, k + K)                                   
+    #         k += K    
+    #     elif param == "alpha":
+    #         param_positions_dict[param] = (k, k + J)                                       
+    #         k += J    
+    #     elif param == "gamma":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    #     elif param == "delta":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    #     elif param == "mu_e":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    #     elif param == "sigma_e":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    # theta_curr = np.zeros((parameter_space_dim,))
+    # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), "r") as f:
+    #     for result in f.iter(type=dict, skip_invalid=True):
+    #         for param in parameter_names:
+    #             theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+    # outdir = "{}/posterior_plots/".format(data_location)
+    # pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
     
-    for param in parameter_names:
-        outdir = "{}/posterior_plots/{}/".format(data_location, param)
-        pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
-        if param in ["X", "beta"]:
-            for i in range(K):                
-                if param == "X":
-                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=None, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
-                    for j in range(d):
-                        plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=j, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
-                else:
-                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=i, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
-        elif param in ["Z", "Phi", "alpha"]:
-            for j in range(J):
-                if param in ["Phi", "Z"]:
-                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=None, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
-                    for i in range(d):
-                        plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=i, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
-                else:
-                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=j, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
-        else:
-            plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=None, vector_coordinate=0, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    # for param in parameter_names:
+    #     outdir = "{}/posterior_plots/{}/".format(data_location, param)
+    #     pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
+    #     if param in ["X", "beta"]:
+    #         for i in range(K):                
+    #             if param == "X":
+    #                 plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=None, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    #                 for j in range(d):
+    #                     plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=j, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    #             else:
+    #                 plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=i, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    #     elif param in ["Z", "Phi", "alpha"]:
+    #         for j in range(J):
+    #             if param in ["Phi", "Z"]:
+    #                 plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=None, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    #                 for i in range(d):
+    #                     plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=i, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    #             else:
+    #                 plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=j, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    #     else:
+    #         plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=None, vector_coordinate=0, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
 
 
 

@@ -26,6 +26,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
 
+       
     params = estimation_result.x        
     try:                        
         if params.shape[0] == 1:
@@ -58,11 +59,11 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
             if full_hessian:
                 if parallel:                    
                     hess = np.linalg.inv(estimation_result.hess_inv * np.ones(len(params)) + 1e-8 * np.eye(len(params)))                    
-                    variance = estimation_result.hess_inv * np.ones(len(params))
+                    variance = estimation_result.hess_inv * np.ones((len(params), len(params)))
                 else:
                     # Use Hessian approximation to compute Fisher Information as the sample Hessian                                                  
-                    params_jax = jnp.asarray(params)                  
-                    hess = np.asarray(hessian(nloglik_jax)(params_jax)                                     )
+                    params_jax = jnp.asarray(params)                                   
+                    hess = np.asarray(hessian(nloglik_jax)(params_jax))                    
                     # Add small regularization to prevent singularity
                     variance = -np.linalg.inv(hess + 1e-8 * np.eye(len(params)))            
                 if np.any(np.isnan(variance)):                                
@@ -151,7 +152,7 @@ def maximum_likelihood_estimator(
             variance_diag = np.zeros((mle.shape[0],))
             result["variance_method"] = "{}".format(variance_method)
             result["variance_diag"] = variance_diag
-            result["variance_status"] = variance_status
+            result["variance_status"] = False
     else:
         result["variance_method"] = None
         result["variance_diag"] = np.zeros((mle.shape[0],))
@@ -203,12 +204,12 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
             pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
             errloc = mu_e            
-            philogcdf = jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+            philogcdf = jax.scipy.stats.norm.logcdf(jnp.asarray(pij_arg), loc=jnp.asarray(errloc), scale=jnp.asarray(errscale))
+            log_one_minus_cdf = log_complement_from_log_cdf(jnp.asarray(philogcdf), jnp.asarray(pij_arg), mean=jnp.asarray(errloc), variance=jnp.asarray(errscale), use_jax=True)
             nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
 
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
-    return -nll[0] + penalty_weight_Z * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
+    return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
 
 def estimate_mle(args):
@@ -316,8 +317,8 @@ def estimate_mle(args):
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+        grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
+        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
         hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
@@ -351,8 +352,8 @@ def estimate_mle(args):
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+        grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
+        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
         hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
@@ -504,8 +505,8 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome = dict()
             grid_and_optim_outcome["PID"] = current_pid
             grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+            grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
+            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
             hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
             grid_and_optim_outcome["elapsedtime_hours"] = hours
             grid_and_optim_outcome["retry"] = retry
@@ -539,8 +540,8 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome = dict()
             grid_and_optim_outcome["PID"] = current_pid
             grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
+            grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
+            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
             hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
             grid_and_optim_outcome["elapsedtime_hours"] = hours
             grid_and_optim_outcome["retry"] = retry
@@ -687,11 +688,23 @@ if __name__ == "__main__":
         dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
+    # params_out_jsonl = dict()
     # for m in range(M):
     #     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
     #     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
     #     params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
+    #     for param in parameter_names:
+    #         if param == "X":                
+    #             params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()                        
+    #         elif param == "Z":
+    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
+    #         elif param == "Phi":            
+    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
+    #         elif param in ["beta", "alpha"]:
+    #             params_out_jsonl[param] = params_out[param].tolist()            
+    #         else:
+    #             params_out_jsonl[param] = params_out[param]
     #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
     #     with open(out_file, 'a') as f:         
     #         writer = jsonlines.Writer(f)
-    #         writer.write(params_out)
+    #         writer.write(params_out_jsonl)
