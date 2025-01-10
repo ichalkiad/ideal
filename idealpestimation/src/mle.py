@@ -10,8 +10,6 @@ from datetime import datetime
 from scipy.stats import norm
 from scipy.optimize import minimize
 from jax import hessian
-import jax
-import jax.numpy as jnp
 import math
 import random
 from datetime import timedelta
@@ -23,7 +21,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
-                                                            create_constraint_functions, p_ij_arg
+                                                            create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
@@ -173,12 +171,10 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
         for j in range(J):
             pij_arg = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
             errscale = sigma_e
-            errloc = mu_e
-            phicdf = norm.cdf(pij_arg, loc=errloc, scale=errscale)
-            if np.abs(phicdf) < 1e-10:                
-                nll += Y[i, j]*norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log1p(-phicdf)
-            else:
-                nll += Y[i, j]*norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*np.log(1-phicdf)
+            errloc = mu_e            
+            philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+            nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
 
     sum_Z_J_vectors = np.sum(Z, axis=1)    
     return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
@@ -206,12 +202,10 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
         for j in range(J):
             pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
             errscale = sigma_e
-            errloc = mu_e
-            phicdf = jax.scipy.stats.norm.cdf(pij_arg, loc=errloc, scale=errscale)
-            if jnp.abs(phicdf) < 1e-10:                
-                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log1p(-phicdf)
-            else:
-                nll += Y[i, j]*jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale) + (1-Y[i, j])*jnp.log(1-phicdf)
+            errloc = mu_e            
+            philogcdf = jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+            nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
 
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + penalty_weight_Z * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    

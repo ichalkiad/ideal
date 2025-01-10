@@ -93,9 +93,9 @@ def get_evaluation_grid(param, args):
         if 0.0 in grid:
             grid.remove(0.0)        
     elif param == "mu_e":
-        grid = np.linspace(-1, 1, gridpoints_num).tolist()
+        grid = np.linspace(-2, 2, gridpoints_num).tolist()
     elif param == "sigma_e":
-        grid = np.linspace(0.1, 2, gridpoints_num).tolist()
+        grid = np.linspace(0.000001, 1.5, gridpoints_num).tolist()
     else:
         if d == 1:
             if param == "Phi":
@@ -124,28 +124,69 @@ def get_evaluation_grid(param, args):
 
 def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_curr, gamma, param_positions_dict, args):
     
-    f = get_posterior_for_optimisation_vec(param, Y, idx, vector_coordinate, theta_curr, gamma, param_positions_dict, args)
-    xx = np.linspace(-100, 100, 500)
-    yy = np.asarray([f(x)[0] for x in xx])
-    print(yy)
-    fig = go.Figure(data=go.Scatter(
-                    x=xx,
-                    y=yy,
-                    mode='lines',
-                    name=param,
-                    line=dict(
-                        color='royalblue',
-                        width=2
-                    ),
-                    hovertemplate='x: %{x:.2f}<br>y: %{y:.2f}<extra></extra>'
-    ))
-    fig.show()
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
+        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
+    f = get_posterior_for_optimisation_vec(param=param, Y=Y, idx=idx, vector_coordinate=vector_coordinate, theta_curr=theta_curr, 
+                                           gamma=gamma, param_positions_dict=param_positions_dict, args=args)
     
-    ipdb.set_trace()
+    if elementwise and vector_coordinate is None:
+        xx_ = np.linspace(-2, 2, 30)
+        xx = itertools.product(*[xx_, xx_])    
+        yy = np.asarray([f(x)[0] for x in xx]).flatten()
+    else:
+        if param == "gamma":
+            xx_ = np.linspace(-5, 5, 300)
+        elif param == "mu_e":
+            xx_ = np.linspace(-10, 10, 500)
+        elif param == "sigma_e":
+            xx_ = np.linspace(0.0001, 1.5, 300)
+        else:
+            xx_ = np.linspace(-2, 2, 300)
+        yy = np.asarray([f(x)[0] for x in xx_]).flatten()
+        
+    if vector_coordinate is not None:
+        fig = go.Figure(data=go.Scatter(
+                        x=[xxx for xxx in xx_],
+                        y=yy,
+                        mode='lines',
+                        name=param,
+                        line=dict(
+                            color='royalblue',
+                            width=2
+                        ),
+                        hovertemplate='x: %{x:.2f}<br>y: %{y:.2f}<extra></extra>'
+        ))
+    else:        
+        fig = go.Figure(data=
+                    go.Contour(
+                        x=xx_,
+                        y=xx_,
+                        z=yy,
+                        colorscale='Hot',
+                        contours=dict(
+                                    # start=np.min(yy)-10,
+                                    # end=np.max(yy)+10,
+                                    # size=0.1,
+                                    showlabels=True
+                                ),
+                        colorbar=dict(
+                            title='Value',
+                            titleside='right'
+                        )
+                    )
+                )
+        fig.update_layout(                
+                xaxis_title='x1',
+                yaxis_title='x2',                
+        )
+    # fig.show()
+    
+    # ipdb.set_trace()
         
     pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)    
     savename = "{}/{}_idx_{}_vector_coord_{}.html".format(outdir, param, idx, vector_coordinate)
-    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False, print_png=True, print_html=False, print_pdf=False)
+    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
     
 def get_posterior_for_optimisation_vec(param, Y, idx, vector_coordinate, theta_curr, gamma, param_positions_dict, args):
 
@@ -154,20 +195,22 @@ def get_posterior_for_optimisation_vec(param, Y, idx, vector_coordinate, theta_c
             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
 
     if param == "X":
-        if elementwise:
-            post2optim = lambda x: log_conditional_posterior_x_il(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x, prior_scale_x, gamma)
+        if elementwise and isinstance(vector_coordinate, int):
+            post2optim = lambda x: log_conditional_posterior_x_il(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, 
+                                                                  prior_loc_x[vector_coordinate], prior_scale_x[vector_coordinate, vector_coordinate], gamma)
         else:
             post2optim = lambda x: log_conditional_posterior_x_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x, prior_scale_x, gamma)  
     elif param == "Z":
-        if elementwise:
-            post2optim = lambda x: log_conditional_posterior_z_jl(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x, 
-                                                                prior_scale_x, gamma, constant_Z, penalty_weight_Z)
+        if elementwise and isinstance(vector_coordinate, int):
+            post2optim = lambda x: log_conditional_posterior_z_jl(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z[vector_coordinate], 
+                                                                prior_scale_z[vector_coordinate, vector_coordinate], gamma, constant_Z, penalty_weight_Z)
         else:
             post2optim = lambda x: log_conditional_posterior_z_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z, prior_scale_z, gamma, 
                                                                 constant_Z, penalty_weight_Z)
     elif param == "Phi":            
-        if elementwise:
-            post2optim = lambda x: log_conditional_posterior_phi_jl(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x, prior_scale_x, gamma)
+        if elementwise and isinstance(vector_coordinate, int):
+            post2optim = lambda x: log_conditional_posterior_phi_jl(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi[vector_coordinate], 
+                                                                    prior_scale_phi[vector_coordinate, vector_coordinate], gamma)
         else:
             post2optim = lambda x: log_conditional_posterior_phi_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi, prior_scale_phi, gamma)
     elif param == "beta":
@@ -383,7 +426,7 @@ if __name__ == "__main__":
     niter = 10
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    elementwise = False
+    elementwise = True
     evaluate_posterior = True
     retries = 10
     # In parameter names keep the order fixed as is
@@ -392,8 +435,8 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
     M = 1
-    K = 500
-    J = 50
+    K = 30
+    J = 10
     d = 2  
     gridpoints_num = 50
     # Change to univariate if optimising the parameter vector elementwise
@@ -404,13 +447,13 @@ if __name__ == "__main__":
     prior_loc_phi = np.zeros((d,))
     prior_scale_phi = np.eye(d)
     prior_loc_beta = 0
-    prior_scale_beta = 1
+    prior_scale_beta = 0.5
     prior_loc_alpha = 0
-    prior_scale_alpha = 1
+    prior_scale_alpha = 0.5
     annealing_schedule = 10
     delta_n = 0.1
-    tol = 1e-6
-    sigma_e_true = 0.5      
+    tol = 1e-6    
+    sigma_e_true = 1      
     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 100                 
@@ -471,6 +514,31 @@ if __name__ == "__main__":
         for result in f.iter(type=dict, skip_invalid=True):
             for param in parameter_names:
                 theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
-    plot_posterior_elementwise(outdir="/tmp/", param="X", Y=Y, idx=1, vector_coordinate=None, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+    outdir = "{}/posterior_plots/".format(data_location)
+    pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
+    
+    for param in parameter_names:
+        outdir = "{}/posterior_plots/{}/".format(data_location, param)
+        pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
+        if param in ["X", "beta"]:
+            for i in range(K):                
+                if param == "X":
+                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=None, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+                    for j in range(d):
+                        plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=j, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+                else:
+                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=i, vector_coordinate=i, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+        elif param in ["Z", "Phi", "alpha"]:
+            for j in range(J):
+                if param in ["Phi", "Z"]:
+                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=None, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+                    for i in range(d):
+                        plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=i, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+                else:
+                    plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=j, vector_coordinate=j, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+        else:
+            plot_posterior_elementwise(outdir=outdir, param=param, Y=Y, idx=None, vector_coordinate=0, theta_curr=theta_curr, gamma=1, param_positions_dict=param_positions_dict, args=args)
+
+
 
     
