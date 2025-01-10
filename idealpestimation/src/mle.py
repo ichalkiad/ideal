@@ -646,7 +646,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
     
-    parallel = False
+    parallel = True
     if not parallel:
         jax.default_device = jax.devices("gpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
@@ -662,9 +662,9 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
     M = 1
-    K = 50
-    J = 20
-    sigma_e_true = 0.5
+    K = 30
+    J = 10
+    sigma_e_true = 1
     d = 2    
     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30              
