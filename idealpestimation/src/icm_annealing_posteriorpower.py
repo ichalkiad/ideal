@@ -362,8 +362,8 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
                 gridpoints_num, diff_iter, disp  = args
     
     if evaluate_posterior:
-        # Negate its result for the negative log posterior likelihood
-        f = get_posterior_for_optimisation_vec(param, Y, idx, None, theta_curr, gamma, param_positions_dict, args)
+        # Negate its result for the negative log posterior likelihood        
+        f = get_posterior_for_optimisation_vec(param, Y, idx, idx, None, theta_curr, gamma, param_positions_dict, args)
         # get grid depending on param
         grid = get_evaluation_grid(param, None, args)        
         # parallel eval grid
@@ -546,8 +546,8 @@ if __name__ == "__main__":
     niter = 10
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    elementwise = True
-    evaluate_posterior = False
+    elementwise = False
+    evaluate_posterior = True
     retries = 10
     diff_iter = None
     disp = True
@@ -560,7 +560,7 @@ if __name__ == "__main__":
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 50    
+    gridpoints_num = 5    
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -575,8 +575,8 @@ if __name__ == "__main__":
     delta_n = 0.1
     tol = 1e-6    
     sigma_e_true = 1      
-    # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 200                 
     # full, with status quo
     # parameter_space_dim = (K+2*J)*d + J + K + 4
