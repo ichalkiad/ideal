@@ -9,6 +9,7 @@ import jsonlines
 import numpy as np
 import random
 import itertools
+from scipy.optimize import minimize
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from idealpestimation.src.parallel_manager import jsonlines, ProcessManager
@@ -23,7 +24,9 @@ from idealpestimation.src.utils import log_conditional_posterior_x_vec,  \
                                                             log_conditional_posterior_sigma_e, \
                                                               log_conditional_posterior_x_il, \
                                                                 log_conditional_posterior_phi_jl, \
-                                                                    log_conditional_posterior_z_jl, qmc, fix_plot_layout_and_save
+                                                                    log_conditional_posterior_z_jl, \
+                                                                        qmc, fix_plot_layout_and_save, \
+                                                                            create_constraint_functions_icm
 
 
 
@@ -39,7 +42,7 @@ class ProcessManagerSynthetic(ProcessManager):
             self.shared_dict[current_pid] = self.execution_counter.value
         
         t0 = time.time()
-        f, gridpoint, gamma_annealing, l, DIR_out, param, idx = args
+        f, gridpoint, gamma_annealing, l, DIR_out, param, idx, vector_coordinate = args
         posterior_eval = -f(gridpoint)
         
         grid_and_optim_outcome = dict()
@@ -48,14 +51,20 @@ class ProcessManagerSynthetic(ProcessManager):
         grid_and_optim_outcome["elapsedtime_seconds"] = str(timedelta(seconds=time.time()-t0))   
         time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime_seconds"], '%H:%M:%S.%f')
         hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
-        grid_and_optim_outcome["elapsedtime_hours"] = hours        
-        grid_and_optim_outcome["gridpoint"] = list(gridpoint)
+        grid_and_optim_outcome["elapsedtime_hours"] = hours  
+        if isinstance(gridpoint, float):
+            grid_and_optim_outcome["gridpoint"] = gridpoint
+        else:      
+            grid_and_optim_outcome["gridpoint"] = list(gridpoint)
         grid_and_optim_outcome["posterior"] = posterior_eval.tolist()[0]
         # print(posterior_eval.tolist()[0])
         grid_and_optim_outcome["gamma_annealing"] = gamma_annealing
         grid_and_optim_outcome["icm_iteration"] = l
-               
-        out_file = "{}/{}/{}/posterior_evaluation_anneal_power_{}_param_idx_{}.jsonl".format(DIR_out, param, l, gamma_annealing, idx)
+            
+        if vector_coordinate is not None:
+            out_file = "{}/{}/{}/posterior_evaluation_anneal_power_{}_param_idx_{}_vectorcoordinate_{}.jsonl".format(DIR_out, param, l, gamma_annealing, idx, vector_coordinate)
+        else:
+            out_file = "{}/{}/{}/posterior_evaluation_anneal_power_{}_param_idx_{}.jsonl".format(DIR_out, param, l, gamma_annealing, idx)
         pathlib.Path("{}/{}/{}/".format(DIR_out, param, l)).mkdir(parents=True, exist_ok=True)     
         self.append_to_json_file(grid_and_optim_outcome, output_file=out_file)
 
@@ -66,19 +75,24 @@ def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
         if param_positions_dict[param][0] <= i and param_positions_dict[param][1] >= i:
             target_param = param
             index_in_flat_vector = i - param_positions_dict[param][0]            
-            column = index_in_flat_vector // d
-            row = index_in_flat_vector % d
-            return target_param, column, row
+            if target_param in ["X", "Z", "Phi"]:                
+                column = index_in_flat_vector // d
+                row = index_in_flat_vector % d
+                return target_param, column, row
+            else:
+                # alpha, beta are vectors, not flattened matrices
+                return target_param, index_in_flat_vector, index_in_flat_vector
         else:
             continue
     raise AttributeError("Should never reach this point.")
 
-def get_evaluation_grid(param, args):
+def get_evaluation_grid(param, vector_coordinate, args):
 
     grid_width_std = 5
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
     
     if param == "alpha":
         grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, gridpoints_num).tolist()
@@ -96,17 +110,14 @@ def get_evaluation_grid(param, args):
         grid = np.linspace(-2, 2, gridpoints_num).tolist()
     elif param == "sigma_e":
         grid = np.linspace(0.000001, 1.5, gridpoints_num).tolist()
-    else:
-        if d == 1:
+    else:        
+        if d == 1 or elementwise:
             if param == "Phi":
-                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_phi)+prior_loc_phi, grid_width_std*np.sqrt(prior_scale_phi)+prior_loc_phi, gridpoints_num).tolist() for i in range(d)]
-                grid = itertools.product(*unidimensional_grid)
+                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate], grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate], gridpoints_num).tolist()                
             elif param == "Z":
-                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_z)+prior_loc_z, grid_width_std*np.sqrt(prior_scale_z)+prior_loc_z, gridpoints_num).tolist() for i in range(d)]
-                grid = itertools.product(*unidimensional_grid)
+                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], gridpoints_num).tolist()                
             elif param == "X":
-                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_x)+prior_loc_x, grid_width_std*np.sqrt(prior_scale_x)+prior_loc_x, gridpoints_num).tolist() for i in range(d)]
-                grid = itertools.product(*unidimensional_grid)
+                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], gridpoints_num).tolist()                
         elif (d > 1 and d <= 5):
             if param == "Phi":
                 unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], gridpoints_num).tolist() for i in range(d)]
@@ -126,7 +137,9 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
+    
     f = get_posterior_for_optimisation_vec(param=param, Y=Y, idx=idx, vector_coordinate=vector_coordinate, theta_curr=theta_curr, 
                                            gamma=gamma, param_positions_dict=param_positions_dict, args=args)
     
@@ -181,41 +194,44 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                 yaxis_title='x2',                
         )
     # fig.show()
-    
-    # ipdb.set_trace()
         
     pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)    
     savename = "{}/{}_idx_{}_vector_coord_{}.html".format(outdir, param, idx, vector_coordinate)
     fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
     
-def get_posterior_for_optimisation_vec(param, Y, idx, vector_coordinate, theta_curr, gamma, param_positions_dict, args):
+def get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matrix, vector_coordinate, theta_curr, gamma, param_positions_dict, args):
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
 
     if param == "X":
         if elementwise and isinstance(vector_coordinate, int):
-            post2optim = lambda x: log_conditional_posterior_x_il(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, 
+            post2optim = lambda x: log_conditional_posterior_x_il(x, vector_coordinate, vector_index_in_param_matrix, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, 
                                                                   prior_loc_x[vector_coordinate], prior_scale_x[vector_coordinate, vector_coordinate], gamma)
         else:
             post2optim = lambda x: log_conditional_posterior_x_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x, prior_scale_x, gamma)  
     elif param == "Z":
         if elementwise and isinstance(vector_coordinate, int):
-            post2optim = lambda x: log_conditional_posterior_z_jl(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z[vector_coordinate], 
+            post2optim = lambda x: log_conditional_posterior_z_jl(x, vector_coordinate, vector_index_in_param_matrix, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z[vector_coordinate], 
                                                                 prior_scale_z[vector_coordinate, vector_coordinate], gamma, constant_Z, penalty_weight_Z)
         else:
             post2optim = lambda x: log_conditional_posterior_z_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z, prior_scale_z, gamma, 
                                                                 constant_Z, penalty_weight_Z)
     elif param == "Phi":            
         if elementwise and isinstance(vector_coordinate, int):
-            post2optim = lambda x: log_conditional_posterior_phi_jl(x, vector_coordinate, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi[vector_coordinate], 
+            post2optim = lambda x: log_conditional_posterior_phi_jl(x, vector_coordinate, vector_index_in_param_matrix, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi[vector_coordinate], 
                                                                     prior_scale_phi[vector_coordinate, vector_coordinate], gamma)
         else:
             post2optim = lambda x: log_conditional_posterior_phi_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi, prior_scale_phi, gamma)
     elif param == "beta":
+        if elementwise and isinstance(vector_coordinate, int):
+            idx = vector_coordinate
         post2optim = lambda x: log_conditional_posterior_beta_i(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta, prior_scale_beta, gamma)
     elif param == "alpha":
+        if elementwise and isinstance(vector_coordinate, int):
+            idx = vector_coordinate
         post2optim = lambda x: log_conditional_posterior_alpha_j(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha, prior_scale_alpha, gamma)
     elif param == "gamma":
         post2optim = lambda x: log_conditional_posterior_gamma(x, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=gamma) 
@@ -228,28 +244,128 @@ def get_posterior_for_optimisation_vec(param, Y, idx, vector_coordinate, theta_c
         
     return post2optim
 
-def optimise_posterior_elementwise(param, i, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, l, args):
+def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, l, args):
     
-    DIR_out, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha = args
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
     
-    if evaluate_posterior:
-        raise NotImplementedError("More efficient to evaluate posterior using vector parameters.")
+    # Negate its result for the negative log posterior likelihood
+    f = get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matrix, vector_coordinate, theta_curr, gamma, param_positions_dict, args)
+    # get grid depending on param
+    grid = get_evaluation_grid(param, vector_coordinate, args)      
+    if evaluate_posterior:                  
+        # parallel eval grid
+        if parallel:
+            manager = ProcessManagerSynthetic(total_running_processes)  
+            try:   
+                manager.create_results_dict(optim_target="all")  
+                t0 = time.time()  
+                while True:                    
+                    for gridpoint in grid:
+                        worker_args = (f, gridpoint, gamma, l, DIR_out, param, idx, vector_coordinate) 
+                        #####  parallelisation with Parallel Manager #####
+                        manager.cleanup_finished_processes()
+                        current_count = manager.current_process_count()                                
+                        print(f"Currently running processes: {current_count}")
+                        manager.print_shared_dict() 
+                        while current_count == total_running_processes:
+                            manager.cleanup_finished_processes()
+                            current_count = manager.current_process_count()                                                                                                                                                   
+                        if current_count < total_running_processes:
+                            manager.spawn_process(args=(worker_args,))                                                  
+                        # Wait before next iteration
+                        time.sleep(1)  
+                        ################################################## 
+                    if manager.all_processes_complete.is_set():
+                        break                    
+                if manager.all_processes_complete.is_set():                        
+                    out_folder = "{}/{}/{}/".format(DIR_out, param, l)
+                    min_f = np.inf
+                    param_estimate = None                    
+                    with jsonlines.open("{}/posterior_evaluation_anneal_power_{}_param_idx_{}_vectorcoordinate_{}.jsonl".format(out_folder, 
+                                                                                                gamma, idx, vector_coordinate), mode="r") as f: 
+                        for result in f.iter(type=dict, skip_invalid=True): 
+                            if not np.isnan(result["posterior"]) and result["posterior"] < min_f:
+                                min_f = result["posterior"]
+                                param_estimate = result["gridpoint"]
+                            else:
+                                continue
+                    elapsedtime = str(timedelta(seconds=time.time()-t0))   
+                    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+                    hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)   
+                    print(elapsedtime)  
+                    
+                    # ipdb.set_trace()
+            
+            except KeyboardInterrupt:
+                # On Ctrl-C stop all processes
+                print("\nShutting down gracefully...")
+                if parallel:
+                    manager.cleanup_all_processes()
+                    manager.print_shared_dict()  # Final print of shared dictionary                    
+                sys.exit(0)  
+        else:
+            min_f = np.inf
+            param_estimate = None
+            t0 = time.time()            
+            for gridpoint in grid:
+                posterior_eval = -f(gridpoint)
+                if posterior_eval < min_f:
+                    min_f = posterior_eval
+                    param_estimate = gridpoint
+            elapsedtime = str(timedelta(seconds=time.time()-t0))   
+            time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)   
+            print(elapsedtime)                 
+            
+            # ipdb.set_trace()
+    
     else:
-        raise NotImplementedError("TO BE IMPLEMENTED")
-        
+        # use previously evaluation grid as starting points grid
+        retry = 0
+        minus_f = lambda x: -f(x)
+        t0 = time.time()
+        while retry < retries:   
+            print("Retry: {}".format(retry))
+            gridpoint = random.choice(grid)
+            optimize_kwargs = {
+                'method': optimisation_method,
+                'x0': np.asarray([gridpoint]),                
+                'jac': '3-point'
+            }                               
+            bounds = create_constraint_functions_icm(parameter_space_dim, vector_coordinate, param=param, param_positions_dict=param_positions_dict, args=args)    
+            if diff_iter is not None:
+                result = minimize(minus_f, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":diff_iter, "maxls":20})
+            else:
+                result = minimize(minus_f, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxls":20})
+            
+            param_estimate = result.x[0]          
+            
+            if result.success:
+                break
+            else:              
+                grid.remove(gridpoint)
+                retry += 1
+       
+    
+    theta_curr[idx] = param_estimate
+    
+    return theta_curr
+
 def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, l, args):
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
     
     if evaluate_posterior:
         # Negate its result for the negative log posterior likelihood
         f = get_posterior_for_optimisation_vec(param, Y, idx, None, theta_curr, gamma, param_positions_dict, args)
         # get grid depending on param
-        grid = get_evaluation_grid(param, args)        
+        grid = get_evaluation_grid(param, None, args)        
         # parallel eval grid
         if parallel:
             manager = ProcessManagerSynthetic(total_running_processes)  
@@ -294,12 +410,16 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
         else:
             min_f = np.inf
             param_estimate = None
+            t0 = time.time()
             for gridpoint in grid:
                 posterior_eval = -f(gridpoint)
                 if posterior_eval < min_f:
                     min_f = posterior_eval
                     param_estimate = gridpoint
-
+            elapsedtime = str(timedelta(seconds=time.time()-t0))   
+            time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)                    
+            print(elapsedtime)
     else:
         raise NotImplementedError("More efficient to differentiate posterior coordinate-wise.")
 
@@ -312,7 +432,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num = args
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
 
     gamma = 1
     delta_theta = np.inf
@@ -325,9 +446,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
     while (L is not None and L > 0) or abs(delta_theta) > tol:
         for n in range(1, N+1, 1):
             if elementwise:
-                for i in range(parameter_space_dim):
+                for i in range(parameter_space_dim):                    
                     target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
-                    theta_curr = optimise_posterior_elementwise(target_param, i, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)                                        
+                    theta_curr = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)                                        
             else:
                 for param in parameter_names:
                     if param in ["X", "beta"]:  
@@ -351,12 +472,12 @@ def main(J=2, K=2, d=1, N=100, total_running_processes=1, data_location="/tmp/",
         parameter_space_dim=None, trials=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10,
         elementwise=True, evaluate_posterior=True, delta_n=0.1, L=20, tol=1e-6, prior_loc_x=0, prior_scale_x=1, 
         prior_loc_z=0, prior_scale_z=1, prior_loc_phi=0, prior_scale_phi=1, prior_loc_beta=0, prior_scale_beta=1, 
-        prior_loc_alpha=0, prior_scale_alpha=1, gridpoints_num=10):
+        prior_loc_alpha=0, prior_scale_alpha=1, gridpoints_num=10, optimization_method="L-BFGS-B", diff_iter=None, disp=False):
 
         for m in range(trials):
             if elementwise:
                 if evaluate_posterior:
-                    raise NotImplementedError("At the moment we only evaluate the posterior with vector parameters as it is more efficient.")
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(data_location, m)
                 else:
                     DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
             else:
@@ -404,7 +525,8 @@ def main(J=2, K=2, d=1, N=100, total_running_processes=1, data_location="/tmp/",
 
             args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol,                     
                     parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
-                    prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num)   
+                    prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num, 
+                    diff_iter, disp)   
             
             icm_posterior_power_annealing(Y, param_positions_dict, args)
             
@@ -415,7 +537,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
     
-    parallel = True
+    parallel = False
     if not parallel:
         jax.default_device = jax.devices("cpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
@@ -424,9 +546,11 @@ if __name__ == "__main__":
     niter = 10
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    elementwise = False
-    evaluate_posterior = True
+    elementwise = True
+    evaluate_posterior = False
     retries = 10
+    diff_iter = None
+    disp = True
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
@@ -436,8 +560,7 @@ if __name__ == "__main__":
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 50
-    # Change to univariate if optimising the parameter vector elementwise
+    gridpoints_num = 50    
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -452,8 +575,8 @@ if __name__ == "__main__":
     delta_n = 0.1
     tol = 1e-6    
     sigma_e_true = 1      
-    data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 200                 
     # full, with status quo
     # parameter_space_dim = (K+2*J)*d + J + K + 4
@@ -468,12 +591,12 @@ if __name__ == "__main__":
         elementwise=elementwise, evaluate_posterior=evaluate_posterior, delta_n=delta_n, L=niter, tol=tol, 
         prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, 
         prior_loc_phi=prior_loc_phi, prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, gridpoints_num=gridpoints_num)
-
+        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, gridpoints_num=gridpoints_num, diff_iter=diff_iter, disp=disp)
 
     # args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, annealing_schedule, delta_n, niter, tol,                     
     #                 parameter_space_dim, 0, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
-    #                 prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num) 
+    #                 prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num, 
+    #                 diff_iter, disp) 
     # with open("{}/{}/Y.pickle".format(data_location, 0), "rb") as f:
     #         Y = pickle.load(f)
     # Y = Y.astype(np.int8).reshape((K, J), order="F")    

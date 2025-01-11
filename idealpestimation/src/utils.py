@@ -306,6 +306,40 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
 
 ####################### ICM #############################
 
+def create_constraint_functions_icm(n, vector_coordinate=None, param=None, param_positions_dict=None, args=None):
+    
+    bounds = []
+    grid_width_std = 5
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
+        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
+    
+    if param == "alpha":
+        bounds.append((-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha))
+    elif param == "beta":
+        bounds.append((-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta))
+    elif param == "gamma":            
+        bounds.append((None, None))  ########## MODIFY TO SET NON_ZERO CONSTRAINT?
+    elif param == "delta":                    
+        bounds.append((None, None))  ########## MODIFY TO SET NON_ZERO CONSTRAINT?        
+    elif param == "mu_e":
+        bounds.append((None, None))
+    elif param == "sigma_e":
+        bounds.append((0.000001, 5))
+    else:
+        if d == 1 or elementwise:
+            if param == "Phi":
+                bounds.append((-grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate], grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate]))
+            elif param == "Z":
+                bounds.append((-grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate]))
+            elif param == "X":
+                bounds.append((-grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate]))        
+        else:
+            raise NotImplementedError("At the moment, we have not implemented diffentiation for multivariate parameter vector.")
+    
+    return bounds
+
 def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
     """
     Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
@@ -330,7 +364,6 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
                 ret = norm.logcdf(-x, loc=mean, scale=variance)       
                     
     return ret
-
 
 
 def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
@@ -574,21 +607,5 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
             logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
         
     return logpsigma_e**gamma
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ####################### ICM #############################
