@@ -403,8 +403,10 @@ def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, d
         philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
         log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
         logpx_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x)
-             
-    return logpx_i**gamma
+    
+    # print(theta)
+    # posterior to the power, log posterior -> product
+    return logpx_i*gamma
 
 def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1):
     # l denotes the coordinate of vector x_i
@@ -422,7 +424,7 @@ def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_name
         log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
         logpx_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(x_il, loc=prior_loc_x, scale=prior_scale_x)
              
-    return logpx_il**gamma
+    return logpx_il*gamma
 
 
 def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1):
@@ -440,7 +442,7 @@ def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_name
         log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
         logpphi_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi)
              
-    return logpphi_i**gamma
+    return logpphi_i*gamma
 
 
 def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1):
@@ -459,10 +461,12 @@ def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_
         log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
         logpphi_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(phi_il, loc=prior_loc_phi, scale=prior_scale_phi)
              
-    return logpphi_il**gamma
+    return logpphi_il*gamma
 
 def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                     prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100):
+    
+    # print(param_positions_dict["Z"])
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
@@ -479,11 +483,13 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
     
     if abs(penalty_weight_Z) > 1e-10:
         sum_Z_J_vectors = np.sum(Z, axis=1)    
-        obj = logpz_i + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+        obj = logpz_i*gamma + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
     else:
-        obj = logpz_i
+        obj = logpz_i*gamma
+    
+    # print(theta)
 
-    return obj**gamma
+    return obj
 
 
 def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
@@ -509,12 +515,14 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
     else:
         obj = logpz_il
 
-    return obj**gamma
+    return obj*gamma
 
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1):
     # Assuming independent, Gaussian alphas.
     # Hence, even when evaluating with vector parameters, we use the uni-dimensional posterior for alpha.
+
+    # print(param_positions_dict["alpha"][0],param_positions_dict["alpha"][0] + idx, idx)
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
@@ -527,10 +535,14 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
             philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
-             
-    return logpalpha_j**gamma
+    
+    # print(theta)
+
+    return logpalpha_j*gamma
 
 def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1):
+    
+    # print(param_positions_dict["beta"][0],param_positions_dict["beta"][0] + idx, idx)
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
@@ -543,8 +555,8 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
             philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             logpbeta_k += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta)
-             
-    return logpbeta_k**gamma
+
+    return logpbeta_k*gamma
 
 def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1):    
         
@@ -560,7 +572,7 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             logpgamma += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
                     
-    return logpgamma**gamma_annealing
+    return logpgamma*gamma_annealing
 
 def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1):    
     
@@ -591,7 +603,7 @@ def log_conditional_posterior_mu_e(mu_e, Y, theta, J, K, d, parameter_names, dst
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             logpmu_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
         
-    return logpmu_e**gamma
+    return logpmu_e*gamma
 
 def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1):    
     
@@ -606,6 +618,6 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
         
-    return logpsigma_e**gamma
+    return logpsigma_e*gamma
 
 ####################### ICM #############################

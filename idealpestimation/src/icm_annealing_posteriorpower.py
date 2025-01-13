@@ -26,7 +26,8 @@ from idealpestimation.src.utils import log_conditional_posterior_x_vec,  \
                                                                 log_conditional_posterior_phi_jl, \
                                                                     log_conditional_posterior_z_jl, \
                                                                         qmc, fix_plot_layout_and_save, \
-                                                                            create_constraint_functions_icm
+                                                                            create_constraint_functions_icm, \
+                                                                                optimisation_dict2paramvectors
 
 
 
@@ -72,12 +73,13 @@ class ProcessManagerSynthetic(ProcessManager):
 def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
 
     for param in param_positions_dict.keys():
-        if param_positions_dict[param][0] <= i and param_positions_dict[param][1] >= i:
+        if param_positions_dict[param][0] <= i and param_positions_dict[param][1] > i: # not equal to upper limit
             target_param = param
             index_in_flat_vector = i - param_positions_dict[param][0]            
             if target_param in ["X", "Z", "Phi"]:                
                 column = index_in_flat_vector // d
                 row = index_in_flat_vector % d
+                # print(target_param, i, column, row)
                 return target_param, column, row
             else:
                 # alpha, beta are vectors, not flattened matrices
@@ -88,7 +90,7 @@ def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
 
 def get_evaluation_grid(param, vector_coordinate, args):
 
-    grid_width_std = 5
+    grid_width_std = 3
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
@@ -109,7 +111,7 @@ def get_evaluation_grid(param, vector_coordinate, args):
     elif param == "mu_e":
         grid = np.linspace(-2, 2, gridpoints_num).tolist()
     elif param == "sigma_e":
-        grid = np.linspace(0.000001, 1.5, gridpoints_num).tolist()
+        grid = np.linspace(0.0001, 1.5, gridpoints_num).tolist()
     else:        
         if d == 1 or elementwise:
             if param == "Phi":
@@ -416,6 +418,10 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
                 if posterior_eval < min_f:
                     min_f = posterior_eval
                     param_estimate = gridpoint
+            
+            if param_estimate is None or np.any(np.isnan(param_estimate)) or np.any(np.isinf(param_estimate)):
+                ipdb.set_trace()
+            
             elapsedtime = str(timedelta(seconds=time.time()-t0))   
             time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
             hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)                    
@@ -423,7 +429,11 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
     else:
         raise NotImplementedError("More efficient to differentiate posterior coordinate-wise.")
 
-    theta_curr[param_positions_dict[param][0] + idx*d:param_positions_dict[param][0] + (idx + 1)*d] = param_estimate
+    if param in ["X", "Z", "Phi"]:
+        theta_curr[param_positions_dict[param][0] + idx*d:param_positions_dict[param][0] + (idx + 1)*d] = param_estimate
+    else:
+        # scalar updates and coordinate-wise updates of alphas/betas
+        theta_curr[param_positions_dict[param][0] + idx:param_positions_dict[param][0] + (idx + 1)] = param_estimate
 
     return theta_curr
 
@@ -445,12 +455,13 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
     delta_theta = np.inf
     while (L is not None and L > 0) or abs(delta_theta) > tol:
         for n in range(1, N+1, 1):
+            print(n, gamma)
             if elementwise:
                 for i in range(parameter_space_dim):                    
                     target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
                     theta_curr = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)                                        
             else:
-                for param in parameter_names:                    
+                for param in parameter_names:            
                     if param in ["X", "beta"]:  
                         for idx in range(K):
                             theta_curr = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)                                                            
@@ -459,15 +470,18 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
                             theta_curr = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)                                                            
                     else:
                         # scalars
-                        theta_curr = optimise_posterior_vector(param, 0, Y, gamma, theta_curr, param_positions_dict, L, args)                                                            
-                    # ipdb.set_trace()
+                        theta_curr = optimise_posterior_vector(param, 0, Y, gamma, theta_curr, param_positions_dict, L, args)
             gamma += delta_n
 
         if L is not None:
-            L = L - 1        
+            L = L - 1    
+        print(theta_prev)    
+        print(theta_curr)
         delta_theta = np.sum((theta_curr - theta_prev)**2)
-        theta_prev = theta_curr.copy()
-        print(L, gamma, delta_theta)
+        theta_prev = theta_curr.copy()       
+        print(L, delta_theta)
+    
+    return theta_curr
 
 def main(J=2, K=2, d=1, N=100, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
@@ -529,9 +543,25 @@ def main(J=2, K=2, d=1, N=100, total_running_processes=1, data_location="/tmp/",
                     parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
                     prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num, 
                     diff_iter, disp)   
-            
-            icm_posterior_power_annealing(Y, param_positions_dict, args)
-            
+            t0 = time.time()
+            theta = icm_posterior_power_annealing(Y, param_positions_dict, args)
+            # print(theta)
+
+            params_out = dict()
+            params_out["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            params_out["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
+            time_obj = datetime.strptime(params_out["elapsedtime"], '%H:%M:%S.%f')
+            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+            params_out["elapsedtime_hours"] = hours
+            params_out["param_positions_dict"] = param_positions_dict
+            for param in parameter_names:
+                params_out[param] = theta[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                if isinstance(params_out[param], np.ndarray):
+                    params_out[param] = params_out[param].tolist()
+            out_file = "{}/params_out_global_theta_hat.jsonl".format(DIR_out)
+            with open(out_file, 'a') as f:         
+                writer = jsonlines.Writer(f)
+                writer.write(params_out)
 
 if __name__ == "__main__":
 
@@ -545,8 +575,8 @@ if __name__ == "__main__":
         jax.config.update("jax_traceback_filtering", "off")
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 10
-    penalty_weight_Z = 0.0
+    niter = 3
+    penalty_weight_Z = 1000.0
     constant_Z = 0.0
     elementwise = False
     evaluate_posterior = True
@@ -562,7 +592,7 @@ if __name__ == "__main__":
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 5    
+    gridpoints_num = 100
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -574,11 +604,11 @@ if __name__ == "__main__":
     prior_loc_alpha = 0
     prior_scale_alpha = 0.5
     annealing_schedule = 10
-    delta_n = 0.1
+    delta_n = 0.05
     tol = 1e-6    
     sigma_e_true = 1      
-    # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 200                 
     # full, with status quo
     # parameter_space_dim = (K+2*J)*d + J + K + 4
