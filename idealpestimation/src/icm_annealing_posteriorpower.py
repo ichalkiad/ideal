@@ -445,7 +445,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
                 gridpoints_num, diff_iter, disp  = args
 
-    gamma = 1
+    # gamma = 1
+    l = 0
+    gamma = 3*delta_n**l
     delta_theta = np.inf
     theta_prev = np.zeros((parameter_space_dim,))
 
@@ -453,7 +455,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
     theta_curr = sampler.random_base2(m=4)[5]       
     
     delta_theta = np.inf
-    while (L is not None and L > 0) or abs(delta_theta) > tol:
+    while (L is not None and l < L) or abs(delta_theta) > tol:
         for n in range(1, N+1, 1):
             print(n, gamma)
             if elementwise:
@@ -471,10 +473,11 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args):
                     else:
                         # scalars
                         theta_curr = optimise_posterior_vector(param, 0, Y, gamma, theta_curr, param_positions_dict, L, args)
-            gamma += delta_n
+            # gamma += delta_n
+            gamma = 5*delta_n**l
 
         if L is not None:
-            L = L - 1    
+            l += 1    
         print(theta_prev)    
         print(theta_curr)
         delta_theta = np.sum((theta_curr - theta_prev)**2)
@@ -545,7 +548,7 @@ def main(J=2, K=2, d=1, N=100, total_running_processes=1, data_location="/tmp/",
                     diff_iter, disp)   
             t0 = time.time()
             theta = icm_posterior_power_annealing(Y, param_positions_dict, args)
-            # print(theta)
+            print(theta)
 
             params_out = dict()
             params_out["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -575,7 +578,7 @@ if __name__ == "__main__":
         jax.config.update("jax_traceback_filtering", "off")
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 3
+    niter = 20
     penalty_weight_Z = 1000.0
     constant_Z = 0.0
     elementwise = False
@@ -592,7 +595,7 @@ if __name__ == "__main__":
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 100
+    gridpoints_num = 20
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -603,8 +606,10 @@ if __name__ == "__main__":
     prior_scale_beta = 0.5
     prior_loc_alpha = 0
     prior_scale_alpha = 0.5
-    annealing_schedule = 10
-    delta_n = 0.05
+    annealing_schedule_duration = 10
+    # if using exponential annealing schedule
+    delta_n = 0.9
+    #delta_n = 0.05
     tol = 1e-6    
     sigma_e_true = 1      
     data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
@@ -615,7 +620,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_space_dim = (K+J)*d + J + K + 3
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
-    main(J=J, K=K, d=d, N=annealing_schedule, total_running_processes=total_running_processes, 
+    main(J=J, K=K, d=d, N=annealing_schedule_duration, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
         dst_func=dst_func, parameter_space_dim=parameter_space_dim, trials=M, 
@@ -625,7 +630,7 @@ if __name__ == "__main__":
         prior_loc_phi=prior_loc_phi, prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
         prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, gridpoints_num=gridpoints_num, diff_iter=diff_iter, disp=disp)
 
-    # args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, annealing_schedule, delta_n, niter, tol,                     
+    # args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, annealing_schedule_duration, delta_n, niter, tol,                     
     #                 parameter_space_dim, 0, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
     #                 prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num, 
     #                 diff_iter, disp) 
