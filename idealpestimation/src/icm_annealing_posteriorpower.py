@@ -417,11 +417,7 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
                 posterior_eval = -f(gridpoint)
                 if posterior_eval < min_f:
                     min_f = posterior_eval
-                    param_estimate = gridpoint
-            
-            if param_estimate is None or np.any(np.isnan(param_estimate)) or np.any(np.isinf(param_estimate)):
-                ipdb.set_trace()
-            
+                    param_estimate = gridpoint            
             elapsedtime = str(timedelta(seconds=time.time()-t0))   
             time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
             hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)                    
@@ -581,7 +577,7 @@ if __name__ == "__main__":
     niter = 20
     penalty_weight_Z = 1000.0
     constant_Z = 0.0
-    elementwise = False
+    elementwise = True
     evaluate_posterior = True
     retries = 10
     diff_iter = None

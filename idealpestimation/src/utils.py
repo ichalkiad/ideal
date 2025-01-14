@@ -465,9 +465,7 @@ def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_
 
 def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                     prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100):
-    
-    # print(param_positions_dict["Z"])
-    
+        
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
     Z[:, i] = zi
@@ -487,8 +485,6 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
     else:
         obj = logpz_i*gamma
     
-    # print(theta)
-
     return obj
 
 
@@ -511,11 +507,11 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
              
     if abs(penalty_weight_Z) > 1e-10:
         sum_Z_J_vectors = np.sum(Z, axis=1)    
-        obj = logpz_il + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+        obj = logpz_il*gamma + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
     else:
-        obj = logpz_il
+        obj = logpz_il*gamma
 
-    return obj*gamma
+    return obj
 
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1):
