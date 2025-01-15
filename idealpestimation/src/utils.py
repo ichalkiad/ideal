@@ -1,6 +1,7 @@
 from scipy.stats import qmc
 import ipdb
 import math
+import time
 import numpy as np
 import math
 import pathlib
@@ -12,6 +13,7 @@ import jax.numpy as jnp
 from jax import jvp, grad
 import jsonlines
 from scipy.optimize import approx_fprime
+from datetime import datetime, timedelta
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=True):
@@ -310,7 +312,7 @@ def create_constraint_functions_icm(n, vector_coordinate=None, param=None, param
     
     bounds = []
     grid_width_std = 5
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, delta_n, L, tol, \
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
                 gridpoints_num, diff_iter, disp  = args
@@ -340,30 +342,68 @@ def create_constraint_functions_icm(n, vector_coordinate=None, param=None, param
     
     return bounds
 
+
+def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
+    """
+    Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
+    """    
+    if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
+        if log_cdfx < -0.693:  #log(0.5)
+            # If CDF(x) < 0.5, direct computation is stable  
+            if use_jax:
+                ret = jnp.log1p(-jnp.exp(log_cdfx))
+            else:
+                ret = np.log1p(-np.exp(log_cdfx))
+        else: 
+            # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+            if use_jax:
+                ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)
+            else:
+                ret = norm.logcdf(-x, loc=mean, scale=variance)       
+    else:
+        if use_jax:
+            ret = jnp.zeros(log_cdfx.shape)
+            idx_case1 = jnp.argwhere(log_cdfx < -0.693)        
+            ret[idx_case1] = jnp.log1p(-jnp.exp(log_cdfx[idx_case1]))
+            idx_case2 = jnp.argwhere(log_cdfx >= -0.693)    
+            ret[idx_case2] = jax.scipy.stats.normal.logcdf(-x[idx_case2], loc=mean, scale=variance)     
+        else:              
+            ret = np.zeros(log_cdfx.shape)
+            idx_case1 = np.argwhere(log_cdfx < -0.693).flatten()        
+            if len(idx_case1) > 0:
+                ret[idx_case1] = np.log1p(-np.exp(log_cdfx[idx_case1]))
+            idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
+            if len(idx_case2) > 0:                
+                ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)            
+        
+    return ret
+
+
 def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
     """
     Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
     """    
-    if log_cdfx < -0.693:  #log(0.5)
-        # If CDF(x) < 0.5, direct computation is stable  
-        if use_jax:
-            ret = jnp.log1p(-jnp.exp(log_cdfx))
-        else:
-            ret = np.log1p(-np.exp(log_cdfx))
-    else: 
-        # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
-        if use_jax:
-            if isinstance(x, jnp.ndarray) and len(x.shape) > 1 and (x.shape[0] > 1 or x.shape[1] > 1):                        
-                ret = jax.scipy.stats.multivariate_normal.logcdf(x, mean=mean, cov=variance)            
-            else:            
-                ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)
-        else:
-            if isinstance(x, np.ndarray) and len(x.shape) > 1 and (x.shape[0] > 1 or x.shape[1] > 1):                        
-                ret = multivariate_normal.logcdf(x, mean=mean, cov=variance)            
-            else:            
-                ret = norm.logcdf(-x, loc=mean, scale=variance)       
-                    
-    return ret
+    def get_one_minus_logcdf(logcdfxx):
+        logcdfx, xx = logcdfxx
+        if logcdfx < -0.693:  #log(0.5)
+            # If CDF(x) < 0.5, direct computation is stable  
+            if use_jax:
+                ret = jnp.log1p(-jnp.exp(logcdfx))
+            else:
+                ret = np.log1p(-np.exp(logcdfx))
+        else: 
+            # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+            if use_jax:
+                ret = jax.scipy.stats.norm.logcdf(-xx, loc=mean, scale=variance)
+            else:
+                ret = norm.logcdf(-xx, loc=mean, scale=variance)       
+                        
+        return ret
+
+    if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1):        
+        return get_one_minus_logcdf((log_cdfx, x))
+    else:        
+        return np.array(list(map(get_one_minus_logcdf, zip(log_cdfx, x))))
 
 
 def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
@@ -384,9 +424,168 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
     # mu_e = params_hat["mu_e"]
     # sigma_e = params_hat["sigma_e"]
         
-    phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+    if isinstance(j, int):
+        phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+    else:        
+        x_broadcast = X[:, i][:, np.newaxis]
+        diff_xz = x_broadcast - Z
+        dst_xz = np.sum(diff_xz * diff_xz, axis=0)
+        if "Phi" in params_hat.keys():
+            diff_xphi = x_broadcast - Phi
+            dst_xphi = np.sum(diff_xphi * diff_xphi, axis=1)
+        else:
+            dst_xphi = 0
+        phi = gamma*dst_xz - delta*dst_xphi + alpha + beta[i]     
     
     return phi
+
+def get_T0(Y, J, K, d, parameter_names, dst_func, param_positions_dict, args):
+    
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+                gridpoints_num, diff_iter, disp  = args
+
+    sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
+    thetas = sampler.random_base2(m=10)
+    logps = []
+    for theta in thetas[1:]:      
+        params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
+        mu_e = params_hat["mu_e"]
+        sigma_e = params_hat["sigma_e"]
+        logp = 0
+        for j in range(J):
+            for i in range(K):
+                pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+                logp += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(params_hat["X"][:, i], mean=prior_loc_x, cov=prior_scale_x) \
+                                            + multivariate_normal.logpdf(params_hat["Z"][:, j], mean=prior_loc_z, cov=prior_scale_z) \
+                                            + multivariate_normal.logpdf(params_hat["alpha"][j], mean=prior_loc_alpha, cov=prior_scale_alpha)\
+                                            + multivariate_normal.logpdf(params_hat["beta"][i], mean=prior_loc_beta, cov=prior_scale_beta)
+        logps.append(logp[0])
+    
+    diffs = np.diff(logps)
+    T0 = 2*np.max(diffs)
+    
+    return T0
+
+def update_annealing_temperature(gamma_prev, n, temperature_rate, temperature_steps):
+
+    delta_n = None
+    if (gamma_prev >= temperature_steps[0] and gamma_prev <= temperature_steps[1]):
+        delta_n = temperature_rate[0]
+    elif (gamma_prev > temperature_steps[1] and gamma_prev <= temperature_steps[2]):
+        delta_n = temperature_rate[1]
+    elif (gamma_prev > temperature_steps[2] and gamma_prev <= temperature_steps[3]):
+        delta_n = temperature_rate[2]
+    elif (gamma_prev > temperature_steps[3]):
+        delta_n = temperature_rate[3]
+
+    print("Delta_{} = {}".format(n, delta_n))
+            
+    gamma = gamma_prev + delta_n
+
+    return gamma, delta_n
+
+def get_min_achievable_mse_under_rotation_scaling(param_true, param_hat):
+
+    """
+    Minimizes ||Y - (XR + t)||_F where ||.||_F is the Frobenius norm and R a rotation matrix
+    
+    """
+    if param_true.shape != param_hat.shape:
+        raise ValueError("Input matrices X and Y must have the same shape")
+    
+    X_mean = np.mean(param_hat, axis=0)
+    Y_mean = np.mean(param_true, axis=0)
+    
+    X_centered = param_hat - X_mean
+    Y_centered = param_true - Y_mean
+    
+    # Compute the covariance
+    H = X_centered.T @ Y_centered
+    
+    # SVD
+    U, S, Vt = np.linalg.svd(H)
+    
+    # Construct the rotation matrix
+    # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
+    d = np.linalg.det(Vt.T @ U.T)
+    M = np.eye(U.shape[1])
+    M[-1, -1] = d
+    R = Vt.T @ M @ U.T
+    
+    # Step 5: Compute the optimal translation
+    t = Y_mean - X_mean @ R
+    
+    # Compute the residual error
+    # error = np.linalg.norm(param_true - (param_hat @ R + t), 'fro')
+    error = np.sum((param_true - (param_hat @ R + t))**2)
+    
+    orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
+    det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
+    t_shape_correct = t.shape == (param_hat.shape[1],)
+    if not (orthogonality_error < 1e-10 and det_is_one and t_shape_correct):
+        raise AttributeError("Error in solving projection probelm?")
+    
+    return R, t, error
+
+
+def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta_n, gamma_n, args, param_positions_dict,
+                         plot_online=True, fig_theta_full=None, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[]):
+
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+    parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+            gridpoints_num, diff_iter, disp  = args
+
+    if fig_theta_full is None:
+        fig_theta_full = go.Figure()    
+    # compute with full theta vector
+    mse = np.sum((theta_true - theta_hat)**2)/len(theta_true)
+    mse_theta_full.append(mse)
+    fig_theta_full.add_trace(go.Box(
+                                y=mse_theta_full, 
+                                x=[delta_n] * len(mse_theta_full),
+                                name="Annealing step = {}<br>Iteration = {}<br>gamma_{}={}".format(annealing_step, iteration, annealing_step, gamma_n),
+                                boxpoints='outliers'
+                            ))
+    if plot_online:
+        fig_theta_full.show()
+
+    # compute min achievable mse for X, Z under rotation and scaling
+    params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+    X_true = np.asarray(params_true["X"]).reshape((d, K), order="F")       
+    Z_true = np.asarray(params_true["Z"]).reshape((d, J), order="F")                         
+
+    params_hat = optimisation_dict2params(theta_hat, param_positions_dict, J, K, d, parameter_names)
+    X_hat = np.asarray(params_hat["X"]).reshape((d, K), order="F")       
+    Z_hat = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
+
+    if fig_xz is None:
+        fig_xz = go.Figure()    
+    # compute with full theta vector
+    Rx, tx, mse_x = get_min_achievable_mse_under_rotation_scaling(param_true=X_true, param_hat=X_hat)
+    mse_x_list.append(mse_x)
+    Rz, tz, mse_z = get_min_achievable_mse_under_rotation_scaling(param_true=Z_true, param_hat=Z_hat)
+    mse_z_list.append(mse_z)
+    fig_xz.add_trace(go.Box(
+                            y=mse_x_list, 
+                            x=[delta_n] * len(mse_x_list),
+                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(annealing_step, iteration, annealing_step, gamma_n),
+                            boxpoints='outliers', line=dict(color="red")
+                            ))
+    fig_xz.add_trace(go.Box(
+                            y=mse_z_list, 
+                            x=[delta_n] * len(mse_z_list),
+                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(annealing_step, iteration, annealing_step, gamma_n),
+                            boxpoints='outliers', line=dict(color="green")
+                            ))
+    if plot_online:
+        fig_xz.show()
+
+    return mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz
 
 
 def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1):
@@ -398,14 +597,51 @@ def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, d
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     logpx_i = 0
+
+    testpij = []
+    testlogcdf = []
+    test1mlogcdf = []
+    
+    t0 = time.time()
     for j in range(J):
         pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+        testpij.append(pij)
+        
         philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+        testlogcdf.append(philogcdf)
+        
         log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+        test1mlogcdf.append(log_one_minus_cdf)
+        
         logpx_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x)
+    elapsedtime = str(timedelta(seconds=time.time()-t0))   
+    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+    print(time_obj)
     
-    # print(theta)
-    # posterior to the power, log posterior -> product
+    pitest = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdftest = norm.logcdf(pitest, loc=mu_e, scale=sigma_e)
+    
+    t0 = time.time()
+    log1mcdftestA = log_complement_from_log_cdf(logcdftest, pitest, mean=mu_e, variance=sigma_e)
+    elapsedtime = str(timedelta(seconds=time.time()-t0))   
+    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+    print(time_obj)
+    assert(np.allclose(np.asarray(test1mlogcdf).reshape(1,-1), log1mcdftestA.reshape(1,-1)))
+    
+    t0 = time.time()
+    log1mcdftestB = log_complement_from_log_cdf_vec(logcdftest, pitest, mean=mu_e, variance=sigma_e)
+    elapsedtime = str(timedelta(seconds=time.time()-t0))   
+    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+    print(time_obj)
+        
+    assert(np.allclose(np.asarray(testpij).reshape(1,-1), pitest.reshape(1,-1)))
+    assert(np.allclose(np.asarray(testlogcdf).reshape(1,-1), logcdftest.reshape(1,-1)))
+    assert(np.allclose(np.asarray(test1mlogcdf).reshape(1,-1), log1mcdftestB.reshape(1,-1)))
+    assert(np.allclose(log1mcdftestA.reshape(1,-1), log1mcdftestB.reshape(1,-1)))
+    
+    testlogpdf = np.sum(Y[i, :]*logcdftest + (1-Y[i, :])*log1mcdftestB + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x))
+    assert(np.allclose(testlogpdf, logpx_i))
+    
     return logpx_i*gamma
 
 def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1):
@@ -481,11 +717,11 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
     
     if abs(penalty_weight_Z) > 1e-10:
         sum_Z_J_vectors = np.sum(Z, axis=1)    
-        obj = logpz_i*gamma + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+        obj = logpz_i + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
     else:
-        obj = logpz_i*gamma
+        obj = logpz_i
     
-    return obj
+    return obj*gamma
 
 
 def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
@@ -507,11 +743,11 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
              
     if abs(penalty_weight_Z) > 1e-10:
         sum_Z_J_vectors = np.sum(Z, axis=1)    
-        obj = logpz_il*gamma + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+        obj = logpz_il + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
     else:
-        obj = logpz_il*gamma
+        obj = logpz_il
 
-    return obj
+    return obj*gamma
 
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1):
