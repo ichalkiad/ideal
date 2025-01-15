@@ -362,19 +362,43 @@ def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
                 ret = norm.logcdf(-x, loc=mean, scale=variance)       
     else:
         if use_jax:
-            ret = jnp.zeros(log_cdfx.shape)
-            idx_case1 = jnp.argwhere(log_cdfx < -0.693)        
-            ret[idx_case1] = jnp.log1p(-jnp.exp(log_cdfx[idx_case1]))
-            idx_case2 = jnp.argwhere(log_cdfx >= -0.693)    
-            ret[idx_case2] = jax.scipy.stats.normal.logcdf(-x[idx_case2], loc=mean, scale=variance)     
-        else:              
-            ret = np.zeros(log_cdfx.shape)
-            idx_case1 = np.argwhere(log_cdfx < -0.693).flatten()        
-            if len(idx_case1) > 0:
-                ret[idx_case1] = np.log1p(-np.exp(log_cdfx[idx_case1]))
-            idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
-            if len(idx_case2) > 0:                
-                ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)            
+            ret = jnp.zeros(log_cdfx.shape)                
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case1 = jnp.argwhere(log_cdfx < -0.693)
+                if idx_case1.size > 0:
+                    ret[log_cdfx < -0.693] = jnp.log1p(-jnp.exp(log_cdfx[log_cdfx < -0.693]))                     
+            else:
+                idx_case1 = jnp.argwhere(log_cdfx < -0.693).flatten()       
+                if idx_case1.size > 0:
+                    ret[idx_case1] = jnp.log1p(-np.exp(log_cdfx[idx_case1]))             
+
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case2 = jnp.argwhere(log_cdfx >= -0.693)
+                if idx_case2.size > 0:
+                   ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
+            else:
+                idx_case2 = jnp.argwhere(log_cdfx >= -0.693).flatten()    
+                if idx_case2.size > 0:                
+                    ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)        
+        else:               
+            ret = np.zeros(log_cdfx.shape)                
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case1 = np.argwhere(log_cdfx < -0.693)
+                if idx_case1.size > 0:
+                    ret[log_cdfx < -0.693] = np.log1p(-np.exp(log_cdfx[log_cdfx < -0.693]))                     
+            else:
+                idx_case1 = np.argwhere(log_cdfx < -0.693).flatten()       
+                if idx_case1.size > 0:
+                    ret[idx_case1] = np.log1p(-np.exp(log_cdfx[idx_case1]))             
+
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case2 = np.argwhere(log_cdfx >= -0.693)
+                if idx_case2.size > 0:
+                   ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
+            else:
+                idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
+                if idx_case2.size > 0:                
+                    ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)            
         
     return ret
 
@@ -389,21 +413,24 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
             # If CDF(x) < 0.5, direct computation is stable  
             if use_jax:
                 ret = jnp.log1p(-jnp.exp(logcdfx))
-            else:
+                # ret = jnp.asarray(list(ret))
+            else:                
                 ret = np.log1p(-np.exp(logcdfx))
+                # ret = np.asarray(list(ret))                
         else: 
             # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
             if use_jax:
                 ret = jax.scipy.stats.norm.logcdf(-xx, loc=mean, scale=variance)
             else:
-                ret = norm.logcdf(-xx, loc=mean, scale=variance)       
-                        
+                ret = norm.logcdf(-xx, loc=mean, scale=variance)             
+        
         return ret
 
     if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1):        
         return get_one_minus_logcdf((log_cdfx, x))
-    else:        
-        return np.array(list(map(get_one_minus_logcdf, zip(log_cdfx, x))))
+    else:                
+        retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
+        return np.array(retvallist)
 
 
 def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
@@ -424,18 +451,27 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
     # mu_e = params_hat["mu_e"]
     # sigma_e = params_hat["sigma_e"]
         
-    if isinstance(j, int):
+
+    if isinstance(i, int) and isinstance(j, int):
         phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
-    else:        
-        x_broadcast = X[:, i][:, np.newaxis]
-        diff_xz = x_broadcast - Z
-        dst_xz = np.sum(diff_xz * diff_xz, axis=0)
-        if "Phi" in params_hat.keys():
-            diff_xphi = x_broadcast - Phi
-            dst_xphi = np.sum(diff_xphi * diff_xphi, axis=1)
-        else:
-            dst_xphi = 0
-        phi = gamma*dst_xz - delta*dst_xphi + alpha + beta[i]     
+    else:
+        def pairwise_dst_fast(xi_betai):
+            xi, betai = xi_betai            
+            x_broadcast = xi[:, np.newaxis]
+            diff_xz = x_broadcast - Z
+            dst_xz = np.sum(diff_xz * diff_xz, axis=0)
+            if "Phi" in params_hat.keys():
+                diff_xphi = x_broadcast - Phi
+                dst_xphi = np.sum(diff_xphi * diff_xphi, axis=1)
+            else:
+                dst_xphi = 0
+            phi = gamma*dst_xz - delta*dst_xphi + alpha + betai     
+            return phi
+        if isinstance(i, int) and j is None:        
+            phi = pairwise_dst_fast((X[:, i], beta[i]))            
+        elif i is None and j is None:                          
+            arr_list = list(map(pairwise_dst_fast, zip(X.transpose(), beta)))
+            phi = np.vstack(arr_list)
     
     return phi
 
@@ -482,7 +518,7 @@ def update_annealing_temperature(gamma_prev, n, temperature_rate, temperature_st
     elif (gamma_prev > temperature_steps[3]):
         delta_n = temperature_rate[3]
 
-    print("Delta_{} = {}".format(n, delta_n))
+    # print("Delta_{} = {}".format(n, delta_n))
             
     gamma = gamma_prev + delta_n
 
@@ -532,7 +568,7 @@ def get_min_achievable_mse_under_rotation_scaling(param_true, param_hat):
     return R, t, error
 
 
-def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta_n, gamma_n, args, param_positions_dict,
+def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta_rate, gamma_n, args, param_positions_dict,
                          plot_online=True, fig_theta_full=None, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[]):
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
@@ -543,15 +579,15 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
     if fig_theta_full is None:
         fig_theta_full = go.Figure()    
     # compute with full theta vector
-    mse = np.sum((theta_true - theta_hat)**2)/len(theta_true)
-    mse_theta_full.append(mse)
-    fig_theta_full.add_trace(go.Box(
-                                y=mse_theta_full, 
-                                x=[delta_n] * len(mse_theta_full),
-                                name="Annealing step = {}<br>Iteration = {}<br>gamma_{}={}".format(annealing_step, iteration, annealing_step, gamma_n),
+    mse = np.sum((theta_true - theta_hat)**2)/len(theta_true)    
+    mse_theta_full.append(mse)    
+    if plot_online:
+        fig_theta_full.add_trace(go.Box(
+                                y=np.asarray(mse_theta_full).flatten(), 
+                                x=[delta_rate] * len(mse_theta_full),
+                                name="Annealing step = {}<br>Iteration = {}<br>gamma_{}={}".format(delta_rate, iteration, annealing_step, gamma_n),
                                 boxpoints='outliers'
                             ))
-    if plot_online:
         fig_theta_full.show()
 
     # compute min achievable mse for X, Z under rotation and scaling
@@ -569,26 +605,26 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
     Rx, tx, mse_x = get_min_achievable_mse_under_rotation_scaling(param_true=X_true, param_hat=X_hat)
     mse_x_list.append(mse_x)
     Rz, tz, mse_z = get_min_achievable_mse_under_rotation_scaling(param_true=Z_true, param_hat=Z_hat)
-    mse_z_list.append(mse_z)
-    fig_xz.add_trace(go.Box(
-                            y=mse_x_list, 
-                            x=[delta_n] * len(mse_x_list),
-                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(annealing_step, iteration, annealing_step, gamma_n),
+    mse_z_list.append(mse_z)    
+    if plot_online:
+        fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_x_list).tolist(), 
+                            x=[delta_rate] * len(mse_x_list),
+                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(delta_rate, iteration, annealing_step, gamma_n),
                             boxpoints='outliers', line=dict(color="red")
                             ))
-    fig_xz.add_trace(go.Box(
-                            y=mse_z_list, 
-                            x=[delta_n] * len(mse_z_list),
-                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(annealing_step, iteration, annealing_step, gamma_n),
+        fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_z_list).tolist(), 
+                            x=[delta_rate] * len(mse_z_list),
+                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(delta_rate, iteration, annealing_step, gamma_n),
                             boxpoints='outliers', line=dict(color="green")
                             ))
-    if plot_online:
         fig_xz.show()
 
     return mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz
 
 
-def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1):
+def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, debug=False):
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                         
@@ -596,55 +632,24 @@ def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, d
     theta[param_positions_dict["X"][0]:param_positions_dict["X"][1]] = X.reshape((d*K,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
-    logpx_i = 0
-
-    testpij = []
-    testlogcdf = []
-    test1mlogcdf = []
+    if debug:
+        _logpx_i = 0   
+        for j in range(J):
+            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                  
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)        
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)        
+            _logpx_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x)
     
-    t0 = time.time()
-    for j in range(J):
-        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
-        testpij.append(pij)
-        
-        philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-        testlogcdf.append(philogcdf)
-        
-        log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-        test1mlogcdf.append(log_one_minus_cdf)
-        
-        logpx_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x)
-    elapsedtime = str(timedelta(seconds=time.time()-t0))   
-    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
-    print(time_obj)
-    
-    pitest = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
-    logcdftest = norm.logcdf(pitest, loc=mu_e, scale=sigma_e)
-    
-    t0 = time.time()
-    log1mcdftestA = log_complement_from_log_cdf(logcdftest, pitest, mean=mu_e, variance=sigma_e)
-    elapsedtime = str(timedelta(seconds=time.time()-t0))   
-    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
-    print(time_obj)
-    assert(np.allclose(np.asarray(test1mlogcdf).reshape(1,-1), log1mcdftestA.reshape(1,-1)))
-    
-    t0 = time.time()
-    log1mcdftestB = log_complement_from_log_cdf_vec(logcdftest, pitest, mean=mu_e, variance=sigma_e)
-    elapsedtime = str(timedelta(seconds=time.time()-t0))   
-    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
-    print(time_obj)
-        
-    assert(np.allclose(np.asarray(testpij).reshape(1,-1), pitest.reshape(1,-1)))
-    assert(np.allclose(np.asarray(testlogcdf).reshape(1,-1), logcdftest.reshape(1,-1)))
-    assert(np.allclose(np.asarray(test1mlogcdf).reshape(1,-1), log1mcdftestB.reshape(1,-1)))
-    assert(np.allclose(log1mcdftestA.reshape(1,-1), log1mcdftestB.reshape(1,-1)))
-    
-    testlogpdf = np.sum(Y[i, :]*logcdftest + (1-Y[i, :])*log1mcdftestB + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x))
-    assert(np.allclose(testlogpdf, logpx_i))
+    pijs = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    logpx_i = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x))
+    if debug:
+        assert(np.allclose(logpx_i, _logpx_i))
     
     return logpx_i*gamma
 
-def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1):
+def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, debug=False):
     # l denotes the coordinate of vector x_i
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -653,17 +658,25 @@ def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_name
     theta[param_positions_dict["X"][0]:param_positions_dict["X"][1]] = X.reshape((d*K,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
-    logpx_il = 0
-    for j in range(J):
-        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
-        philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-        log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-        logpx_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(x_il, loc=prior_loc_x, scale=prior_scale_x)
+    if debug:
+        _logpx_il = 0
+        for j in range(J):
+            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+            _logpx_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(x_il, loc=prior_loc_x, scale=prior_scale_x)
+    
+    pijs = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    logpx_il = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(x_il, mean=prior_loc_x, cov=prior_scale_x))
+    if debug:
+        assert(np.allclose(logpx_il, _logpx_il))
              
     return logpx_il*gamma
 
 
-def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1):
+def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1, debug=False):
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")                         
@@ -671,17 +684,25 @@ def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_name
     theta[param_positions_dict["Phi"][0]:param_positions_dict["Phi"][1]] = Phi.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
-    logpphi_i = 0
-    for j in range(J):
-        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
-        philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-        log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-        logpphi_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi)
+    if debug:
+        _logpphi_i = 0
+        for j in range(J):
+            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+            _logpphi_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi)
+
+    pijs = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    logpphi_i = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi))
+    if debug:
+        assert(np.allclose(logpphi_i, _logpphi_i))
              
     return logpphi_i*gamma
 
 
-def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1):
+def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1, debug=False):
     # l denotes the coordinate of vector phi_i
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -690,17 +711,25 @@ def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_
     theta[param_positions_dict["Phi"][0]:param_positions_dict["Phi"][1]] = Phi.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
-    logpphi_il = 0
-    for j in range(J):
-        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
-        philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-        log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-        logpphi_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(phi_il, loc=prior_loc_phi, scale=prior_scale_phi)
-             
+    if debug:
+        _logpphi_il = 0
+        for j in range(J):
+            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+            _logpphi_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(phi_il, loc=prior_loc_phi, scale=prior_scale_phi)
+    
+    pijs = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    logpphi_il = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(phi_il, mean=prior_loc_phi, cov=prior_scale_phi))
+    if debug:
+        assert(np.allclose(logpphi_il, _logpphi_il))
+
     return logpphi_il*gamma
 
 def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
-                                    prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100):
+                                    prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, debug=False):
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
@@ -708,12 +737,20 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
     theta[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]] = Z.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
-    logpz_i = 0
-    for j in range(J):
-        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
-        philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-        log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-        logpz_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z)
+    if debug:
+        _logpz_i = 0
+        for j in range(J):
+            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+            _logpz_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z)
+    
+    pijs = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    logpz_i = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z))
+    if debug:
+        assert(np.allclose(logpz_i, _logpz_i))
     
     if abs(penalty_weight_Z) > 1e-10:
         sum_Z_J_vectors = np.sum(Z, axis=1)    
@@ -725,7 +762,7 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
 
 
 def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
-                                   prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100):
+                                   prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, debug=False):
     # l denotes the coordinate of vector z_i
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -734,13 +771,21 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
     theta[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]] = Z.reshape((d*J,), order="F")
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
-    logpz_il = 0
-    for j in range(J):
-        pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
-        philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-        log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-        logpz_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(z_il, loc=prior_loc_z, scale=prior_scale_z)
+    if debug:
+        _logpz_il = 0
+        for j in range(J):
+            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)        
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+            _logpz_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(z_il, loc=prior_loc_z, scale=prior_scale_z)
              
+    pijs = p_ij_arg(i, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    logpz_il = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(z_il, mean=prior_loc_z, cov=prior_scale_z))
+    if debug:
+        assert(np.allclose(logpz_il, _logpz_il))
+
     if abs(penalty_weight_Z) > 1e-10:
         sum_Z_J_vectors = np.sum(Z, axis=1)    
         obj = logpz_il + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
@@ -750,29 +795,33 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
     return obj*gamma
 
 
-def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1):
+def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1, debug=False):
     # Assuming independent, Gaussian alphas.
     # Hence, even when evaluating with vector parameters, we use the uni-dimensional posterior for alpha.
-
-    # print(param_positions_dict["alpha"][0],param_positions_dict["alpha"][0] + idx, idx)
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     theta[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][0] + idx] = alpha
-    logpalpha_j = 0
-    for j in range(J):
-        for i in range(K):
-            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
-            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
-    
-    # print(theta)
-
+    if debug:
+        _logpalpha_j = 0
+        for j in range(J):        
+            for i in range(K):
+                pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
+                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+                _logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
+                
+    pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    logpalpha_j = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
+    if debug:
+        assert(np.allclose(logpalpha_j, _logpalpha_j))
+   
     return logpalpha_j*gamma
 
-def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1):
+def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1, debug=False):
     
     # print(param_positions_dict["beta"][0],param_positions_dict["beta"][0] + idx, idx)
     
@@ -780,75 +829,115 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     theta[param_positions_dict["beta"][0]:param_positions_dict["beta"][0] + idx] = beta
-    logpbeta_k = 0
-    for j in range(J):
-        for i in range(K):
-            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
-            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            logpbeta_k += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta)
+    if debug:
+        _logpbeta_k = 0
+        for j in range(J):
+            for i in range(K):
+                pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
+                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+                _logpbeta_k += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta)
+
+    pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    logpbeta_k = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta))
+    if debug:
+        assert(np.allclose(logpbeta_k, _logpbeta_k))
 
     return logpbeta_k*gamma
 
-def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1):    
+def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1, debug=False):    
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     theta[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]] = gamma
-    logpgamma = 0
-    for j in range(J):
-        for i in range(K):
-            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
-            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            logpgamma += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+    if debug:
+        _logpgamma = 0
+        for j in range(J):
+            for i in range(K):
+                pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
+                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+                _logpgamma += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+
+    pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    logpgamma = np.sum(Y*logcdfs + (1-Y)*log1mcdfs)
+    if debug:
+        assert(np.allclose(logpgamma, _logpgamma))
                     
     return logpgamma*gamma_annealing
 
-def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1):    
+def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, debug=False):    
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     theta[param_positions_dict["delta"][0]:param_positions_dict["delta"][1]] = delta
-    logpdelta = 0
-    for j in range(J):
-        for i in range(K):
-            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)           
-            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            logpdelta += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
+    if debug:
+        _logpdelta = 0
+        for j in range(J):
+            for i in range(K):
+                pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)           
+                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+                _logpdelta += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
+
+    pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    logpdelta = np.sum(Y*logcdfs + (1-Y)*log1mcdfs)   
+    if debug:
+        assert(np.allclose(logpdelta, _logpdelta))     
         
     return logpdelta**gamma
 
-def log_conditional_posterior_mu_e(mu_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1):    
+def log_conditional_posterior_mu_e(mu_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, debug=False):    
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     sigma_e = params_hat["sigma_e"]
     theta[param_positions_dict["mu_e"][0]:param_positions_dict["mu_e"][1]] = mu_e
-    logpmu_e = 0
-    for j in range(J):
-        for i in range(K):
-            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
-            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            logpmu_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
+    if debug:
+        _logpmu_e = 0
+        for j in range(J):
+            for i in range(K):
+                pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
+                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+                _logpmu_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
+    
+    pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    logpmu_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs)   
+    if debug:
+        assert(np.allclose(logpmu_e, _logpmu_e))    
         
     return logpmu_e*gamma
 
-def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1):    
+def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, debug=False):    
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
     theta[param_positions_dict["sigma_e"][0]:param_positions_dict["sigma_e"][1]] = sigma_e
-    logpsigma_e = 0
-    for j in range(J):
-        for i in range(K):
-            pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
-            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
+    if debug:
+        _logpsigma_e = 0
+        for j in range(J):
+            for i in range(K):
+                pij = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)            
+                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+                _logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf
+    
+    pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)                
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    logpsigma_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs)   
+    if debug:
+        assert(np.allclose(logpsigma_e, _logpsigma_e)) 
         
     return logpsigma_e*gamma
 
