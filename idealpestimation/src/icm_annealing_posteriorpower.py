@@ -456,7 +456,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
     mse_x_list = []
     mse_z_list = []
 
-    while (L is not None and l < L) or abs(delta_theta) > tol:
+    while (L is not None and l < L) and abs(delta_theta) > tol:
         for n in range(N):
             print(n, gamma, delta_rate_prev)
             if elementwise:
@@ -495,7 +495,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
             l += 1            
         delta_theta = np.sum((theta_curr - theta_prev)**2)
         theta_prev = theta_curr.copy()       
-        # print(l, delta_theta)
+        print(l, delta_theta)
     
     return theta_curr
 
@@ -611,7 +611,7 @@ if __name__ == "__main__":
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 20
+    gridpoints_num = 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -623,8 +623,8 @@ if __name__ == "__main__":
     prior_loc_alpha = 0
     prior_scale_alpha = 0.5    
     temperature_steps = [0, 1, 2, 5, 10]
-    temperature_rate = [1e-3, 1e-2, 1e-1, 1]
-    annealing_schedule_duration = 900 + 100 + 30 + 5
+    temperature_rate = [1e-4, 1e-3, 1e-2, 0.1] #[1e-3, 1e-2, 1e-1, 1]
+    annealing_schedule_duration = 9000 + 1000 + 300 + 50
     print(annealing_schedule_duration)
     tol = 1e-6    
     sigma_e_true = 1      

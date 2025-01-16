@@ -1,18 +1,15 @@
 import os 
 import sys
-import time 
 import ipdb
 import pathlib
 import jsonlines
 import pickle
 import numpy as np
-from datetime import datetime
 from scipy.stats import norm
 from scipy.optimize import minimize
 from jax import hessian
 import math
 import random
-from datetime import timedelta
 from idealpestimation.src.parallel_manager import ProcessManager, \
                                                     jsonlines
 from idealpestimation.src.utils import params2optimisation_dict, \
@@ -21,7 +18,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
-                                                            create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf
+                                                            create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf, time, datetime, timedelta
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
@@ -682,29 +679,29 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
     print("Observed data points per data split: {}".format(N*J))        
-    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
-        parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
-        penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
+    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+    #     data_location=data_location, parallel=parallel, 
+    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
+    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
+    #     penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
-    # params_out_jsonl = dict()
-    # for m in range(M):
-    #     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
-    #     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
-    #     params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
-    #     for param in parameter_names:
-    #         if param == "X":                
-    #             params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()                        
-    #         elif param == "Z":
-    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
-    #         elif param == "Phi":            
-    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
-    #         elif param in ["beta", "alpha"]:
-    #             params_out_jsonl[param] = params_out[param].tolist()            
-    #         else:
-    #             params_out_jsonl[param] = params_out[param]
-    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
-    #     with open(out_file, 'a') as f:         
-    #         writer = jsonlines.Writer(f)
-    #         writer.write(params_out_jsonl)
+    params_out_jsonl = dict()
+    for m in range(M):
+        data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+        # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+        params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
+        for param in parameter_names:
+            if param == "X":                
+                params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()                        
+            elif param == "Z":
+                params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
+            elif param == "Phi":            
+                params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
+            elif param in ["beta", "alpha"]:
+                params_out_jsonl[param] = params_out[param].tolist()            
+            else:
+                params_out_jsonl[param] = params_out[param]
+        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out_jsonl)
