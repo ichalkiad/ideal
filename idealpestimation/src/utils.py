@@ -347,40 +347,42 @@ def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
     """
     Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
     """    
-    if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
-        if log_cdfx < -0.693:  #log(0.5)
-            # If CDF(x) < 0.5, direct computation is stable  
-            if use_jax:
+    if use_jax:
+        if len(log_cdfx.shape)==0 or (isinstance(log_cdfx, jnp.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
+            if log_cdfx < -0.693:  #log(0.5)
+                # If CDF(x) < 0.5, direct computation is stable  
                 ret = jnp.log1p(-jnp.exp(log_cdfx))
-            else:
-                ret = np.log1p(-np.exp(log_cdfx))
-        else: 
-            # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
-            if use_jax:
-                ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)
-            else:
-                ret = norm.logcdf(-x, loc=mean, scale=variance)       
-    else:
-        if use_jax:
-            ret = jnp.zeros(log_cdfx.shape)                
+            else: 
+                # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+                ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)       
+        else:
+            ret = jnp.zeros(log_cdfx.shape)    
             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
                 idx_case1 = jnp.argwhere(log_cdfx < -0.693)
                 if idx_case1.size > 0:
-                    ret[log_cdfx < -0.693] = jnp.log1p(-jnp.exp(log_cdfx[log_cdfx < -0.693]))                     
+                    ret.at[log_cdfx < -0.693].set(jnp.log1p(-jnp.exp(log_cdfx[log_cdfx < -0.693])))                  
             else:
                 idx_case1 = jnp.argwhere(log_cdfx < -0.693).flatten()       
                 if idx_case1.size > 0:
-                    ret[idx_case1] = jnp.log1p(-np.exp(log_cdfx[idx_case1]))             
+                    ret.at[idx_case1].set(jnp.log1p(-np.exp(log_cdfx[idx_case1])))          
 
             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
                 idx_case2 = jnp.argwhere(log_cdfx >= -0.693)
                 if idx_case2.size > 0:
-                   ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
+                    ret.at[log_cdfx >= -0.693].set(jax.scipy.stats.norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance))
             else:
                 idx_case2 = jnp.argwhere(log_cdfx >= -0.693).flatten()    
                 if idx_case2.size > 0:                
-                    ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)        
-        else:               
+                    ret.at[idx_case2].set(jax.scipy.stats.norm.logcdf(-x[idx_case2], loc=mean, scale=variance))       
+    else:
+        if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
+            if log_cdfx < -0.693:  #log(0.5)
+                # If CDF(x) < 0.5, direct computation is stable  
+                ret = np.log1p(-np.exp(log_cdfx))
+            else: 
+                # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+                ret = norm.logcdf(-x, loc=mean, scale=variance)       
+        else:                          
             ret = np.zeros(log_cdfx.shape)                
             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
                 idx_case1 = np.argwhere(log_cdfx < -0.693)
@@ -394,12 +396,12 @@ def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
                 idx_case2 = np.argwhere(log_cdfx >= -0.693)
                 if idx_case2.size > 0:
-                   ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
+                    ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
             else:
                 idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
                 if idx_case2.size > 0:                
-                    ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)            
-        
+                    ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)   
+              
     return ret
 
 
@@ -426,51 +428,95 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
         
         return ret
 
-    if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1):        
-        return get_one_minus_logcdf((log_cdfx, x))
-    else:                
-        retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
-        return np.array(retvallist)
+    if use_jax:
+        if len(log_cdfx.shape)==0 or (isinstance(log_cdfx, jnp.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1):        
+            return get_one_minus_logcdf((log_cdfx, x))
+        else:                
+            retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
+            return jnp.array(retvallist)
+    else:
+        if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1):        
+            return get_one_minus_logcdf((log_cdfx, x))
+        else:                
+            retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
+            return np.array(retvallist)
 
 
-def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict):
+
+def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict, use_jax=False):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
-    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
-    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")      
-    if "Phi" in params_hat.keys(): 
-        Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
-        delta = params_hat["delta"]
+    if use_jax:
+        X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
+        Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")      
+        if "Phi" in params_hat.keys(): 
+            Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+            delta = jnp.asarray(params_hat["delta"])
+        else:
+            Phi = jnp.zeros(Z.shape)
+            delta = 0
+        alpha = jnp.asarray(params_hat["alpha"])
+        beta = jnp.asarray(params_hat["beta"])
+        # c = params_hat["c"]
+        gamma = jnp.asarray(params_hat["gamma"])    
+        # mu_e = params_hat["mu_e"]
+        # sigma_e = params_hat["sigma_e"]        
+        if isinstance(i, int) and isinstance(j, int):
+            phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+        else:
+            def pairwise_dst_fast(xi_betai):
+                xi, betai = xi_betai            
+                x_broadcast = xi[:, jnp.newaxis]
+                diff_xz = x_broadcast - Z
+                dst_xz = jnp.sum(diff_xz * diff_xz, axis=0)
+                if "Phi" in params_hat.keys():
+                    diff_xphi = x_broadcast - Phi
+                    dst_xphi = jnp.sum(diff_xphi * diff_xphi, axis=1)
+                else:
+                    dst_xphi = 0
+                phi = gamma*dst_xz - delta*dst_xphi + alpha + betai     
+                return phi
+            if isinstance(i, int) and j is None:        
+                phi = pairwise_dst_fast((X[:, i], beta[i]))            
+            elif i is None and j is None:                          
+                arr_list = list(map(pairwise_dst_fast, zip(X.transpose(), beta)))
+                phi = jnp.vstack(arr_list)
     else:
-        Phi = np.zeros(Z.shape)
-        delta = 0
-    alpha = params_hat["alpha"]
-    beta = params_hat["beta"]
-    # c = params_hat["c"]
-    gamma = params_hat["gamma"]    
-    # mu_e = params_hat["mu_e"]
-    # sigma_e = params_hat["sigma_e"]        
+        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
+        Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")      
+        if "Phi" in params_hat.keys(): 
+            Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+            delta = params_hat["delta"]
+        else:
+            Phi = np.zeros(Z.shape)
+            delta = 0
+        alpha = params_hat["alpha"]
+        beta = params_hat["beta"]
+        # c = params_hat["c"]
+        gamma = params_hat["gamma"]    
+        # mu_e = params_hat["mu_e"]
+        # sigma_e = params_hat["sigma_e"]        
 
-    if isinstance(i, int) and isinstance(j, int):
-        phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
-    else:
-        def pairwise_dst_fast(xi_betai):
-            xi, betai = xi_betai            
-            x_broadcast = xi[:, np.newaxis]
-            diff_xz = x_broadcast - Z
-            dst_xz = np.sum(diff_xz * diff_xz, axis=0)
-            if "Phi" in params_hat.keys():
-                diff_xphi = x_broadcast - Phi
-                dst_xphi = np.sum(diff_xphi * diff_xphi, axis=1)
-            else:
-                dst_xphi = 0
-            phi = gamma*dst_xz - delta*dst_xphi + alpha + betai     
-            return phi
-        if isinstance(i, int) and j is None:        
-            phi = pairwise_dst_fast((X[:, i], beta[i]))            
-        elif i is None and j is None:                          
-            arr_list = list(map(pairwise_dst_fast, zip(X.transpose(), beta)))
-            phi = np.vstack(arr_list)
+        if isinstance(i, int) and isinstance(j, int):
+            phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+        else:
+            def pairwise_dst_fast(xi_betai):
+                xi, betai = xi_betai            
+                x_broadcast = xi[:, np.newaxis]
+                diff_xz = x_broadcast - Z
+                dst_xz = np.sum(diff_xz * diff_xz, axis=0)
+                if "Phi" in params_hat.keys():
+                    diff_xphi = x_broadcast - Phi
+                    dst_xphi = np.sum(diff_xphi * diff_xphi, axis=1)
+                else:
+                    dst_xphi = 0
+                phi = gamma*dst_xz - delta*dst_xphi + alpha + betai     
+                return phi
+            if isinstance(i, int) and j is None:        
+                phi = pairwise_dst_fast((X[:, i], beta[i]))            
+            elif i is None and j is None:                          
+                arr_list = list(map(pairwise_dst_fast, zip(X.transpose(), beta)))
+                phi = np.vstack(arr_list)
     
     return phi
 
@@ -589,7 +635,7 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
                             ))
         fig_theta_full.show()
         savename = "{}/mse_plots_theta/theta_full.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_theta/").mkdir(parents=True, exist_ok=True)     
+        pathlib.Path("{}/mse_plots_theta/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig_theta_full, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=False)
 
@@ -624,7 +670,7 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
                             ))
         fig_xz.show()
         savename = "{}/mse_plots_xz/theta_xz_rotated_translated.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_xz/").mkdir(parents=True, exist_ok=True)     
+        pathlib.Path("{}/mse_plots_xz/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=False)
 

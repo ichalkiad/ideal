@@ -64,6 +64,7 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                     hess = np.asarray(hessian(nloglik_jax)(params_jax))                    
                     # Add small regularization to prevent singularity
                     variance = -np.linalg.inv(hess + 1e-8 * np.eye(len(params)))            
+                    ipdb.set_trace()
                 if np.any(np.isnan(variance)):                                
                     raise ArithmeticError
                 else:
@@ -130,16 +131,16 @@ def maximum_likelihood_estimator(
 
     if result.success:
         try:        
-            variance_noninv, hessian, variance_diag, variance_status = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
+            variance_noninv, hessian_mat, variance_diag, variance_status = variance_estimation(estimation_result=result, loglikelihood=likelihood_function,
                                         data=data, full_hessian=full_hessian, diag_hessian_only=diag_hessian_only,
                                         loglikelihood_per_data_point=loglikelihood_per_data_point, nloglik_jax=negloglik_jax, parallel=parallel)
             result["variance_method"] = variance_method
             result["variance_diag"] = variance_diag
             result["variance_status"] = variance_status
             if full_hessian:
-                result["full_hessian"] = hessian
+                result["full_hessian"] = hessian_mat
                 if plot_hessian:
-                    fig = visualise_hessian(hessian)
+                    fig = visualise_hessian(hessian_mat)
                     fix_plot_layout_and_save(fig, "{}/hessian_{}_{}.html".format(output_dir, subdataset_name.replace(".pickle", ""), datetime.now().strftime("%Y-%m-%d")),
                                             xaxis_title="", yaxis_title="", title="Full Hessian matrix estimate", showgrid=False, showlegend=False,
                                             print_png=True, print_html=True, print_pdf=False)
@@ -159,7 +160,7 @@ def maximum_likelihood_estimator(
         
     return mle, result
 
-def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=True):
+def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
     mu_e = params_hat["mu_e"]
@@ -187,11 +188,12 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
     sum_Z_J_vectors = np.sum(Z, axis=1)    
     return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
 
-def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=True):
+def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
-    Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")       
+    Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")   
+    Y = jnp.asarray(Y)    
     if "Phi" in params_hat.keys():
         Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
         delta = jnp.asarray(params_hat["delta"])
@@ -208,22 +210,34 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     errloc = mu_e 
     _nll = 0
     dst_func = lambda x, y: jnp.sum((x-y)**2)
-    if debug:
-        for i in range(K):
-            for j in range(J):
-                pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]           
-                philogcdf = jax.scipy.stats.norm.logcdf(jnp.asarray(pij_arg), loc=jnp.asarray(errloc), scale=jnp.asarray(errscale))
-                log_one_minus_cdf = log_complement_from_log_cdf(jnp.asarray(philogcdf), jnp.asarray(pij_arg), mean=jnp.asarray(errloc), variance=jnp.asarray(errscale), use_jax=True)
+
+    pij_argJ = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict, use_jax=True)  
+    philogcdfJ = jax.scipy.stats.norm.logcdf(pij_argJ, loc=errloc, scale=errscale)
+    # log_one_minus_cdfJ = log_complement_from_log_cdf_vec(philogcdfJ, pij_argJ, mean=errloc, variance=errscale, use_jax=True) - probably numerical errors vs iterative
+    log_one_minus_cdfJ = jnp.zeros(philogcdfJ.shape)
+    nlltest = 0
+    for i in range(K):
+        for j in range(J):
+            if debug:
+                pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]    
+                philogcdf = jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+            else:
+                pij_arg = pij_argJ[i, j]
+                philogcdf = philogcdfJ[i, j]
+            
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, 
+                                                            variance=errscale, use_jax=True)
+            if debug:
+                log_one_minus_cdfJ.at[i,j].set(log_one_minus_cdf[0])
+                nlltest += (1-Y[i, j])*log_one_minus_cdfJ[i,j]
                 _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
-    
-    pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
-    philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
-    nll = jnp.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
-
+            else:
+                nlltest += (1-Y[i, j])*log_one_minus_cdf
+                
+    nll = jnp.sum(Y*philogcdfJ) + nlltest
     if debug:
-        assert(np.allclose(nll, _nll))
-
+        assert(jnp.allclose(nll, _nll))
+        
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
@@ -704,23 +718,23 @@ if __name__ == "__main__":
         dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
-    params_out_jsonl = dict()
-    for m in range(M):
-        data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
-        # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
-        params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
-        for param in parameter_names:
-            if param == "X":                
-                params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()                        
-            elif param == "Z":
-                params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
-            elif param == "Phi":            
-                params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
-            elif param in ["beta", "alpha"]:
-                params_out_jsonl[param] = params_out[param].tolist()            
-            else:
-                params_out_jsonl[param] = params_out[param]
-        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
-        with open(out_file, 'a') as f:         
-            writer = jsonlines.Writer(f)
-            writer.write(params_out_jsonl)
+    # params_out_jsonl = dict()
+    # for m in range(M):
+    #     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+    #     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+    #     params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
+    #     for param in parameter_names:
+    #         if param == "X":                
+    #             params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()                        
+    #         elif param == "Z":
+    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
+    #         elif param == "Phi":            
+    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
+    #         elif param in ["beta", "alpha"]:
+    #             params_out_jsonl[param] = params_out[param].tolist()            
+    #         else:
+    #             params_out_jsonl[param] = params_out[param]
+    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+    #     with open(out_file, 'a') as f:         
+    #         writer = jsonlines.Writer(f)
+    #         writer.write(params_out_jsonl)
