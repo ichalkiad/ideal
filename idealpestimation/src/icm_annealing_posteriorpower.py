@@ -293,13 +293,9 @@ def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vec
                                 param_estimate = result["gridpoint"]
                             else:
                                 continue
-                    elapsedtime = str(timedelta(seconds=time.time()-t0))   
-                    time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
-                    hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)   
-                    print(elapsedtime)  
-                    
-                    # ipdb.set_trace()
-            
+                elapsedtime = str(timedelta(seconds=time.time()-t0))   
+                time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+                hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)               
             except KeyboardInterrupt:
                 # On Ctrl-C stop all processes
                 print("\nShutting down gracefully...")
@@ -318,11 +314,7 @@ def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vec
                     param_estimate = gridpoint
             elapsedtime = str(timedelta(seconds=time.time()-t0))   
             time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
-            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)   
-            print(elapsedtime)                 
-            
-            # ipdb.set_trace()
-    
+            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)       
     else:
         # use previously evaluation grid as starting points grid
         retry = 0
@@ -349,11 +341,13 @@ def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vec
             else:              
                 grid.remove(gridpoint)
                 retry += 1
+        elapsedtime = str(timedelta(seconds=time.time()-t0))   
+        time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+        hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)    
        
-    
     theta_curr[idx] = param_estimate
     
-    return theta_curr
+    return theta_curr, time_obj
 
 def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, l, args):
     
@@ -371,7 +365,8 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
         if parallel:
             manager = ProcessManagerSynthetic(total_running_processes)  
             try:   
-                manager.create_results_dict(optim_target="all")    
+                manager.create_results_dict(optim_target="all")  
+                t0 = time.time()
                 while True:                    
                     for gridpoint in grid:
                         worker_args = (f, gridpoint, gamma, l, DIR_out, param, idx, None) 
@@ -389,7 +384,10 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
                         time.sleep(1)  
                         ################################################## 
                     if manager.all_processes_complete.is_set():
-                        break                    
+                        break  
+                elapsedtime = str(timedelta(seconds=time.time()-t0))   
+                time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+                hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)                   
                 if manager.all_processes_complete.is_set():                        
                     out_folder = "{}/{}/{}/".format(DIR_out, param, l)
                     min_f = np.inf
@@ -430,7 +428,7 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
         # scalar updates and coordinate-wise updates of alphas/betas
         theta_curr[param_positions_dict[param][0] + idx:param_positions_dict[param][0] + (idx + 1)] = param_estimate
 
-    return theta_curr
+    return theta_curr, time_obj
 
 
 def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None, temperature_rate=None, temperature_steps=None, plot_online=True):
@@ -462,34 +460,34 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
             if elementwise:
                 for i in range(parameter_space_dim):                    
                     target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
-                    theta_curr = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)                                        
+                    theta_curr, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)                                        
             else:
                 for param in parameter_names:            
                     if param in ["X", "beta"]:  
-                        for idx in range(K):
-                            theta_curr = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)                                                            
+                        param_no = K                                                      
                     elif param in ["Z", "Phi", "alpha"]:
-                        for idx in range(J):
-                            theta_curr = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)                                                            
+                        param_no = J                                                        
                     else:
                         # scalars
-                        theta_curr = optimise_posterior_vector(param, 0, Y, gamma, theta_curr, param_positions_dict, L, args)     
-                    print(theta_curr)       
-            gamma, delta_rate = update_annealing_temperature(gamma, n, temperature_rate, temperature_steps)
-            if delta_rate_prev is not None and delta_rate_prev < delta_rate:                
-                mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
-                                compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
-                                    plot_online=True, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                    mse_z_list=mse_z_list)                            
-                mse_theta_full = []                
-                mse_x_list = []
-                mse_z_list = []
-            else:
-                mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
-                                compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
-                                    plot_online=False, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                    mse_z_list=mse_z_list)                                            
-            delta_rate_prev = delta_rate
+                        param_no = 1
+                    for idx in range(param_no):
+                        theta_curr, _ = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)     
+                        print(theta_curr)       
+                        gamma, delta_rate = update_annealing_temperature(gamma, n, temperature_rate, temperature_steps)
+                        if delta_rate_prev is not None and delta_rate_prev < delta_rate:                
+                            mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
+                                            compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                                plot_online=True, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                                                mse_z_list=mse_z_list)                            
+                            mse_theta_full = []                
+                            mse_x_list = []
+                            mse_z_list = []
+                        else:
+                            mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
+                                            compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                                plot_online=False, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                                                mse_z_list=mse_z_list)                                            
+                        delta_rate_prev = delta_rate
 
         if L is not None:
             l += 1            
@@ -611,7 +609,7 @@ if __name__ == "__main__":
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 30
+    gridpoints_num = 50
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -619,12 +617,12 @@ if __name__ == "__main__":
     prior_loc_phi = np.zeros((d,))
     prior_scale_phi = np.eye(d)
     prior_loc_beta = 0
-    prior_scale_beta = 0.5
+    prior_scale_beta = 1
     prior_loc_alpha = 0
-    prior_scale_alpha = 0.5    
+    prior_scale_alpha = 1    
     temperature_steps = [0, 1, 2, 5, 10]
-    temperature_rate = [1e-4, 1e-3, 1e-2, 0.1] #[1e-3, 1e-2, 1e-1, 1]
-    annealing_schedule_duration = 9000 + 1000 + 300 + 50
+    temperature_rate = [1e-3, 1e-3, 1e-1, 1] #[1e-3, 1e-2, 1e-1, 1]
+    annealing_schedule_duration = 9000 + 1000 + 30 + 5
     print(annealing_schedule_duration)
     tol = 1e-6    
     sigma_e_true = 1      

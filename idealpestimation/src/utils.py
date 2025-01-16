@@ -449,8 +449,7 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
     # c = params_hat["c"]
     gamma = params_hat["gamma"]    
     # mu_e = params_hat["mu_e"]
-    # sigma_e = params_hat["sigma_e"]
-        
+    # sigma_e = params_hat["sigma_e"]        
 
     if isinstance(i, int) and isinstance(j, int):
         phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
@@ -589,6 +588,10 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
                                 boxpoints='outliers'
                             ))
         fig_theta_full.show()
+        savename = "{}/mse_plots_theta/theta_full.html".format(DIR_out)
+        pathlib.Path("{}/mse_plots_theta/").mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig_theta_full, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
+                            print_png=True, print_html=True, print_pdf=False)
 
     # compute min achievable mse for X, Z under rotation and scaling
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
@@ -610,16 +613,20 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_list).tolist(), 
                             x=[delta_rate] * len(mse_x_list),
-                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(delta_rate, iteration, annealing_step, gamma_n),
+                            name="Users<br>Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(delta_rate, iteration, annealing_step, gamma_n),
                             boxpoints='outliers', line=dict(color="red")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_z_list).tolist(), 
                             x=[delta_rate] * len(mse_z_list),
-                            name="Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(delta_rate, iteration, annealing_step, gamma_n),
+                            name="Politicians<br>Annealing step = {:.4f}<br>Iteration = {}<br>gamma_{}={}".format(delta_rate, iteration, annealing_step, gamma_n),
                             boxpoints='outliers', line=dict(color="green")
                             ))
         fig_xz.show()
+        savename = "{}/mse_plots_xz/theta_xz_rotated_translated.html".format(DIR_out)
+        pathlib.Path("{}/mse_plots_xz/").mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
+                            print_png=True, print_html=True, print_pdf=False)
 
     return mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz
 

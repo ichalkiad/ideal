@@ -18,7 +18,8 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
-                                                            create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf, time, datetime, timedelta
+                                                            create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf, \
+                                                                time, datetime, timedelta, log_complement_from_log_cdf_vec
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
@@ -158,26 +159,35 @@ def maximum_likelihood_estimator(
         
     return mle, result
 
-def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z):
+def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=True):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
+    errscale = sigma_e
+    errloc = mu_e          
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")    
-    nll = 0
-    for i in range(K):
-        for j in range(J):
-            pij_arg = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
-            errscale = sigma_e
-            errloc = mu_e            
-            philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
-            nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+    _nll = 0
+    if debug:
+        for i in range(K):
+            for j in range(J):
+                pij_arg = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+                philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+
+    pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+    philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+    nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
+
+    if debug:
+        assert(np.allclose(nll, _nll))
 
     sum_Z_J_vectors = np.sum(Z, axis=1)    
     return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
 
-def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z):
+def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=True):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
@@ -194,16 +204,25 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     gamma = jnp.asarray(params_hat["gamma"])    
     mu_e = jnp.asarray(params_hat["mu_e"])
     sigma_e = jnp.asarray(params_hat["sigma_e"])
-    nll = 0
+    errscale = sigma_e
+    errloc = mu_e 
+    _nll = 0
     dst_func = lambda x, y: jnp.sum((x-y)**2)
-    for i in range(K):
-        for j in range(J):
-            pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
-            errscale = sigma_e
-            errloc = mu_e            
-            philogcdf = jax.scipy.stats.norm.logcdf(jnp.asarray(pij_arg), loc=jnp.asarray(errloc), scale=jnp.asarray(errscale))
-            log_one_minus_cdf = log_complement_from_log_cdf(jnp.asarray(philogcdf), jnp.asarray(pij_arg), mean=jnp.asarray(errloc), variance=jnp.asarray(errscale), use_jax=True)
-            nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+    if debug:
+        for i in range(K):
+            for j in range(J):
+                pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]           
+                philogcdf = jax.scipy.stats.norm.logcdf(jnp.asarray(pij_arg), loc=jnp.asarray(errloc), scale=jnp.asarray(errscale))
+                log_one_minus_cdf = log_complement_from_log_cdf(jnp.asarray(philogcdf), jnp.asarray(pij_arg), mean=jnp.asarray(errloc), variance=jnp.asarray(errscale), use_jax=True)
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+    
+    pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+    philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+    nll = jnp.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
+
+    if debug:
+        assert(np.allclose(nll, _nll))
 
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
@@ -644,7 +663,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
     
-    parallel = True
+    parallel = False
     if not parallel:
         jax.default_device = jax.devices("gpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
@@ -679,11 +698,11 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
     print("Observed data points per data split: {}".format(N*J))        
-    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-    #     data_location=data_location, parallel=parallel, 
-    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
-    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
-    #     penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
+    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
+        penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
     params_out_jsonl = dict()
     for m in range(M):
