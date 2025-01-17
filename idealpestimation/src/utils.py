@@ -15,6 +15,7 @@ import jsonlines
 from scipy.optimize import approx_fprime
 from datetime import datetime, timedelta
 
+
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=True):
         fig.update_xaxes(showline=True, linewidth=2, linecolor='black')
@@ -67,7 +68,7 @@ def params2optimisation_dict(J, K, d, parameter_names, X, Z, Phi, alpha, beta, g
         if param == "X":
             param_positions_dict[param] = (k, k + K*d)   
             Xvec = X.reshape((d*K,), order="F").tolist()        
-            optim_vector.extend(Xvec)
+            optim_vector.extend(Xvec)            
             k += K*d    
         elif param == "Z":
             param_positions_dict[param] = (k, k + J*d)            
@@ -458,11 +459,9 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
         alpha = jnp.asarray(params_hat["alpha"])
         beta = jnp.asarray(params_hat["beta"])
         # c = params_hat["c"]
-        gamma = jnp.asarray(params_hat["gamma"])    
-        # mu_e = params_hat["mu_e"]
-        # sigma_e = params_hat["sigma_e"]        
-        if isinstance(i, int) and isinstance(j, int):
-            phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
+        gamma = jnp.asarray(params_hat["gamma"])        
+        if isinstance(i, int) and isinstance(j, int):            
+            phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]            
         else:
             def pairwise_dst_fast(xi_betai):
                 xi, betai = xi_betai            
@@ -493,15 +492,13 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
         alpha = params_hat["alpha"]
         beta = params_hat["beta"]
         # c = params_hat["c"]
-        gamma = params_hat["gamma"]    
-        # mu_e = params_hat["mu_e"]
-        # sigma_e = params_hat["sigma_e"]        
+        gamma = params_hat["gamma"]       
 
         if isinstance(i, int) and isinstance(j, int):
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
         else:
             def pairwise_dst_fast(xi_betai):
-                xi, betai = xi_betai            
+                xi, betai = xi_betai  
                 x_broadcast = xi[:, np.newaxis]
                 diff_xz = x_broadcast - Z
                 dst_xz = np.sum(diff_xz * diff_xz, axis=0)
@@ -871,7 +868,7 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
     logpalpha_j = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
     if debug:
         assert(np.allclose(logpalpha_j, _logpalpha_j))
-   
+    
     return logpalpha_j*gamma
 
 def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1, debug=False):
@@ -897,7 +894,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     logpbeta_k = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta))
     if debug:
         assert(np.allclose(logpbeta_k, _logpbeta_k))
-
+    
     return logpbeta_k*gamma
 
 def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1, debug=False):    
