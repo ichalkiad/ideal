@@ -20,6 +20,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
                                                             create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf, \
                                                                 time, datetime, timedelta, log_complement_from_log_cdf_vec
+from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
                         data=None, full_hessian=True, diag_hessian_only=True, nloglik_jax=None, parallel=False):
@@ -256,20 +257,36 @@ def estimate_mle(args):
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
     
+    gridpoints_num = 20
+    args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
+            parameter_space_dim, None, None, None, None, None, None, None, 
+            0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
+    
+    X_list = get_evaluation_grid("X", None, args)
+    Z_list = get_evaluation_grid("Z", None, args)
+    alpha_list = get_evaluation_grid("alpha", None, args)
+    beta_list = get_evaluation_grid("beta", None, args)
+    gamma_list = get_evaluation_grid("gamma", None, args)
+    mu_e_list = get_evaluation_grid("mu_e", None, args)
+    sigma_e_list = get_evaluation_grid("sigma_e", None, args)    
+    Phi_list = None
+    phiidx_all = None
+    delta_list = None
+    deltaidx_all = None
     # init parameter vector x0 - ensure 2**m > retries
-    m_sobol = 12
-    if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
-        raise AttributeError("Generate more Sobol points")
-    X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
+    # m_sobol = 12
+    # if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
+    #     raise AttributeError("Generate more Sobol points")
+    # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
     xidx_all = np.arange(0, len(X_list), 1).tolist()
     zidx_all = np.arange(0, len(Z_list), 1).tolist()
-    if "Phi" in parameter_names:
-        phiidx_all = np.arange(0, len(Phi_list), 1).tolist()
+    # if "Phi" in parameter_names:
+    #     phiidx_all = np.arange(0, len(Phi_list), 1).tolist()
     alphaidx_all = np.arange(0, len(alpha_list), 1).tolist()    
     betaidx_all = np.arange(0, len(beta_list), 1).tolist()    
     gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
-    if "delta" in parameter_names:
-        deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
+    # if "delta" in parameter_names:
+    #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
     mueidx_all = np.arange(0, len(mu_e_list), 1).tolist()    
     sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()   
 
@@ -676,7 +693,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
     
-    parallel = True
+    parallel = False
     if not parallel:
         jax.default_device = jax.devices("gpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
@@ -693,7 +710,7 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
     M = 1
     K = 10000
-    J = 100
+    J = 500
     sigma_e_true = 0.5
     d = 2    
     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
