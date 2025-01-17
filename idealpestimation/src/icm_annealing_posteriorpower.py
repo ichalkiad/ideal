@@ -89,28 +89,30 @@ def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
 
 def get_evaluation_grid(param, vector_coordinate, args):
 
-    grid_width_std = 5
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+    grid_width_std = 5    
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-                gridpoints_num, diff_iter, disp  = args
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp  = args
+    gridpoints_num_alpha_beta = gridpoints_num*10
     
     if param == "alpha":
-        grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, gridpoints_num).tolist()
+        grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, gridpoints_num_alpha_beta).tolist()
     elif param == "beta":
-        grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, gridpoints_num).tolist()
+        grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, gridpoints_num_alpha_beta).tolist()
     elif param == "gamma":            
-        grid = np.linspace(-2, 2, gridpoints_num).tolist()
+        grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma, grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma, gridpoints_num_alpha_beta).tolist()
         if 0.0 in grid:
             grid.remove(0.0)
     elif param == "delta":                    
-        grid = np.linspace(-2, 2, gridpoints_num).tolist()
+        grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta, grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta, gridpoints_num_alpha_beta).tolist()
         if 0.0 in grid:
             grid.remove(0.0)        
     elif param == "mu_e":
-        grid = np.linspace(-2, 2, gridpoints_num).tolist()
+        grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_mue)+prior_loc_mue, grid_width_std*np.sqrt(prior_scale_mue)+prior_loc_mue, gridpoints_num_alpha_beta).tolist()
     elif param == "sigma_e":
-        grid = np.linspace(0.001, 1.5, gridpoints_num).tolist()
+        grid = np.linspace(0.000001, grid_width_std*np.sqrt(prior_scale_sigmae)+prior_loc_sigmae, gridpoints_num_alpha_beta).tolist()
     else:        
         if d == 1 or elementwise:
             if param == "Phi":
@@ -136,32 +138,36 @@ def get_evaluation_grid(param, vector_coordinate, args):
 
 def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_curr, gamma, param_positions_dict, args):
     
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-                gridpoints_num, diff_iter, disp  = args
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp  = args
     
-    f = get_posterior_for_optimisation_vec(param=param, Y=Y, idx=idx, vector_coordinate=vector_coordinate, theta_curr=theta_curr, 
+    f = get_posterior_for_optimisation_vec(param=param, Y=Y, idx=idx, vector_index_in_param_matrix=idx, vector_coordinate=vector_coordinate, theta=theta_curr, 
                                            gamma=gamma, param_positions_dict=param_positions_dict, args=args)
-    
-    if elementwise and vector_coordinate is None:
-        xx_ = np.linspace(-2, 2, 30)
-        xx = itertools.product(*[xx_, xx_])    
-        yy = np.asarray([f(x)[0] for x in xx]).flatten()
-    else:
+
+    if vector_coordinate is None:
+        xx_ = np.linspace(-5, 5, 100)
+        xx = itertools.product(*[xx_, xx_])  
+        xxlist = [ix for ix in xx]        
+        yy = np.asarray(list(map(f, xxlist)))          
+        # yy = np.asarray([f(x)[0] for x in xx]).flatten()
+    else:        
         if param == "gamma":
-            xx_ = np.linspace(-5, 5, 300)
+            xx_ = np.linspace(-5, 5, 1000)
         elif param == "mu_e":
-            xx_ = np.linspace(-10, 10, 500)
+            xx_ = np.linspace(-100, 100, 1000)
         elif param == "sigma_e":
-            xx_ = np.linspace(0.0001, 1.5, 300)
+            xx_ = np.linspace(0.0001, 1.5, 1000)
         else:
-            xx_ = np.linspace(-2, 2, 300)
-        yy = np.asarray([f(x)[0] for x in xx_]).flatten()
+            xx_ = np.linspace(-5, 5, 1000)        
+        yy = np.asarray(list(map(f, xx_)))        
+        # yy = np.asarray([f(x)[0] for x in xx_]).flatten()
         
     if vector_coordinate is not None:
         fig = go.Figure(data=go.Scatter(
-                        x=[xxx for xxx in xx_],
+                        x=xx_,
                         y=yy,
                         mode='lines',
                         name=param,
@@ -185,7 +191,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                                     showlabels=True
                                 ),
                         colorbar=dict(
-                            title='Value',
+                            title='Loglikelihood',
                             titleside='right'
                         )
                     )
@@ -200,60 +206,63 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     savename = "{}/{}_idx_{}_vector_coord_{}.html".format(outdir, param, idx, vector_coordinate)
     fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
     
-def get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matrix, vector_coordinate, theta_curr, gamma, param_positions_dict, args):
+def get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matrix, vector_coordinate, theta, gamma, param_positions_dict, args):
 
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-                gridpoints_num, diff_iter, disp  = args
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp  = args
 
     if param == "X":
         if elementwise and isinstance(vector_coordinate, int):
-            post2optim = lambda x: log_conditional_posterior_x_il(x, vector_coordinate, vector_index_in_param_matrix, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, 
+            post2optim = lambda x: log_conditional_posterior_x_il(x, vector_coordinate, vector_index_in_param_matrix, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, 
                                                                   prior_loc_x[vector_coordinate], prior_scale_x[vector_coordinate, vector_coordinate], gamma)
         else:
-            post2optim = lambda x: log_conditional_posterior_x_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x, prior_scale_x, gamma)  
+            post2optim = lambda x: log_conditional_posterior_x_vec(x, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x, prior_scale_x, gamma)  
     elif param == "Z":
         if elementwise and isinstance(vector_coordinate, int):
-            post2optim = lambda x: log_conditional_posterior_z_jl(x, vector_coordinate, vector_index_in_param_matrix, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z[vector_coordinate], 
+            post2optim = lambda x: log_conditional_posterior_z_jl(x, vector_coordinate, vector_index_in_param_matrix, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z[vector_coordinate], 
                                                                 prior_scale_z[vector_coordinate, vector_coordinate], gamma, constant_Z, penalty_weight_Z)
         else:
-            post2optim = lambda x: log_conditional_posterior_z_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z, prior_scale_z, gamma, 
+            post2optim = lambda x: log_conditional_posterior_z_vec(x, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z, prior_scale_z, gamma, 
                                                                 constant_Z, penalty_weight_Z)
     elif param == "Phi":            
         if elementwise and isinstance(vector_coordinate, int):
-            post2optim = lambda x: log_conditional_posterior_phi_jl(x, vector_coordinate, vector_index_in_param_matrix, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi[vector_coordinate], 
+            post2optim = lambda x: log_conditional_posterior_phi_jl(x, vector_coordinate, vector_index_in_param_matrix, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi[vector_coordinate], 
                                                                     prior_scale_phi[vector_coordinate, vector_coordinate], gamma)
         else:
-            post2optim = lambda x: log_conditional_posterior_phi_vec(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi, prior_scale_phi, gamma)
+            post2optim = lambda x: log_conditional_posterior_phi_vec(x, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi, prior_scale_phi, gamma)
     elif param == "beta":
         if elementwise and isinstance(vector_coordinate, int):
             idx = vector_coordinate
-        post2optim = lambda x: log_conditional_posterior_beta_i(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta, prior_scale_beta, gamma)
+        post2optim = lambda x: log_conditional_posterior_beta_i(x, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_beta, prior_scale_beta, gamma)
     elif param == "alpha":
         if elementwise and isinstance(vector_coordinate, int):
             idx = vector_coordinate
-        post2optim = lambda x: log_conditional_posterior_alpha_j(x, idx, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha, prior_scale_alpha, gamma)
+        post2optim = lambda x: log_conditional_posterior_alpha_j(x, idx, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_alpha, prior_scale_alpha, gamma)
     elif param == "gamma":
-        post2optim = lambda x: log_conditional_posterior_gamma(x, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=gamma) 
+        post2optim = lambda x: log_conditional_posterior_gamma(x, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=gamma, prior_loc_gamma=prior_loc_gamma, prior_scale_gamma=prior_scale_gamma) 
     elif param == "delta":
-        post2optim = lambda x: log_conditional_posterior_delta(x, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, gamma)    
+        post2optim = lambda x: log_conditional_posterior_delta(x, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma, prior_loc_delta, prior_scale_delta)    
     elif param == "mu_e":
-        post2optim = lambda x: log_conditional_posterior_mu_e(x, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, gamma)         
+        post2optim = lambda x: log_conditional_posterior_mu_e(x, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma, prior_loc_mue, prior_scale_mue)         
     elif param == "sigma_e":
-        post2optim = lambda x: log_conditional_posterior_sigma_e(x, Y, theta_curr, J, K, d, parameter_names, dst_func, param_positions_dict, gamma) 
+        post2optim = lambda x: log_conditional_posterior_sigma_e(x, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma, prior_loc_sigmae, prior_scale_sigmae) 
         
     return post2optim
 
 def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, l, args, debug=False):
     
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-                gridpoints_num, diff_iter, disp  = args
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp  = args
     
+    theta_test_in = theta_curr.copy()
     # Negate its result for the negative log posterior likelihood
-    f = get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matrix, vector_coordinate, theta_curr, gamma, param_positions_dict, args)
+    f = get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matrix, vector_coordinate, theta_test_in, gamma, param_positions_dict, args)
     # get grid depending on param
     grid = get_evaluation_grid(param, vector_coordinate, args)      
     if evaluate_posterior:                  
@@ -361,21 +370,24 @@ def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vec
         elapsedtime = str(timedelta(seconds=time.time()-t0))   
         time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
         hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)    
-       
-    theta_curr[idx] = param_estimate
     
-    return theta_curr, elapsedtime
+    theta_test_out = theta_curr.copy()
+    theta_test_out[idx] = param_estimate
+    
+    return theta_test_out, elapsedtime
 
 def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, l, args, debug=False):
     
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-                gridpoints_num, diff_iter, disp  = args
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp  = args
     
+    theta_test_in = theta_curr.copy()
     if evaluate_posterior:
         # Negate its result for the negative log posterior likelihood        
-        f = get_posterior_for_optimisation_vec(param, Y, idx, idx, None, theta_curr, gamma, param_positions_dict, args)
+        f = get_posterior_for_optimisation_vec(param, Y, idx, idx, None, theta_test_in, gamma, param_positions_dict, args)
         # get grid depending on param
         grid = get_evaluation_grid(param, None, args)        
         # parallel eval grid
@@ -448,7 +460,7 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
             if debug:
                 param_estimate_map = grid_list[np.argmax(grideval_map)]
             else:                
-                param_estimate = grid_list[np.argmax(grideval_map)]
+                param_estimate = grid_list[np.argmax(grideval_map)]           
             elapsedtime = str(timedelta(seconds=time.time()-t0))  
             if debug:
                 print("Map elapsed time: {}".format(elapsedtime))                         
@@ -457,28 +469,40 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
     else:
         raise NotImplementedError("More efficient to differentiate posterior coordinate-wise.")
 
+    theta_test_out = theta_curr.copy()
     if param in ["X", "Z", "Phi"]:
-        theta_curr[param_positions_dict[param][0] + idx*d:param_positions_dict[param][0] + (idx + 1)*d] = param_estimate
+        theta_test_out[param_positions_dict[param][0] + idx*d:param_positions_dict[param][0] + (idx + 1)*d] = param_estimate
     else:
         # scalar updates and coordinate-wise updates of alphas/betas
-        theta_curr[param_positions_dict[param][0] + idx:param_positions_dict[param][0] + (idx + 1)] = param_estimate
+        theta_test_out[param_positions_dict[param][0] + idx:param_positions_dict[param][0] + (idx + 1)] = param_estimate
 
-    return theta_curr, elapsedtime
+    return theta_test_out, elapsedtime
 
 
 def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None, temperature_rate=None, temperature_steps=None, plot_online=True):
 
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
+    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-                gridpoints_num, diff_iter, disp  = args
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp  = args
 
-    gamma = 0.001
+    gamma = 0.1
     # T0 = get_T0(Y, J, K, d, parameter_names, dst_func, param_positions_dict, args)#3
-    l = 0    
+    l = 0
+    n = 0
+    i = 0    
     delta_theta = np.inf
     theta_prev = np.zeros((parameter_space_dim,))
 
+    all_gammas = []
+    for gidx in range(len(temperature_steps[1:])):
+        upperlim = temperature_steps[1+gidx]        
+        start = gamma if gidx==0 else all_gammas[-1]        
+        all_gammas.extend(np.arange(start, upperlim, temperature_rate[gidx]))            
+    N = len(all_gammas)
+    print("Annealing schedule: {}".format(N))
+    
     sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
     theta_curr = sampler.random_base2(m=4)[5]       
     delta_rate_prev = None
@@ -488,33 +512,42 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
     fig_xz = None
     mse_x_list = []
     mse_z_list = []
-    print(theta_true)
-    while (L is not None and l < L) and abs(delta_theta) > tol:
-        for n in range(N):
-            print(n, gamma, delta_rate_prev)
+    # print(theta_true)
+    total_iter = 1    
+    while (L is not None and l < L) and not np.isclose(delta_theta, tol):
+        n = 0
+        while n < N and not np.isclose(delta_theta, tol):
+            # print(n, gamma, delta_rate_prev)
             if elementwise:
-                for i in range(parameter_space_dim):                    
-                    target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
-                    theta_curr, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)
-                    # print(theta_curr)       
-                    # for paramm in parameter_names:
-                    #     print("Paramm", paramm)
-                    #     print(theta_curr[param_positions_dict[paramm][0]:param_positions_dict[paramm][1]])
-                    gamma, delta_rate = update_annealing_temperature(gamma, n, temperature_rate, temperature_steps)
-                    if delta_rate_prev is not None and delta_rate_prev < delta_rate:                
+                i = 0
+                while i < parameter_space_dim and abs(delta_theta) > tol:
+                    target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)                    
+                    theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)
+                    theta_curr = theta_test.copy()
+                    gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas=all_gammas)
+                    delta_theta = np.sum((theta_curr - theta_prev)**2)                    
+                    if delta_rate_prev is not None and delta_rate_prev < delta_rate or (total_iter % 50 == 0 and total_iter > 1):                
                         mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
-                                        compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                        compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
                                             plot_online=True, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                                             mse_z_list=mse_z_list)                            
+                        print(l, n, i, total_iter, delta_theta, mse_theta_full[-1])     
                         mse_theta_full = []                
                         mse_x_list = []
-                        mse_z_list = []
+                        mse_z_list = []                        
                     else:
                         mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
-                                        compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                        compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
                                             plot_online=False, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                                             mse_z_list=mse_z_list)                                            
-                    delta_rate_prev = delta_rate                                        
+                        print(l, n, i, total_iter, delta_theta, mse_theta_full[-1])     
+                    delta_rate_prev = delta_rate      
+                    theta_prev = theta_curr.copy()                                            
+                    total_iter += 1   
+                    i += 1
+                    n += 1                                      
+                    # if abs(delta_theta) < tol:
+                    #     break           
             else:
                 for param in parameter_names:            
                     if param in ["X", "beta"]:  
@@ -523,41 +556,53 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
                         param_no = J                                                        
                     else:
                         # scalars
-                        param_no = 1
+                        param_no = 1                    
                     for idx in range(param_no):
-                        theta_curr, _ = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)     
+                        theta_test, _ = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)     
+                        theta_curr = theta_test.copy()
                         # print(theta_curr)       
-                        gamma, delta_rate = update_annealing_temperature(gamma, n, temperature_rate, temperature_steps)
-                        if delta_rate_prev is not None and delta_rate_prev < delta_rate:                
+                        gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)
+                        if (delta_rate_prev is not None and delta_rate_prev < delta_rate) or (total_iter % 50 == 0 and total_iter > 1):                
                             mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
-                                            compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                            compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
                                                 plot_online=True, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                                mse_z_list=mse_z_list)                            
+                                                mse_z_list=mse_z_list)    
+                            # print(l, n, idx, total_iter, delta_theta, mse_theta_full[-1])                             
                             mse_theta_full = []                
                             mse_x_list = []
                             mse_z_list = []
                         else:
                             mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
-                                            compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                            compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
                                                 plot_online=False, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                                mse_z_list=mse_z_list)                                            
+                                                mse_z_list=mse_z_list)      
+                            # print(l, n, idx, total_iter, delta_theta, mse_theta_full[-1])                                           
                         delta_rate_prev = delta_rate
-
-        if L is not None:
-            l += 1            
-        delta_theta = np.sum((theta_curr - theta_prev)**2)
-        theta_prev = theta_curr.copy()       
-        print(l, delta_theta)
+                        delta_theta = np.sum((theta_curr - theta_prev)**2)  
+                        theta_prev = theta_curr.copy()    
+                        print(total_iter, delta_theta)                                           
+                        total_iter += 1                                                
+                        if np.isclose(delta_theta, tol):                            
+                            break
+                    if np.isclose(delta_theta, tol):
+                            break
+                print(theta_curr)
+        l += 1            
+        # delta_theta = np.sum((theta_curr - theta_prev)**2)
+        # theta_prev = theta_curr.copy()       
+        # print(l, delta_theta)
     
     return theta_curr
 
-def main(J=2, K=2, d=1, N=100, total_running_processes=1, data_location="/tmp/", 
+def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
         parameter_space_dim=None, trials=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10,
         elementwise=True, evaluate_posterior=True, temperature_rate=[0, 1], temperature_steps=[1e-3], 
         L=20, tol=1e-6, prior_loc_x=0, prior_scale_x=1, 
         prior_loc_z=0, prior_scale_z=1, prior_loc_phi=0, prior_scale_phi=1, prior_loc_beta=0, prior_scale_beta=1, 
-        prior_loc_alpha=0, prior_scale_alpha=1, gridpoints_num=10, optimization_method="L-BFGS-B", diff_iter=None, disp=False,
+        prior_loc_alpha=0, prior_scale_alpha=1, prior_loc_gamma=0, prior_scale_gamma=1, prior_loc_delta=0, prior_scale_delta=1, 
+        prior_loc_mue=0, prior_scale_mue=1, prior_loc_sigmae=0, prior_scale_sigmae=1,
+        gridpoints_num=10, optimization_method="L-BFGS-B", diff_iter=None, disp=False,
         theta_true=None):
 
         for m in range(trials):
@@ -609,10 +654,11 @@ def main(J=2, K=2, d=1, N=100, total_running_processes=1, data_location="/tmp/",
                     param_positions_dict[param] = (k, k + 1)                                
                     k += 1
 
-            args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol,                     
+            args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                     parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
-                    prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num, 
-                    diff_iter, disp)   
+                    prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
+                    prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, 
+                    gridpoints_num, diff_iter, disp)   
             t0 = time.time()
             theta = icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=theta_true,
                                                    temperature_rate=temperature_rate, temperature_steps=temperature_steps)
@@ -663,25 +709,33 @@ if __name__ == "__main__":
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 10
+    gridpoints_num = 100
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
     prior_scale_z = np.eye(d)
     prior_loc_phi = np.zeros((d,))
     prior_scale_phi = np.eye(d)
-    prior_loc_beta = 0
-    prior_scale_beta = 1
     prior_loc_alpha = 0
     prior_scale_alpha = 1    
+    prior_loc_beta = 0
+    prior_scale_beta = 1
+    prior_loc_gamma = 0
+    prior_scale_gamma = 1    
+    prior_loc_delta = 0
+    prior_scale_delta= 1    
+    prior_loc_mue = 0
+    prior_scale_mue = 1    
+    # a
+    prior_loc_sigmae = 1.0
+    # b
+    prior_scale_sigmae = 0.5
     temperature_steps = [0, 1, 2, 5, 10]
-    temperature_rate = [1e-3, 1e-3, 1e-2, 1] #[1e-3, 1e-2, 1e-1, 1]
-    annealing_schedule_duration = 990 + 1000 + 300 + 5
-    print(annealing_schedule_duration)
-    tol = 1e-6    
-    sigma_e_true = 1      
+    temperature_rate = [1e-3, 1e-2, 1e-1, 1] #[1e-3, 1e-2, 1e-1, 1]    
+    tol = 1e-8    
+    sigma_e_true = 0.5
     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto_barbera/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 50                 
     param_positions_dict = dict()            
     k = 0
@@ -723,7 +777,7 @@ if __name__ == "__main__":
             for param in parameter_names:
                 theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
-    main(J=J, K=K, d=d, N=annealing_schedule_duration, total_running_processes=total_running_processes, 
+    main(J=J, K=K, d=d, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
         dst_func=dst_func, parameter_space_dim=parameter_space_dim, trials=M, 
@@ -731,12 +785,18 @@ if __name__ == "__main__":
         elementwise=elementwise, evaluate_posterior=evaluate_posterior, temperature_rate=temperature_rate, temperature_steps=temperature_steps, L=niter, tol=tol, 
         prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, 
         prior_loc_phi=prior_loc_phi, prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, gridpoints_num=gridpoints_num, diff_iter=diff_iter, disp=disp, theta_true=theta_true)
+        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, 
+        prior_loc_gamma=prior_loc_gamma, prior_scale_gamma=prior_scale_gamma, 
+        prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+        prior_loc_mue=prior_loc_mue, prior_scale_mue=prior_scale_mue,
+        prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae,
+        gridpoints_num=gridpoints_num, diff_iter=diff_iter, disp=disp, theta_true=theta_true)
 
-    # args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, annealing_schedule_duration, niter, tol,                     
-    #                 parameter_space_dim, 0, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
-    #                 prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, gridpoints_num, 
-    #                 diff_iter, disp) 
+    # args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, niter, tol,                     
+    #         parameter_space_dim, 0, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
+    #         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
+    #         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, 
+    #         gridpoints_num, diff_iter, disp) 
     # with open("{}/{}/Y.pickle".format(data_location, 0), "rb") as f:
     #         Y = pickle.load(f)
     # Y = Y.astype(np.int8).reshape((K, J), order="F")    
