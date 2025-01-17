@@ -260,7 +260,7 @@ def estimate_mle(args):
     gridpoints_num = 100
     args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
-            0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
+            np.zeros((d,)), np.eye((d,)), np.zeros((d,)), np.eye((d,)), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
     
     X_list = get_evaluation_grid("X", None, args)
     Z_list = get_evaluation_grid("Z", None, args)
@@ -695,7 +695,11 @@ if __name__ == "__main__":
     
     parallel = False
     if not parallel:
-        jax.default_device = jax.devices("gpu")[0]
+        try:
+            jax.default_device = jax.devices("gpu")[0]
+        except:
+            print("Using cpu")
+            jax.default_device = jax.devices("cpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
