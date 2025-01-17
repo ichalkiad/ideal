@@ -64,7 +64,6 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                     hess = np.asarray(hessian(nloglik_jax)(params_jax))                    
                     # Add small regularization to prevent singularity
                     variance = -np.linalg.inv(hess + 1e-8 * np.eye(len(params)))            
-                    ipdb.set_trace()
                 if np.any(np.isnan(variance)):                                
                     raise ArithmeticError
                 else:

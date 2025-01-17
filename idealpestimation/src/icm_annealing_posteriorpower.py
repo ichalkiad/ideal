@@ -110,7 +110,7 @@ def get_evaluation_grid(param, vector_coordinate, args):
     elif param == "mu_e":
         grid = np.linspace(-2, 2, gridpoints_num).tolist()
     elif param == "sigma_e":
-        grid = np.linspace(0.0001, 1.5, gridpoints_num).tolist()
+        grid = np.linspace(0.001, 1.5, gridpoints_num).tolist()
     else:        
         if d == 1 or elementwise:
             if param == "Phi":
@@ -245,7 +245,7 @@ def get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matr
         
     return post2optim
 
-def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, l, args):
+def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, l, args, debug=False):
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -305,16 +305,33 @@ def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vec
                 sys.exit(0)  
         else:
             min_f = np.inf
-            param_estimate = None
-            t0 = time.time()            
-            for gridpoint in grid:
-                posterior_eval = -f(gridpoint)
-                if posterior_eval < min_f:
-                    min_f = posterior_eval
-                    param_estimate = gridpoint
-            elapsedtime = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
-            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)       
+            param_estimate = None            
+            if debug:
+                t0 = time.time()  
+                grideval = []          
+                for gridpoint in grid:
+                    posterior_eval = -f(gridpoint)
+                    grideval.append(posterior_eval)
+                    if posterior_eval < min_f:
+                        min_f = posterior_eval
+                        param_estimate = gridpoint
+                elapsedtime = str(timedelta(seconds=time.time()-t0))   
+                time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+                hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)       
+                print("Loop elapsed time: {}".format(elapsedtime))
+            
+            t0 = time.time()
+            grid_list = np.asarray([gp for gp in grid])   
+            grideval_map = np.asarray(list(map(f, grid_list)))        
+            if debug:
+                param_estimate_map = grid_list[np.argmax(grideval_map)]
+            else:                
+                param_estimate = grid_list[np.argmax(grideval_map)]
+            elapsedtime = str(timedelta(seconds=time.time()-t0))  
+            if debug:
+                print("Map elapsed time: {}".format(elapsedtime))                         
+                assert(np.allclose(grideval, -grideval_map))
+                assert(np.allclose(param_estimate, param_estimate_map))   
     else:
         # use previously evaluation grid as starting points grid
         retry = 0
@@ -347,9 +364,9 @@ def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vec
        
     theta_curr[idx] = param_estimate
     
-    return theta_curr, time_obj
+    return theta_curr, elapsedtime
 
-def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, l, args):
+def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, l, args, debug=False):
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, N, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -409,16 +426,34 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
         else:
             min_f = np.inf
             param_estimate = None
-            t0 = time.time()
-            for gridpoint in grid:                
-                posterior_eval = -f(gridpoint)
-                if posterior_eval < min_f:
-                    min_f = posterior_eval
-                    param_estimate = gridpoint            
-            elapsedtime = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
-            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)                    
-            # print(elapsedtime)
+            if debug:
+                grideval = []
+                t0 = time.time()
+                for gridpoint in grid:                
+                    posterior_eval = -f(gridpoint)
+                    grideval.append(posterior_eval)
+                    if posterior_eval < min_f:
+                        min_f = posterior_eval
+                        param_estimate = gridpoint            
+                elapsedtime = str(timedelta(seconds=time.time()-t0))   
+                time_obj = datetime.strptime(elapsedtime, '%H:%M:%S.%f')
+                hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)       
+                print("Loop elapsed time: {}".format(elapsedtime))            
+                # to refill grid
+                grid = get_evaluation_grid(param, None, args)    
+            
+            t0 = time.time()     
+            grid_list = np.asarray([gp for gp in grid])   
+            grideval_map = np.asarray(list(map(f, grid_list)))        
+            if debug:
+                param_estimate_map = grid_list[np.argmax(grideval_map)]
+            else:                
+                param_estimate = grid_list[np.argmax(grideval_map)]
+            elapsedtime = str(timedelta(seconds=time.time()-t0))  
+            if debug:
+                print("Map elapsed time: {}".format(elapsedtime))                         
+                assert(np.allclose(grideval, -grideval_map))
+                assert(np.allclose(param_estimate, param_estimate_map))              
     else:
         raise NotImplementedError("More efficient to differentiate posterior coordinate-wise.")
 
@@ -428,7 +463,7 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
         # scalar updates and coordinate-wise updates of alphas/betas
         theta_curr[param_positions_dict[param][0] + idx:param_positions_dict[param][0] + (idx + 1)] = param_estimate
 
-    return theta_curr, time_obj
+    return theta_curr, elapsedtime
 
 
 def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None, temperature_rate=None, temperature_steps=None, plot_online=True):
@@ -438,7 +473,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
                 gridpoints_num, diff_iter, disp  = args
 
-    gamma = 0.1
+    gamma = 0.001
     # T0 = get_T0(Y, J, K, d, parameter_names, dst_func, param_positions_dict, args)#3
     l = 0    
     delta_theta = np.inf
@@ -453,14 +488,33 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
     fig_xz = None
     mse_x_list = []
     mse_z_list = []
-
+    print(theta_true)
     while (L is not None and l < L) and abs(delta_theta) > tol:
         for n in range(N):
             print(n, gamma, delta_rate_prev)
             if elementwise:
                 for i in range(parameter_space_dim):                    
                     target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
-                    theta_curr, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)                                        
+                    theta_curr, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, param_positions_dict, L, args)
+                    # print(theta_curr)       
+                    # for paramm in parameter_names:
+                    #     print("Paramm", paramm)
+                    #     print(theta_curr[param_positions_dict[paramm][0]:param_positions_dict[paramm][1]])
+                    gamma, delta_rate = update_annealing_temperature(gamma, n, temperature_rate, temperature_steps)
+                    if delta_rate_prev is not None and delta_rate_prev < delta_rate:                
+                        mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
+                                        compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                            plot_online=True, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                                            mse_z_list=mse_z_list)                            
+                        mse_theta_full = []                
+                        mse_x_list = []
+                        mse_z_list = []
+                    else:
+                        mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
+                                        compute_and_plot_mse(theta_true, theta_curr, n, iteration=l, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                                            plot_online=False, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                                            mse_z_list=mse_z_list)                                            
+                    delta_rate_prev = delta_rate                                        
             else:
                 for param in parameter_names:            
                     if param in ["X", "beta"]:  
@@ -472,7 +526,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
                         param_no = 1
                     for idx in range(param_no):
                         theta_curr, _ = optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_dict, L, args)     
-                        print(theta_curr)       
+                        # print(theta_curr)       
                         gamma, delta_rate = update_annealing_temperature(gamma, n, temperature_rate, temperature_steps)
                         if delta_rate_prev is not None and delta_rate_prev < delta_rate:                
                             mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz = \
@@ -604,12 +658,12 @@ if __name__ == "__main__":
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
     # no status quo
-    parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
+    parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "mu_e", "sigma_e"]
     M = 1
     K = 30
     J = 10
     d = 2  
-    gridpoints_num = 50
+    gridpoints_num = 10
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -621,8 +675,8 @@ if __name__ == "__main__":
     prior_loc_alpha = 0
     prior_scale_alpha = 1    
     temperature_steps = [0, 1, 2, 5, 10]
-    temperature_rate = [1e-3, 1e-3, 1e-1, 1] #[1e-3, 1e-2, 1e-1, 1]
-    annealing_schedule_duration = 9000 + 1000 + 30 + 5
+    temperature_rate = [1e-3, 1e-3, 1e-2, 1] #[1e-3, 1e-2, 1e-1, 1]
+    annealing_schedule_duration = 990 + 1000 + 300 + 5
     print(annealing_schedule_duration)
     tol = 1e-6    
     sigma_e_true = 1      
