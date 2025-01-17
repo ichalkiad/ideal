@@ -446,8 +446,8 @@ class ProcessManagerSynthetic(ProcessManager):
         Y = Y.astype(np.int8).reshape((N, J), order="F")         
                 
         # init parameter vector x0 - ensure 2**m > retries
-        m_sobol = 12
-        if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
+        m_sobol = 15
+        if 2**m_sobol < retries or 2**m_sobol < J*d*retries or 2**m_sobol < N*d*retries:
             raise AttributeError("Generate more Sobol points")
         X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
         xidx_all = np.arange(0, len(X_list), 1).tolist()
