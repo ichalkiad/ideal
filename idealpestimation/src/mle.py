@@ -123,9 +123,9 @@ def maximum_likelihood_estimator(
     # Perform maximum likelihood estimation        
     bounds, _ = create_constraint_functions(len(initial_guess))    
     if niter is not None:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxls":20})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":250000})
     else:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxls":20})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":250000})
     
     mle = result.x          
 
@@ -260,10 +260,12 @@ def estimate_mle(args):
     gridpoints_num = 100
     args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
-            np.zeros((d,)), np.eye((d,)), np.zeros((d,)), np.eye((d,)), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
+            np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
     
     X_list = get_evaluation_grid("X", None, args)
+    X_list = [xx for xx in X_list]
     Z_list = get_evaluation_grid("Z", None, args)
+    Z_list = [xx for xx in Z_list]
     alpha_list = get_evaluation_grid("alpha", None, args)
     beta_list = get_evaluation_grid("beta", None, args)
     gamma_list = get_evaluation_grid("gamma", None, args)
@@ -307,10 +309,14 @@ def estimate_mle(args):
             Phi = np.asarray(Phirem).reshape((d, J), order="F")
         else:
             Phi = None
-        alphaidx = np.random.choice(alphaidx_all, size=1, replace=False)
-        alpha = np.asarray(alpha_list[alphaidx[0]])
-        betaidx = np.random.choice(betaidx_all, size=1, replace=False)
-        beta = np.asarray(beta_list[betaidx[0]])
+        # alphaidx = np.random.choice(alphaidx_all, size=1, replace=False)
+        # alpha = np.asarray(alpha_list[alphaidx[0]])
+        alphaidx = np.random.choice(alphaidx_all, size=J, replace=False)
+        alpha = np.asarray(alpha_list)[np.asarray(alphaidx)]
+        # betaidx = np.random.choice(betaidx_all, size=1, replace=False)
+        # beta = np.asarray(beta_list[betaidx[0]])
+        betaidx = np.random.choice(betaidx_all, size=N, replace=False)
+        beta = np.asarray(beta_list)[np.asarray(betaidx)]     
         gammaidx = np.random.choice(gammaidx_all, size=1, replace=False)
         gamma = gamma_list[gammaidx[0]]
         if "delta" in parameter_names:
@@ -693,7 +699,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
     
-    parallel = False
+    parallel = True
     if not parallel:
         try:
             jax.default_device = jax.devices("gpu")[0]
@@ -706,7 +712,7 @@ if __name__ == "__main__":
     niter = None
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    retries = 10
+    retries = 20
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
@@ -714,11 +720,11 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
     M = 1
     K = 10000
-    J = 500
+    J = 100
     sigma_e_true = 0.5
     d = 2    
     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    total_running_processes = 30              
+    total_running_processes = 10              
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]
