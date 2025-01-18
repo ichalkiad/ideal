@@ -257,7 +257,7 @@ def estimate_mle(args):
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
     
-    gridpoints_num = 100
+    gridpoints_num = 200
     args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
             np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)

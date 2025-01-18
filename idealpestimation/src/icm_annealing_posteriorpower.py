@@ -95,7 +95,7 @@ def get_evaluation_grid(param, vector_coordinate, args):
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp  = args
-    gridpoints_num_alpha_beta = gridpoints_num*10
+    gridpoints_num_alpha_beta = gridpoints_num*50
     
     if param == "alpha":
         grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, gridpoints_num_alpha_beta).tolist()
