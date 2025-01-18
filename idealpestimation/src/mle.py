@@ -468,22 +468,40 @@ class ProcessManagerSynthetic(ProcessManager):
         N = Y.shape[0]
         Y = Y.astype(np.int8).reshape((N, J), order="F")         
                 
+        gridpoints_num = 100
+        args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
+                parameter_space_dim, None, None, None, None, None, None, None, 
+                np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
+        
+        X_list = get_evaluation_grid("X", None, args)
+        X_list = [xx for xx in X_list]
+        Z_list = get_evaluation_grid("Z", None, args)
+        Z_list = [xx for xx in Z_list]
+        alpha_list = get_evaluation_grid("alpha", None, args)
+        beta_list = get_evaluation_grid("beta", None, args)
+        gamma_list = get_evaluation_grid("gamma", None, args)
+        mu_e_list = get_evaluation_grid("mu_e", None, args)
+        sigma_e_list = get_evaluation_grid("sigma_e", None, args)    
+        Phi_list = None
+        phiidx_all = None
+        delta_list = None
+        deltaidx_all = None
         # init parameter vector x0 - ensure 2**m > retries
-        m_sobol = 15
-        if 2**m_sobol < retries or 2**m_sobol < J*d*retries or 2**m_sobol < N*d*retries:
-            raise AttributeError("Generate more Sobol points")
-        X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
+        # m_sobol = 12
+        # if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
+        #     raise AttributeError("Generate more Sobol points")
+        # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
         xidx_all = np.arange(0, len(X_list), 1).tolist()
         zidx_all = np.arange(0, len(Z_list), 1).tolist()
-        if "Phi" in parameter_names:
-            phiidx_all = np.arange(0, len(Phi_list), 1).tolist()
+        # if "Phi" in parameter_names:
+        #     phiidx_all = np.arange(0, len(Phi_list), 1).tolist()
         alphaidx_all = np.arange(0, len(alpha_list), 1).tolist()    
         betaidx_all = np.arange(0, len(beta_list), 1).tolist()    
         gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
-        if "delta" in parameter_names:
-            deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
+        # if "delta" in parameter_names:
+        #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
         mueidx_all = np.arange(0, len(mu_e_list), 1).tolist()    
-        sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()   
+        sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()     
 
         retry = 0
         t0 = time.time()
@@ -502,10 +520,14 @@ class ProcessManagerSynthetic(ProcessManager):
                 Phi = np.asarray(Phirem).reshape((d, J), order="F")
             else:
                 Phi = None
-            alphaidx = np.random.choice(alphaidx_all, size=1, replace=False)
-            alpha = np.asarray(alpha_list[alphaidx[0]])
-            betaidx = np.random.choice(betaidx_all, size=1, replace=False)
-            beta = np.asarray(beta_list[betaidx[0]])
+            # alphaidx = np.random.choice(alphaidx_all, size=1, replace=False)
+            # alpha = np.asarray(alpha_list[alphaidx[0]])
+            alphaidx = np.random.choice(alphaidx_all, size=J, replace=False)
+            alpha = np.asarray(alpha_list)[np.asarray(alphaidx)]
+            # betaidx = np.random.choice(betaidx_all, size=1, replace=False)
+            # beta = np.asarray(beta_list[betaidx[0]])
+            betaidx = np.random.choice(betaidx_all, size=N, replace=False)
+            beta = np.asarray(beta_list)[np.asarray(betaidx)]     
             gammaidx = np.random.choice(gammaidx_all, size=1, replace=False)
             gamma = gamma_list[gammaidx[0]]
             if "delta" in parameter_names:
@@ -528,7 +550,7 @@ class ProcessManagerSynthetic(ProcessManager):
             mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                     variance_method='jacobian', disp=True, 
                                                     optimization_method=optimisation_method, 
-                                                    data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
+                                                    data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                                     loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                     output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
             if result.success:
@@ -648,23 +670,28 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     for dataset_index in range(len(subdatasets_names)):                    
                         subdataset_name = subdatasets_names[dataset_index]                        
                         DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name)
-                        pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
-                        args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)    
-                                            
-                        #####  parallelisation with Parallel Manager #####
-                        manager.cleanup_finished_processes()
-                        current_count = manager.current_process_count()                                
-                        print(f"Currently running processes: {current_count}")
-                        manager.print_shared_dict() 
-                        while current_count == total_running_processes:
+                        from_row = int(subdataset_name.split("_")[1])
+                        to_row = int(subdataset_name.split("_")[2])
+                        if pathlib.Path(DIR_out).is_dir() and pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists():
+                            continue
+                        else:
+                            pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
+                            args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
+                                    parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)    
+                                                
+                            #####  parallelisation with Parallel Manager #####
                             manager.cleanup_finished_processes()
-                            current_count = manager.current_process_count()                                                                                                                                                   
-                        if current_count < total_running_processes:
-                            manager.spawn_process(args=(args,))                                                  
-                        # Wait before next iteration
-                        time.sleep(1)  
-                        ################################################## 
+                            current_count = manager.current_process_count()                                
+                            print(f"Currently running processes: {current_count}")
+                            manager.print_shared_dict() 
+                            while current_count == total_running_processes:
+                                manager.cleanup_finished_processes()
+                                current_count = manager.current_process_count()                                                                                                                                                   
+                            if current_count < total_running_processes:
+                                manager.spawn_process(args=(args,))                                                  
+                            # Wait before next iteration
+                            time.sleep(1)  
+                            ################################################## 
                 if manager.all_processes_complete.is_set():
                     break       
         else:
@@ -674,10 +701,15 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                 for dataset_index in range(len(subdatasets_names)):               
                     subdataset_name = subdatasets_names[dataset_index]                    
                     DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name)
-                    pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
-                    args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)
-                    estimate_mle(args)                  
+                    from_row = int(subdataset_name.split("_")[1])
+                    to_row = int(subdataset_name.split("_")[2])
+                    if pathlib.Path(DIR_out).is_dir() and pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists():
+                        continue
+                    else:
+                        pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
+                        args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
+                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)
+                        estimate_mle(args)                  
 
     except KeyboardInterrupt:
         # On Ctrl-C stop all processes
@@ -720,11 +752,11 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
     M = 1
     K = 10000
-    J = 100
+    J = 1000
     sigma_e_true = 0.5
     d = 2    
-    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    total_running_processes = 10              
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    total_running_processes = 15              
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]
@@ -746,7 +778,7 @@ if __name__ == "__main__":
     
     # params_out_jsonl = dict()
     # for m in range(M):
-    #     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
+    #     data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
     #     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
     #     params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
     #     for param in parameter_names:
