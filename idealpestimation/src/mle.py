@@ -672,6 +672,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                         DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name)
                         from_row = int(subdataset_name.split("_")[1])
                         to_row = int(subdataset_name.split("_")[2])
+                        # if all have completed, following never exits the while loop
                         if pathlib.Path(DIR_out).is_dir() and pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists():
                             continue
                         else:
