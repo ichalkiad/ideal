@@ -123,9 +123,9 @@ def maximum_likelihood_estimator(
     # Perform maximum likelihood estimation        
     bounds, _ = create_constraint_functions(len(initial_guess))    
     if niter is not None:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":250000})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":1000000})
     else:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":250000})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":1000000})
     
     mle = result.x          
 
@@ -277,7 +277,7 @@ def estimate_mle(args):
     deltaidx_all = None
     # init parameter vector x0 - ensure 2**m > retries
     # m_sobol = 12
-    # if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
+    # if 2**m_sobol < retries*J*N:
     #     raise AttributeError("Generate more Sobol points")
     # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
     xidx_all = np.arange(0, len(X_list), 1).tolist()
@@ -488,7 +488,7 @@ class ProcessManagerSynthetic(ProcessManager):
         deltaidx_all = None
         # init parameter vector x0 - ensure 2**m > retries
         # m_sobol = 12
-        # if 2**m_sobol < retries or 2**m_sobol < J or 2**m_sobol < N:
+        # if 2**m_sobol < retries*J*N:
         #     raise AttributeError("Generate more Sobol points")
         # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
         xidx_all = np.arange(0, len(X_list), 1).tolist()
@@ -756,7 +756,7 @@ if __name__ == "__main__":
     sigma_e_true = 0.5
     d = 2    
     data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    total_running_processes = 15              
+    total_running_processes = 20              
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]
