@@ -26,7 +26,8 @@ from idealpestimation.src.utils import log_conditional_posterior_x_vec,  \
                                                                         qmc, fix_plot_layout_and_save, \
                                                                             create_constraint_functions_icm, \
                                                                                 update_annealing_temperature, \
-                                                                                    compute_and_plot_mse, time, datetime, timedelta
+                                                                                    compute_and_plot_mse, time, datetime, \
+                                                                                        timedelta, parse_input_arguments
 
 
 
@@ -596,7 +597,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, theta_true=None
 
 def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
-        parameter_space_dim=None, trials=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10,
+        parameter_space_dim=None, trialsmin=None, trialsmax=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10,
         elementwise=True, evaluate_posterior=True, temperature_rate=[0, 1], temperature_steps=[1e-3], 
         L=20, tol=1e-6, prior_loc_x=0, prior_scale_x=1, 
         prior_loc_z=0, prior_scale_z=1, prior_loc_phi=0, prior_scale_phi=1, prior_loc_beta=0, prior_scale_beta=1, 
@@ -605,7 +606,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         gridpoints_num=10, optimization_method="L-BFGS-B", diff_iter=None, disp=False,
         theta_true=None):
 
-        for m in range(trials):
+        for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:
                     DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(data_location, m)
@@ -682,11 +683,43 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
+    # python idealpestimation/src/icm_annealing_posteriorpower.py --trials 1 --K 30 --J 10 --sigmae 05 --elementwise --evaluate_posterior  --total_running_processes 5
+
     seed_value = 8125
     random.seed(seed_value)
     np.random.seed(seed_value)
+
+    args = parse_input_arguments()
     
-    parallel = False
+    if args.trials is None or args.K is None or args.J is None or args.sigmae is None:
+        parallel = False
+        Mmin = 0
+        M = 1
+        K = 10000
+        J = 1000
+        sigma_e_true = 0.5
+        total_running_processes = 20   
+        elementwise = False
+        evaluate_posterior = True
+    else:
+        parallel = args.parallel
+        trialsstr = args.trials
+        if "-" in trialsstr:
+            trialsparts = trialsstr.split("")
+            Mmin = int(trialsparts[0])
+            M = int(trialsparts[1])
+        else:
+            Mmin = 0
+            M = int(trialsstr)
+        K = args.K
+        J = args.J
+        total_running_processes = args.total_running_processes
+        sigma_e_true = args.sigmae
+        elementwise = args.elementwise
+        evaluate_posterior = args.evaluate_posterior
+
+    print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
+    
     if not parallel:
         jax.default_device = jax.devices("cpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
@@ -695,8 +728,6 @@ if __name__ == "__main__":
     niter = 5
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    elementwise = False
-    evaluate_posterior = True
     retries = 10
     diff_iter = None
     disp = True
@@ -705,9 +736,6 @@ if __name__ == "__main__":
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "mu_e", "sigma_e"]
-    M = 1
-    K = 30
-    J = 10
     d = 2  
     gridpoints_num = 100
     prior_loc_x = np.zeros((d,))
@@ -780,7 +808,7 @@ if __name__ == "__main__":
     main(J=J, K=K, d=d, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, parameter_space_dim=parameter_space_dim, trials=M, 
+        dst_func=dst_func, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, trialsmax=M, 
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, 
         elementwise=elementwise, evaluate_posterior=evaluate_posterior, temperature_rate=temperature_rate, temperature_steps=temperature_steps, L=niter, tol=tol, 
         prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, 

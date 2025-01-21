@@ -14,6 +14,7 @@ from jax import jvp, grad
 import jsonlines
 from scipy.optimize import approx_fprime
 from datetime import datetime, timedelta
+import argparse
 
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
@@ -302,6 +303,71 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
             params_out[param] = weighted_estimate
     
     return params_out
+
+def parse_input_arguments():
+
+    parser = argparse.ArgumentParser(
+        description='Input values: trials, either integer or range of values, e.g. 0-5, K, J, sigmae as a string without a decimal point, e.g. 0.5 -> 05.\
+            Pass all arguments otherwise those hardcoded will be used.'
+    )
+    
+    # Add optional arguments of different types with default values
+    parser.add_argument(
+        '--trials',
+        type=str,
+        default=None,
+        help='Trial folders to run.'
+    )
+    
+    parser.add_argument(
+        '--K',
+        type=int,
+        default=None,
+        help='K users'
+    )
+    
+    parser.add_argument(
+        '--J',
+        type=int,
+        default=None,
+        help='J users'
+    )
+
+    parser.add_argument(
+        '--sigmae',
+        type=str,
+        default=None,
+        help='sigma_e'
+    )
+
+    parser.add_argument(
+        '--parallel',
+        action='store_true',
+        help='parallel execution flag - omit for single thread execution'
+    )
+
+    parser.add_argument(
+        '--elementwise',
+        action='store_true',
+        help='for ICM: elementwise posterior optimisation'
+    )
+
+    parser.add_argument(
+        '--evaluate_posterior',
+        action='store_true',
+        help='for ICM: evaluate posterior on a grid (True), differentiate (False)'
+    )
+
+    parser.add_argument(
+        '--total_running_processes',
+        type=int,
+        default=10,
+        help='total number of running processes in parallel'
+    )
+    
+    return parser.parse_args()
+
+
 
 ####################### MLE #############################
 

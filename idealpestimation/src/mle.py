@@ -19,7 +19,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
                                                             create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf, \
-                                                                time, datetime, timedelta, log_complement_from_log_cdf_vec
+                                                                time, datetime, timedelta, log_complement_from_log_cdf_vec, parse_input_arguments
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
@@ -655,7 +655,7 @@ class ProcessManagerSynthetic(ProcessManager):
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
-        niter=None, parameter_space_dim=None, trials=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10):
+        niter=None, parameter_space_dim=None, trialsmin=None, trialsmax=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10):
 
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
@@ -664,7 +664,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
         if parallel:  
             manager.create_results_dict(optim_target="all")    
             while True:
-                for m in range(trials):
+                for m in range(trialsmin, trialsmax, 1):
                     path = pathlib.Path("{}/{}".format(data_location, m))  
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
                     for dataset_index in range(len(subdatasets_names)):                    
@@ -696,7 +696,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                 if manager.all_processes_complete.is_set():
                     break       
         else:
-            for m in range(trials):
+            for m in range(trialsmin, trialsmax, 1):
                 path = pathlib.Path("{}/{}".format(data_location, m))  
                 subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                 for dataset_index in range(len(subdatasets_names)):               
@@ -728,11 +728,38 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
+    # python idealpestimation/src/mle.py  --trials 1 --K 30 --J 10 --sigmae 05 --parallel --total_running_processes 5
+
     seed_value = 9125
     random.seed(seed_value)
     np.random.seed(seed_value)
     
-    parallel = True
+    args = parse_input_arguments()
+    
+    if args.trials is None or args.K is None or args.J is None or args.sigmae is None:
+        parallel = False
+        Mmin = 0
+        M = 1
+        K = 10000
+        J = 1000
+        sigma_e_true = 0.5
+        total_running_processes = 20   
+    else:
+        parallel = args.parallel
+        trialsstr = args.trials
+        if "-" in trialsstr:
+            trialsparts = trialsstr.split("")
+            Mmin = int(trialsparts[0])
+            M = int(trialsparts[1])
+        else:
+            Mmin = 0
+            M = int(trialsstr)
+        K = args.K
+        J = args.J
+        total_running_processes = args.total_running_processes
+        sigma_e_true = args.sigmae
+
+    print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes)
     if not parallel:
         try:
             jax.default_device = jax.devices("gpu")[0]
@@ -740,6 +767,7 @@ if __name__ == "__main__":
             print("Using cpu")
             jax.default_device = jax.devices("cpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
+
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
     niter = None
@@ -751,13 +779,9 @@ if __name__ == "__main__":
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
-    M = 1
-    K = 10000
-    J = 1000
-    sigma_e_true = 0.5
     d = 2    
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    total_running_processes = 20              
+    # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto_barbera/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]
@@ -774,8 +798,8 @@ if __name__ == "__main__":
     main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trials=M, 
-        penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
     
     # params_out_jsonl = dict()
     # for m in range(M):
