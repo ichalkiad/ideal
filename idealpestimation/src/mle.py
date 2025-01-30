@@ -18,8 +18,8 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
-                                                            create_constraint_functions, p_ij_arg, jax, jnp, log_complement_from_log_cdf, \
-                                                                time, datetime, timedelta, log_complement_from_log_cdf_vec, parse_input_arguments
+                                                            create_constraint_functions, jax, jnp, \
+                                                                time, datetime, timedelta, parse_input_arguments, negative_loglik, negative_loglik_jax
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
@@ -159,88 +159,6 @@ def maximum_likelihood_estimator(
 
         
     return mle, result
-
-def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
-
-    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
-    mu_e = params_hat["mu_e"]
-    sigma_e = params_hat["sigma_e"]
-    errscale = sigma_e
-    errloc = mu_e          
-    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")    
-    _nll = 0
-    if debug:
-        for i in range(K):
-            for j in range(J):
-                pij_arg = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
-                philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
-                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
-
-    pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
-    philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
-    nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
-
-    if debug:
-        assert(np.allclose(nll, _nll))
-
-    sum_Z_J_vectors = np.sum(Z, axis=1)    
-    return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
-
-def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
-
-    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
-    X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
-    Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")   
-    Y = jnp.asarray(Y)    
-    if "Phi" in params_hat.keys():
-        Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
-        delta = jnp.asarray(params_hat["delta"])
-    else:
-        Phi = jnp.zeros(Z.shape)
-        delta = 0
-    alpha = jnp.asarray(params_hat["alpha"])
-    beta = jnp.asarray(params_hat["beta"])
-    # c = params_hat["c"]
-    gamma = jnp.asarray(params_hat["gamma"])    
-    mu_e = jnp.asarray(params_hat["mu_e"])
-    sigma_e = jnp.asarray(params_hat["sigma_e"])
-    errscale = sigma_e
-    errloc = mu_e 
-    _nll = 0
-    dst_func = lambda x, y: jnp.sum((x-y)**2)
-
-    pij_argJ = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict, use_jax=True)  
-    philogcdfJ = jax.scipy.stats.norm.logcdf(pij_argJ, loc=errloc, scale=errscale)
-    # log_one_minus_cdfJ = log_complement_from_log_cdf_vec(philogcdfJ, pij_argJ, mean=errloc, variance=errscale, use_jax=True) - probably numerical errors vs iterative
-    log_one_minus_cdfJ = jnp.zeros(philogcdfJ.shape)
-    nlltest = 0
-    for i in range(K):
-        for j in range(J):
-            if debug:
-                pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]    
-                philogcdf = jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-            else:
-                pij_arg = pij_argJ[i, j]
-                philogcdf = philogcdfJ[i, j]
-            
-            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, 
-                                                            variance=errscale, use_jax=True)
-            if debug:
-                log_one_minus_cdfJ.at[i,j].set(log_one_minus_cdf[0])
-                nlltest += (1-Y[i, j])*log_one_minus_cdfJ[i,j]
-                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
-            else:
-                nlltest += (1-Y[i, j])*log_one_minus_cdf
-                
-    nll = jnp.sum(Y*philogcdfJ) + nlltest
-    if debug:
-        assert(jnp.allclose(nll, _nll))
-        
-    sum_Z_J_vectors = jnp.sum(Z, axis=1)
-    return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
-
 
 def estimate_mle(args):
 

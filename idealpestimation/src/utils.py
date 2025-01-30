@@ -15,6 +15,7 @@ import jsonlines
 from scipy.optimize import approx_fprime
 from datetime import datetime, timedelta
 import argparse
+from scipy.special import gammainc, gammaincc, loggamma, gammaln
 
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
@@ -367,7 +368,86 @@ def parse_input_arguments():
     
     return parser.parse_args()
 
+def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
 
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
+    mu_e = params_hat["mu_e"]
+    sigma_e = params_hat["sigma_e"]
+    errscale = sigma_e
+    errloc = mu_e          
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")    
+    _nll = 0
+    if debug:
+        for i in range(K):
+            for j in range(J):
+                pij_arg = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+                philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+
+    pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+    philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+    nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
+
+    if debug:
+        assert(np.allclose(nll, _nll))
+
+    sum_Z_J_vectors = np.sum(Z, axis=1)    
+    return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+
+def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+    X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
+    Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")   
+    Y = jnp.asarray(Y)    
+    if "Phi" in params_hat.keys():
+        Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+        delta = jnp.asarray(params_hat["delta"])
+    else:
+        Phi = jnp.zeros(Z.shape)
+        delta = 0
+    alpha = jnp.asarray(params_hat["alpha"])
+    beta = jnp.asarray(params_hat["beta"])
+    # c = params_hat["c"]
+    gamma = jnp.asarray(params_hat["gamma"])    
+    mu_e = jnp.asarray(params_hat["mu_e"])
+    sigma_e = jnp.asarray(params_hat["sigma_e"])
+    errscale = sigma_e
+    errloc = mu_e 
+    _nll = 0
+    dst_func = lambda x, y: jnp.sum((x-y)**2)
+
+    pij_argJ = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict, use_jax=True)  
+    philogcdfJ = jax.scipy.stats.norm.logcdf(pij_argJ, loc=errloc, scale=errscale)
+    # log_one_minus_cdfJ = log_complement_from_log_cdf_vec(philogcdfJ, pij_argJ, mean=errloc, variance=errscale, use_jax=True) - probably numerical errors vs iterative
+    log_one_minus_cdfJ = jnp.zeros(philogcdfJ.shape)
+    nlltest = 0
+    for i in range(K):
+        for j in range(J):
+            if debug:
+                pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]    
+                philogcdf = jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+            else:
+                pij_arg = pij_argJ[i, j]
+                philogcdf = philogcdfJ[i, j]
+            
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, 
+                                                            variance=errscale, use_jax=True)
+            if debug:
+                log_one_minus_cdfJ.at[i,j].set(log_one_minus_cdf[0])
+                nlltest += (1-Y[i, j])*log_one_minus_cdfJ[i,j]
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+            else:
+                nlltest += (1-Y[i, j])*log_one_minus_cdf
+                
+    nll = jnp.sum(Y*philogcdfJ) + nlltest
+    if debug:
+        assert(jnp.allclose(nll, _nll))
+        
+    sum_Z_J_vectors = jnp.sum(Z, axis=1)
+    return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
 ####################### MLE #############################
 
@@ -383,7 +463,7 @@ def create_constraint_functions_icm(n, vector_coordinate=None, param=None, param
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
-        gridpoints_num, diff_iter, disp  = args
+        gridpoints_num, diff_iter, disp, max_sigma_e, theta_true  = args
     
     if param == "alpha":
         bounds.append((-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha))
@@ -396,7 +476,7 @@ def create_constraint_functions_icm(n, vector_coordinate=None, param=None, param
     elif param == "mu_e":
         bounds.append((None, None))
     elif param == "sigma_e":
-        bounds.append((0.000001, 5))
+        bounds.append((0.000001, max_sigma_e))
     else:
         if d == 1 or elementwise:
             if param == "Phi":
@@ -590,7 +670,7 @@ def get_T0(Y, J, K, d, parameter_names, dst_func, param_positions_dict, args):
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
-        gridpoints_num, diff_iter, disp  = args
+        gridpoints_num, diff_iter, disp, max_sigma_e, theta_true  = args
 
     sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
     thetas = sampler.random_base2(m=10)
@@ -616,6 +696,33 @@ def get_T0(Y, J, K, d, parameter_names, dst_func, param_positions_dict, args):
     
     return T0
 
+
+def halve_annealing_rate_upd_schedule(N, gamma, delta_n, delta_theta, temperature_rate, temperature_steps, all_gammas=None, p=None, tol=1e-6):
+    
+    half_rate = False
+    if (np.sum(delta_theta < tol) > int(p*len(delta_theta))):        
+        half_rate = True
+
+    if half_rate:     
+        tr_idx = temperature_rate.index(delta_n)            
+        temperature_rate_upd = temperature_rate[:tr_idx]
+        temperature_rate_upd.append(temperature_rate[tr_idx]/2)
+        temperature_rate_upd.extend(temperature_rate[(tr_idx+1):])        
+        all_gammas = []             
+        gamma = 0.1        
+        for gidx in range(len(temperature_steps[1:])):
+            upperlim = temperature_steps[1+gidx]        
+            start = gamma if gidx==0 else all_gammas[-1]        
+            all_gammas.extend(np.arange(start, upperlim, temperature_rate_upd[gidx]))            
+        N = len(all_gammas)
+        print("Annealing schedule: {}".format(N))                
+        gamma = all_gammas[0] 
+        delta_n = temperature_rate_upd[0] 
+        return half_rate, gamma, delta_n, temperature_rate_upd, all_gammas, N
+    else:
+        return half_rate, gamma, delta_n, temperature_rate, all_gammas, N
+
+
 def update_annealing_temperature(gamma_prev, total_iter, temperature_rate, temperature_steps, all_gammas=None):
 
     delta_n = None
@@ -627,26 +734,25 @@ def update_annealing_temperature(gamma_prev, total_iter, temperature_rate, tempe
         elif (gamma_prev > temperature_steps[2] and gamma_prev <= temperature_steps[3]):
             delta_n = temperature_rate[2]
         elif (gamma_prev > temperature_steps[3]):
-            delta_n = temperature_rate[3]
-        print("Delta_{} = {}".format(total_iter, delta_n))            
-        gamma = gamma_prev + delta_n
-    elif isinstance(all_gammas, list):             
+            delta_n = temperature_rate[3]        
+        gamma = gamma_prev + delta_n        
+        # print("Delta_{} = {}".format(total_iter, delta_n))            
+    elif isinstance(all_gammas, list):  
         idx = total_iter % len(all_gammas)
-        gamma = all_gammas[idx]
+        gamma = all_gammas[idx]                                    
         if (gamma >= temperature_steps[0] and gamma <= temperature_steps[1]):
-            delta_n = temperature_rate[0]
+            tr_idx = 0            
         elif (gamma > temperature_steps[1] and gamma <= temperature_steps[2]):
-            delta_n = temperature_rate[1]
+            tr_idx = 1            
         elif (gamma > temperature_steps[2] and gamma <= temperature_steps[3]):
-            delta_n = temperature_rate[2]
+            tr_idx = 2            
         elif (gamma > temperature_steps[3]):
-            delta_n = temperature_rate[3]            
-
-    # print(total_iter, delta_n, gamma)
+            tr_idx = 3     
+        delta_n = temperature_rate[tr_idx]             
 
     return gamma, delta_n
 
-def get_min_achievable_mse_under_rotation_scaling(param_true, param_hat):
+def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
 
     """
     Minimizes ||Y - (XR + t)||_F where ||.||_F is the Frobenius norm and R a rotation matrix
@@ -679,60 +785,102 @@ def get_min_achievable_mse_under_rotation_scaling(param_true, param_hat):
     
     # Compute the residual error
     # error = np.linalg.norm(param_true - (param_hat @ R + t), 'fro')
-    error = np.sum((param_true - (param_hat @ R + t))**2)
+    error = np.sum((param_true - (param_hat @ R + t))**2)/(param_true.shape[0]*param_true.shape[1])
     
     orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
     det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
     t_shape_correct = t.shape == (param_hat.shape[1],)
     if not (orthogonality_error < 1e-10 and det_is_one and t_shape_correct):
-        raise AttributeError("Error in solving projection probelm?")
+        raise AttributeError("Error in solving projection problem?")
     
     return R, t, error
 
 
 def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta_rate, gamma_n, args, param_positions_dict,
-                         plot_online=True, fig_theta_full=None, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[]):
+                         plot_online=True, fig_theta_full=None, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[],
+                         per_param_ers=dict(), per_param_heats=dict(), per_param_boxes=dict()):
+
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_mue, prior_scale_mue, prior_loc_sigmae, prior_scale_sigmae, \
-        gridpoints_num, diff_iter, disp  = args
+        gridpoints_num, diff_iter, disp, max_sigma_e, theta_true  = args
 
     if fig_theta_full is None:
         fig_theta_full = go.Figure()    
-    # compute with full theta vector
-    mse = np.sum((theta_true - theta_hat)**2)/len(theta_true)    
-    mse_theta_full.append(mse)    
-    if plot_online:
-        fig_theta_full.add_trace(go.Box(
-                                y=np.asarray(mse_theta_full).flatten(), 
-                                x=[iteration] * len(mse_theta_full),
-                                name="Annealing step = {:.4f}<br>gamma_{}={}".format(delta_rate, iteration, gamma_n),
-                                boxpoints='outliers'
-                            ))
-        fig_theta_full.show()
-        savename = "{}/mse_plots_theta/theta_full.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_theta/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig_theta_full, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
-                            print_png=True, print_html=True, print_pdf=False)
+    # compute with full theta vector - relativised
+    sse = (theta_true - theta_hat)**2
+    rel_se = sse/np.sum(sse)    
+    per_param_heats["theta"].append(rel_se)
+    if plot_online:        
+        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
+        savename = "{}/mse_plots_theta_heatmap/theta_full_relativisedSE.html".format(DIR_out)
+        pathlib.Path("{}/mse_plots_theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                print_pdf=False)        
 
     # compute min achievable mse for X, Z under rotation and scaling
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
     X_true = np.asarray(params_true["X"]).reshape((d, K), order="F")       
     Z_true = np.asarray(params_true["Z"]).reshape((d, J), order="F")                         
-
     params_hat = optimisation_dict2params(theta_hat, param_positions_dict, J, K, d, parameter_names)
-    X_hat = np.asarray(params_hat["X"]).reshape((d, K), order="F")       
-    Z_hat = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
+
+    for param in parameter_names:
+        se = (params_true[param] - params_hat[param])**2
+        if param in ["gamma", "delta", "mu_e", "sigma_e"]:
+            per_param_ers[param].append(se[0])
+            if plot_online:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                                        y=per_param_ers[param], 
+                                        x=np.arange(iteration)                                    
+                                    ))
+                savename = "{}/mse_plots_per_param_ts/{}_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                        print_pdf=False)
+        else:
+            if param == "X":
+                X_hat = np.asarray(params_hat["X"]).reshape((d, K), order="F")       
+            elif param == "Z":
+                Z_hat = np.asarray(params_hat["Z"]).reshape((d, J), order="F")   
+            if len(se.shape) >= 2:
+                se = se.reshape((se.shape[0]*se.shape[1], ), order="F")
+            rel_se = se/np.sum(se)              
+            per_param_heats[param].append(rel_se)   
+            if plot_online:            
+                fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
+                savename = "{}/mse_plots_per_param_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/mse_plots_per_param_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                        print_pdf=False)            
+                parray = np.stack(per_param_heats[param])
+                for pidx in range(se.shape[0]):
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                                            y=parray[:, pidx], 
+                                            x=np.arange(iteration)                                    
+                                        ))
+                    savename = "{}/mse_plots_per_param_ts/{}_idx_{}_squarederror.html".format(DIR_out, param, pidx)
+                    pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                    fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
+                                            showgrid=False, showlegend=False, print_png=True, print_html=True, 
+                                            print_pdf=False)     
+
 
     if fig_xz is None:
-        fig_xz = go.Figure()    
-    # compute with full theta vector
-    Rx, tx, mse_x = get_min_achievable_mse_under_rotation_scaling(param_true=X_true, param_hat=X_hat)
+        fig_xz = go.Figure()  
+    # mean error over all elements of the matrices  
+    Rx, tx, mse_x = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
     mse_x_list.append(mse_x)
-    Rz, tz, mse_z = get_min_achievable_mse_under_rotation_scaling(param_true=Z_true, param_hat=Z_hat)
-    mse_z_list.append(mse_z)    
+    Rz, tz, mse_z = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+    mse_z_list.append(mse_z)   
+    per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
+    per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
     if plot_online:
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_list).tolist(), 
@@ -746,13 +894,200 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
                             name="Politicians<br>Annealing step = {:.4f}<br>gamma_{}={}".format(delta_rate, iteration, gamma_n),
                             boxpoints='outliers', line=dict(color="green")
                             ))
-        fig_xz.show()
-        savename = "{}/mse_plots_xz/theta_xz_rotated_translated.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_xz/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        savename = "{}/mse_plots_per_param_box/xz_rotated_translated.html".format(DIR_out)
+        pathlib.Path("{}/mse_plots_per_param_box/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
                             print_png=True, print_html=True, print_pdf=False)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+                                y=per_param_ers["X_rot_translated_mseOverMatrix"], 
+                                x=np.arange(iteration),
+                                name="X - min mean sq. error<br>over matrix (under rot/transl)"
+                            ))
+        savename = "{}/mse_plots_per_param_ts/X_rot_translated_mseOverMatrix.html".format(DIR_out)
+        pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over parameter matrix elements", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                print_pdf=False)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+                                y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
+                                x=np.arange(iteration),
+                                name="Z - min mean sq. error<br>over matrix (under rot/trl)"
+                            ))
+        savename = "{}/mse_plots_per_param_ts/Z_rot_translated_mseOverMatrix.html".format(DIR_out)
+        pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over parameter matrix elements", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                print_pdf=False)
 
-    return mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz
+    return mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, per_param_boxes
+
+
+class TruncatedInverseGamma:
+    """
+    Implementation of a truncated Inverse Gamma distribution.
+    The distribution is truncated to the interval [lower, upper].
+    
+    Parameters:
+    -----------
+    alpha : float
+        Shape parameter of the inverse gamma distribution
+    beta : float
+        Scale parameter of the inverse gamma distribution
+    lower : float
+        Lower bound of the truncation interval
+    upper : float
+        Upper bound of the truncation interval
+    """
+    
+    def __init__(self, alpha, beta, lower, upper):
+        if alpha <= 0 or beta <= 0:
+            raise ValueError("alpha and beta must be positive")
+        if lower >= upper:
+            raise ValueError("lower bound must be less than upper bound")
+        if lower <= 0:
+            raise ValueError("lower bound must be positive")
+            
+        self.alpha = alpha
+        self.beta = beta
+        self.lower = lower
+        self.upper = upper
+        
+        # Calculate normalization constant
+        self.norm_constant = self._get_normalization_constant()
+        self.log_norm_constant = np.log(self.norm_constant)
+        
+    def _get_normalization_constant(self):
+        """Calculate the normalization constant for truncation."""
+        # Integrate the inverse gamma from lower to upper
+        lower_cdf = invgamma.cdf(self.lower, a=self.alpha, loc=0, scale=self.beta)
+        upper_cdf = invgamma.cdf(self.upper, a=self.alpha, loc=0, scale=self.beta)
+        return upper_cdf - lower_cdf
+    
+    def pdf(self, x):
+        """
+        Probability density function of the truncated inverse gamma.
+        
+        Parameters:
+        -----------
+        x : array_like
+            Points at which to evaluate the PDF
+            
+        Returns:
+        --------
+        array_like
+            PDF values at x
+        """
+        x = np.asarray(x)
+        # Return 0 for values outside the truncation interval
+        pdf = np.zeros_like(x, dtype=float)
+        mask = (x >= self.lower) & (x <= self.upper)
+        
+        # Calculate PDF for values within bounds
+        pdf[mask] = invgamma.pdf(x[mask], a=self.alpha, loc=0, scale=self.beta) / self.norm_constant
+        return pdf
+
+    def logcdf(self, x):
+        """
+        Log of the cumulative distribution function of the truncated inverse gamma.
+        Computed in a numerically stable way.
+        
+        Parameters:
+        -----------
+        x : array_like
+            Points at which to evaluate the log CDF
+            
+        Returns:
+        --------
+        array_like
+            Log CDF values at x
+        """
+        x = np.asarray(x)
+        logcdf = np.full_like(x, -np.inf, dtype=float)
+        
+        # For x < lower, logcdf is -inf
+        # For x > upper, logcdf is 0
+        upper_mask = x > self.upper
+        logcdf[upper_mask] = 0.0
+        
+        # For values in truncation interval
+        mask = (x >= self.lower) & (x <= self.upper)
+        if np.any(mask):
+            # Compute unnormalized CDF using the complementary incomplete gamma function
+            # P(X ≤ x) = 1 - P(X > x) = 1 - gammaincc(alpha, beta/x)
+            z = self.beta / x[mask]
+            unnorm_cdf = -np.log1p(-gammaincc(self.alpha, z))
+            
+            # Normalize by the truncation interval
+            lower_cdf = invgamma.cdf(self.lower, a=self.alpha, loc=0, scale=self.beta)
+            logcdf[mask] = unnorm_cdf - np.log(self.norm_constant)
+        
+        return logcdf
+    
+    def rvs(self, size=1, random_state=None):
+        """
+        Random variates from the truncated inverse gamma distribution.
+        
+        Parameters:
+        -----------
+        size : int
+            Number of random variates to generate
+        random_state : int or RandomState, optional
+            Random state for reproducibility
+            
+        Returns:
+        --------
+        array_like
+            Random variates from the truncated distribution
+        """
+        rng = np.random.RandomState(random_state)
+        
+        # Use rejection sampling
+        samples = []
+        while len(samples) < size:
+            # Sample from the original inverse gamma
+            candidate = invgamma.rvs(self.alpha, loc=0, scale=self.beta, 
+                                   size=size, random_state=rng)
+            
+            # Accept samples that fall within bounds
+            valid_samples = candidate[(candidate >= self.lower) & 
+                                   (candidate <= self.upper)]
+            samples.extend(valid_samples[:size - len(samples)])
+            
+        return np.array(samples[:size])
+    
+    def logpdf(self, x):
+        """
+        Log probability density function of the truncated inverse gamma.
+        This method is numerically more stable than taking the log of pdf().
+        
+        Parameters:
+        -----------
+        x : array_like
+            Points at which to evaluate the log PDF
+            
+        Returns:
+        --------
+        array_like
+            Log PDF values at x
+        """
+        x = np.asarray(x)
+        # Initialize with -inf for values outside the truncation interval
+        logpdf = np.full_like(x, -np.inf, dtype=float)
+        mask = (x >= self.lower) & (x <= self.upper)
+        
+        # Calculate logpdf for values within bounds
+        # log(pdf) = log(beta^alpha) - log(Gamma(alpha)) - (alpha + 1)log(x) - beta/x - log(norm_constant)
+        valid_x = x[mask]
+        if len(valid_x) > 0:
+            logpdf[mask] = (self.alpha * np.log(self.beta) - 
+                            gammaln(self.alpha) -
+                           (self.alpha + 1) * np.log(valid_x) -
+                           self.beta / valid_x -
+                           self.log_norm_constant)
+        
+        return logpdf
 
 
 def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, debug=False):
@@ -1061,8 +1396,9 @@ def log_conditional_posterior_mu_e(mu_e, Y, theta, J, K, d, parameter_names, dst
         
     return logpmu_e*gamma
 
-def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, prior_loc_sigmae=0, prior_scale_sigmae=1, debug=False):    
+def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, prior_loc_sigmae=0, prior_scale_sigmae=1, max_sigma_e=0.0001, debug=False):    
     
+    tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=1e-16, upper=max_sigma_e)
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
     theta_test = theta.copy()
@@ -1074,12 +1410,12 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
                 pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)            
                 philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-                _logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf + invgamma.logpdf(sigma_e, a=prior_loc_sigmae, loc=0, scale=prior_scale_sigmae)
+                _logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf + tig.logpdf(sigma_e) #invgamma.logpdf(sigma_e, a=prior_loc_sigmae, loc=0, scale=prior_scale_sigmae)
     
     pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)                
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
     log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
-    logpsigma_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + invgamma.logpdf(sigma_e, a=prior_loc_sigmae, loc=0, scale=prior_scale_sigmae))   
+    logpsigma_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + tig.logpdf(sigma_e)) #invgamma.logpdf(sigma_e, a=prior_loc_sigmae, loc=0, scale=prior_scale_sigmae))   
     if debug:
         assert(np.allclose(logpsigma_e, _logpsigma_e)) 
         
