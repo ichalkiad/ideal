@@ -170,70 +170,70 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
         yy = np.asarray(list(map(f, xx_)))        
         # yy = np.asarray([f(x)[0] for x in xx_]).flatten()
 
-    if fig_in is not None:
-        fig = fig_in
-    else:
-        fig =go.Figure()   
-        if vector_coordinate is not None:
-            fig.add_trace(go.Scatter(
-                            x=xx_,
-                            y=yy,
-                            mode='lines',
-                            name=param,
-                            line=dict(
-                                color='royalblue',
-                                width=2
-                            ),
-                            hovertemplate='x: %{x:.2f}<br>y: %{y:.2f}<extra></extra>'
-            ))
-        else:        
-            fig.add_trace(go.Contour(
-                            x=xx_,
-                            y=xx_,
-                            z=yy,
-                            colorscale='Hot',
-                            contours=dict(
-                                        # start=np.min(yy)-10,
-                                        # end=np.max(yy)+10,
-                                        # size=0.1,
-                                        showlabels=True
-                                    ),
-                            colorbar=dict(
-                                title='Posterior',
-                                titleside='right'
-                            )
+    # if fig_in is not None:
+    #     fig = fig_in
+    # else:
+    fig = go.Figure()   
+    if vector_coordinate is not None:
+        fig.add_trace(go.Scatter(
+                        x=xx_,
+                        y=yy,
+                        mode='lines',
+                        name=param,
+                        line=dict(
+                            color='royalblue',
+                            width=2
+                        ),
+                        hovertemplate='x: %{x:.2f}<br>y: %{y:.2f}<extra></extra>'
+        ))
+    else:        
+        fig.add_trace(go.Contour(
+                        x=xx_,
+                        y=xx_,
+                        z=yy,
+                        colorscale='Hot',
+                        contours=dict(
+                                    # start=np.min(yy)-10,
+                                    # end=np.max(yy)+10,
+                                    # size=0.1,
+                                    showlabels=True
+                                ),
+                        colorbar=dict(
+                            title='Posterior',
+                            titleside='right'
                         )
                     )
-            fig.update_layout(                
-                    xaxis_title='x1',
-                    yaxis_title='x2',                
-            )
-    # fig.show()
+                )
+        fig.update_layout(                
+                xaxis_title='x1',
+                yaxis_title='x2',                
+        )
+    # if fig_in is None:
     if (idx is None and vector_coordinate==0 and true_param is not None) or (isinstance(idx, int) and isinstance(vector_coordinate, int)):
-        # scalar param
-        fig.add_hline(y=true_param, name="True value", annotation_text=f"iter {iteration}", annotation_position="right")
+        # scalar param        
+        fig.add_trace(go.Scatter(x=xx_, y=[true_param]*len(xx_), mode="markers", marker_symbol="star", marker_color="red"))
     elif isinstance(idx, int) and vector_coordinate is None:
         # surface plot
-        fig.add_trace(go.Scatter(x=[true_param[0]], y=[true_param[1]], marker_symbol="star"))
+        fig.add_trace(go.Scatter(x=[true_param[0]], y=[true_param[1]], mode="markers", marker_symbol="star", marker_color="red"))
 
     if hat_param is not None and ((idx is None and vector_coordinate==0) or (isinstance(idx, int) and isinstance(vector_coordinate, int))):
-        # scalar param
-        fig.add_hline(y=hat_param, name="step: {}".format(iteration), annotation_text=f"iter {iteration}", annotation_position="right")
+        # scalar param        
+        fig.add_trace(go.Scatter(x=np.linspace(xx_[0], xx_[-1], num=len(hat_param)), y=hat_param, 
+                                mode="markers+lines", marker_symbol="square", marker_color="blue", name="step: {}".format(iteration)))
     elif hat_param is not None and (isinstance(idx, int) and vector_coordinate is None):
         # surface plot
-        fig.add_trace(go.Scatter(x=[hat_param[0]], y=[hat_param[1]], marker_symbol="star", name="step: {}".format(iteration)))
+        fig.add_trace(go.Scatter(x=hat_param[:, 0], y=hat_param[:, 1], mode="markers+lines", marker_symbol="square", marker_color="blue", name="step: {}".format(iteration)))
     
     fig.update_layout(hovermode='x unified') 
     pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)    
     savename = "{}/{}_idx_{}_vector_coord_{}.html".format(outdir, param, idx, vector_coordinate)
-    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="Posterior", title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
+    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="Posterior", title="", showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
 
     return fig
 
-def plot_posteriors_during_estimation(Y, fig_posteriors, fig_posteriors_annealed, theta_curr, gamma, args):
+def plot_posteriors_during_estimation(Y, iteration, theta_lists, fig_posteriors, fig_posteriors_annealed, gamma, args):
 
-
-    ######################################## INPUT ITERATION NUMBER
+    all_thetas = np.stack(theta_lists)    
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -248,7 +248,7 @@ def plot_posteriors_during_estimation(Y, fig_posteriors, fig_posteriors_annealed
                         Y=Y, idx=vector_index_in_param_matrix, vector_coordinate=vector_coordinate, 
                         theta_curr=theta_true.copy(), gamma=1, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[theta_i], 
-                        hat_param=theta_curr[theta_i], 
+                        hat_param=all_thetas[:, theta_i], iteration=iteration,
                         fig_in=fig_posteriors[target_param])     
     
     for param in parameter_names:
@@ -258,13 +258,13 @@ def plot_posteriors_during_estimation(Y, fig_posteriors, fig_posteriors_annealed
                     fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=i, vector_coordinate=None, 
                         theta_curr=theta_true.copy(), gamma=1, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], iteration=iteration,
                         fig_in=fig_posteriors[param])    
                 elif param=="beta":
                     fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=i, vector_coordinate=i, 
                         theta_curr=theta_true.copy(), gamma=1, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+i], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+i], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+i], iteration=iteration, 
                         fig_in=fig_posteriors[param])    
         elif param in ["Z", "Phi", "alpha"]:
             for j in range(J):
@@ -272,18 +272,15 @@ def plot_posteriors_during_estimation(Y, fig_posteriors, fig_posteriors_annealed
                     fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=j, vector_coordinate=j, 
                         theta_curr=theta_true.copy(), gamma=1, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+j], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+j], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+j], iteration=iteration, 
                         fig_in=fig_posteriors[param])    
                 else:
                     fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=j, vector_coordinate=None, 
                         theta_curr=theta_true.copy(), gamma=1, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], iteration=iteration, 
                         fig_in=fig_posteriors[param])    
         
-            
-
-    ipdb.set_trace()
 
     # annealed posterior
     for theta_i in range(parameter_space_dim):       
@@ -293,11 +290,11 @@ def plot_posteriors_during_estimation(Y, fig_posteriors, fig_posteriors_annealed
             fig = fig_posteriors_annealed[keyname]             
         else:
             fig = go.Figure()
-        fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=target_param, 
+        fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=target_param, 
                         Y=Y, idx=vector_index_in_param_matrix, vector_coordinate=vector_coordinate, 
                         theta_curr=theta_true.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[theta_i], 
-                        hat_param=theta_curr[theta_i], 
+                        hat_param=all_thetas[:, theta_i], iteration=iteration, 
                         fig_in=fig)     
     
     for param in parameter_names:
@@ -309,30 +306,34 @@ def plot_posteriors_during_estimation(Y, fig_posteriors, fig_posteriors_annealed
         if param in ["X", "beta"]:
             for i in range(K):   
                 if param=="X":     
-                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=i, vector_coordinate=None, 
+                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=param, Y=Y, 
+                                                                                  idx=i, vector_coordinate=None, 
                         theta_curr=theta_true.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], iteration=iteration, 
                         fig_in=fig)    
                 elif param=="beta":
-                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=i, vector_coordinate=None, 
+                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=param, Y=Y, 
+                                                                                idx=i, vector_coordinate=i, 
                         theta_curr=theta_true.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+i], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+i], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+i], iteration=iteration, 
                         fig_in=fig)    
         elif param in ["Z", "Phi", "alpha"]:
             for j in range(J):
                 if param=="alpha":
-                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=j, vector_coordinate=None, 
+                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=param, Y=Y, 
+                                                                                idx=j, vector_coordinate=j, 
                         theta_curr=theta_true.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+j], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+j], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+j], iteration=iteration, 
                         fig_in=fig) 
                 else:
-                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=j, vector_coordinate=None, 
+                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=param, Y=Y, idx=j, 
+                                                                                  vector_coordinate=None, 
                         theta_curr=theta_true.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
                         true_param=theta_true[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], 
+                        hat_param=all_thetas[:, param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], iteration=iteration, 
                         fig_in=fig)   
                 
     return fig_posteriors, fig_posteriors_annealed
@@ -815,7 +816,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         per_param_boxes=per_param_boxes)        
                     if total_iter % 50 == 0:
                         # plot posteriors during estimation        
-                        fig_posteriors, fig_posteriors_annealed = plot_posteriors_during_estimation(Y, fig_posteriors, fig_posteriors_annealed, theta_curr, gamma, args)          
+                        fig_posteriors, fig_posteriors_annealed = plot_posteriors_during_estimation(Y, total_iter, per_param_heats["theta"], fig_posteriors, 
+                                                                                                    fig_posteriors_annealed, gamma, args)          
                         ipdb.set_trace()
                     delta_rate_prev = delta_rate      
                     theta_prev = theta_curr.copy()                                            
@@ -861,7 +863,10 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
                                             plot_online=plot_online, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                                             mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, per_param_boxes=per_param_boxes)    
-                            
+                        if total_iter % 50 == 0:
+                            # plot posteriors during estimation        
+                            fig_posteriors, fig_posteriors_annealed = plot_posteriors_during_estimation(Y, total_iter, per_param_heats["theta"], fig_posteriors, 
+                                                                                                        fig_posteriors_annealed, gamma, args)  
                         delta_rate_prev = delta_rate                     
                         delta_theta_se = (theta_curr - theta_prev)**2
                         # delta_theta = delta_theta_se

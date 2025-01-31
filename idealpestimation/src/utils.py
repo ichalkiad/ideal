@@ -1274,8 +1274,8 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
-    theta_test = theta.copy()
-    theta_test[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][0] + idx] = alpha    
+    theta_test = theta.copy()    
+    theta_test[param_positions_dict["alpha"][0] + idx] = alpha     
     if debug:
         _logpalpha_j = 0
         for j in range(J):        
@@ -1302,7 +1302,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     theta_test = theta.copy()
-    theta_test[param_positions_dict["beta"][0]:param_positions_dict["beta"][0] + idx] = beta
+    theta_test[param_positions_dict["beta"][0] + idx] = beta
     if debug:
         _logpbeta_k = 0
         for j in range(J):
@@ -1328,7 +1328,7 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     theta_test = theta.copy()
-    theta_test[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]] = gamma
+    theta_test[param_positions_dict["gamma"][0]] = gamma
     if debug:
         _logpgamma = 0
         for j in range(J):
@@ -1353,7 +1353,7 @@ def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, d
     mu_e = params_hat["mu_e"]
     sigma_e = params_hat["sigma_e"]
     theta_test = theta.copy()
-    theta_test[param_positions_dict["delta"][0]:param_positions_dict["delta"][1]] = delta
+    theta_test[param_positions_dict["delta"][0]] = delta
     if debug:
         _logpdelta = 0
         for j in range(J):
@@ -1377,7 +1377,7 @@ def log_conditional_posterior_mu_e(mu_e, Y, theta, J, K, d, parameter_names, dst
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     sigma_e = params_hat["sigma_e"]
     theta_test = theta.copy()
-    theta_test[param_positions_dict["mu_e"][0]:param_positions_dict["mu_e"][1]] = mu_e
+    theta_test[param_positions_dict["mu_e"][0]] = mu_e
     if debug:
         _logpmu_e = 0
         for j in range(J):
@@ -1402,7 +1402,7 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = params_hat["mu_e"]
     theta_test = theta.copy()
-    theta_test[param_positions_dict["sigma_e"][0]:param_positions_dict["sigma_e"][1]] = sigma_e
+    theta_test[param_positions_dict["sigma_e"][0]] = sigma_e
     if debug:
         _logpsigma_e = 0
         for j in range(J):
