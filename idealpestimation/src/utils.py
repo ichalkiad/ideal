@@ -1132,29 +1132,13 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     
     xx, xx_ = get_evaluation_grid(param, vector_coordinate, args)      
     # yy = np.asarray(list(map(f, xxlist)))          
-    if vector_coordinate is None:
-        # xx_ = np.linspace(-5, 5, 100)
-        # xx = itertools.product(*[xx_, xx_])          
-        # xxlist = [ix for ix in xx]           
-        xxlist = [ix for ix in xx]        
-        # yy = np.asarray(list(map(f, xxlist)))          
-        # yy = np.asarray([f(x)[0] for x in xx]).flatten()
+    if vector_coordinate is None:        
+        xxlist = [ix for ix in xx]                
     else:        
-        # if param == "gamma":
-        #     xx_ = np.linspace(-5, 5, 1000)        
-        # elif param == "sigma_e":
-        #     xx_ = np.linspace(min_sigma_e, 5, 1000)
-        # else:
-        #     xx_ = np.linspace(-5, 5, 1000)        
-        # yy = np.asarray(list(map(f, xx_)))        
-        # yy = np.asarray([f(x)[0] for x in xx_]).flatten()
         xxlist = xx_
     
     yy = np.asarray(list(map(f, xxlist)))
 
-    # if fig_in is not None:
-    #     fig = fig_in
-    # else:
     fig = go.Figure()   
     if vector_coordinate is not None:
         fig.add_trace(go.Scatter(
@@ -1174,23 +1158,14 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                         y=xx_,
                         z=yy,
                         colorscale='Hot',
-                        contours=dict(
-                                    # start=np.min(yy)-10,
-                                    # end=np.max(yy)+10,
-                                    # size=0.1,
-                                    showlabels=True
-                                ),
+                        contours=dict(showlabels=True),
                         colorbar=dict(
                             title='Posterior',
                             titleside='right'
                         )
                     )
                 )
-        fig.update_layout(                
-                xaxis_title='x1',
-                yaxis_title='x2',                
-        )
-    # if fig_in is None:
+        fig.update_layout(xaxis_title='x1', yaxis_title='x2')
     if (idx is None and vector_coordinate==0 and true_param is not None) or (isinstance(idx, int) and isinstance(vector_coordinate, int)):
         # scalar param        
         fig.add_trace(go.Scatter(x=xx_, y=[true_param]*len(xx_), mode="markers", marker_symbol="star", marker_color="red"))

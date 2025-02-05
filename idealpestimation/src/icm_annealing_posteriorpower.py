@@ -316,7 +316,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     theta_samples_list = None
     idx_all = None
     base2exponent = 10
-    theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, args, samples_list=theta_samples_list, idx_all=idx_all)
+    theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
+                                                                    args, samples_list=theta_samples_list, idx_all=idx_all)
 
     #######################################    
     # param = "alpha"
@@ -391,7 +392,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         param_positions_dict=param_positions_dict, plot_online=plot_online, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, 
                                         fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
                                         per_param_boxes=per_param_boxes)        
-                    if total_iter % 10 == 0 and total_iter > 0:
+                    if total_iter % 50 == 0 and total_iter > 0:
                         # plot posteriors during estimation        
                         fig_posteriors, fig_posteriors_annealed = plot_posteriors_during_estimation(Y, total_iter, all_thetas, fig_posteriors, 
                                                                                         fig_posteriors_annealed, gamma, param_positions_dict, args)          
@@ -426,7 +427,10 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                         theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
                                                                                         args, samples_list=theta_samples_list, idx_all=idx_all)
                         n = N
+                        
                         gamma = 0.1 #############################
+                        # all_gammas = [1]*len(all_gammas) ###########################
+
                         delta_theta = np.inf
                         theta_prev = np.zeros((parameter_space_dim,))
                 
@@ -436,7 +440,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 #         continue
                 #     else:
                 #         theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                #         theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] += ((-1)**i)*0.1*np.linalg.norm(theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]], ord=2)
+                #         # theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] += ((-1)**i)*0.1*np.linalg.norm(theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]], ord=2)
                 #########################
 
 
@@ -640,7 +644,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 3
+    gridpoints_num = 50
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
