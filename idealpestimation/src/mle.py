@@ -164,7 +164,7 @@ def estimate_mle(args):
 
     current_pid = os.getpid()    
     DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
-                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel = args
+                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e = args
 
     # load data    
     with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f:
@@ -178,7 +178,7 @@ def estimate_mle(args):
     gridpoints_num = 200
     args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
-            np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
+            np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
     
     X_list = get_evaluation_grid("X", None, args)
     X_list = [xx for xx in X_list]
@@ -186,8 +186,7 @@ def estimate_mle(args):
     Z_list = [xx for xx in Z_list]
     alpha_list = get_evaluation_grid("alpha", None, args)
     beta_list = get_evaluation_grid("beta", None, args)
-    gamma_list = get_evaluation_grid("gamma", None, args)
-    mu_e_list = get_evaluation_grid("mu_e", None, args)
+    gamma_list = get_evaluation_grid("gamma", None, args)    
     sigma_e_list = get_evaluation_grid("sigma_e", None, args)    
     Phi_list = None
     phiidx_all = None
@@ -197,7 +196,7 @@ def estimate_mle(args):
     # m_sobol = 12
     # if 2**m_sobol < retries*J*N:
     #     raise AttributeError("Generate more Sobol points")
-    # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
+    # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d, min_sigma_e=min_sigma_e)
     xidx_all = np.arange(0, len(X_list), 1).tolist()
     zidx_all = np.arange(0, len(Z_list), 1).tolist()
     # if "Phi" in parameter_names:
@@ -206,8 +205,7 @@ def estimate_mle(args):
     betaidx_all = np.arange(0, len(beta_list), 1).tolist()    
     gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
     # if "delta" in parameter_names:
-    #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
-    mueidx_all = np.arange(0, len(mu_e_list), 1).tolist()    
+    #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()        
     sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()   
 
     retry = 0
@@ -241,13 +239,11 @@ def estimate_mle(args):
             deltaidx = np.random.choice(deltaidx_all, size=1, replace=False)
             delta = delta_list[deltaidx[0]]
         else:
-            delta = None        
-        mueidx = np.random.choice(mueidx_all, size=1, replace=False)
-        mu_e = mu_e_list[mueidx[0]]
+            delta = None                
         sigmaeidx = np.random.choice(sigmaeidx_all, size=1, replace=False)
         sigma_e = sigma_e_list[sigmaeidx[0]]
         
-        x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
+        x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, sigma_e)
         # print(x0)
         nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
         if parallel:
@@ -275,8 +271,7 @@ def estimate_mle(args):
             betaidx_all.remove(betaidx[0])
             gammaidx_all.remove(gammaidx[0])
             if "delta" in parameter_names:
-                deltaidx_all.remove(deltaidx[0])
-            mueidx_all.remove(mueidx[0])
+                deltaidx_all.remove(deltaidx[0])            
             sigmaeidx_all.remove(sigmaeidx[0])
             retry += 1
 
@@ -302,8 +297,7 @@ def estimate_mle(args):
         grid_and_optim_outcome["beta"] = params_hat["beta"].tolist() 
         grid_and_optim_outcome["gamma"] = params_hat["gamma"].tolist()[0]
         if "delta" in params_hat.keys():
-            grid_and_optim_outcome["delta"] = params_hat["delta"].tolist()[0]
-        grid_and_optim_outcome["mu_e"] = params_hat["mu_e"].tolist()[0]
+            grid_and_optim_outcome["delta"] = params_hat["delta"].tolist()[0]        
         grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"].tolist()[0]
         grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
         if "Phi" in params_hat.keys():
@@ -311,8 +305,7 @@ def estimate_mle(args):
         grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
         grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
         if "delta" in params_hat.keys():
-            grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]
-        grid_and_optim_outcome["variance_mu_e"] = variance_hat["mu_e"]
+            grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]        
         grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
         
         grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
@@ -337,8 +330,7 @@ def estimate_mle(args):
         grid_and_optim_outcome["beta"] = None
         grid_and_optim_outcome["gamma"] = None
         if "delta" in parameter_names:
-            grid_and_optim_outcome["delta"] = None
-        grid_and_optim_outcome["mu_e"] = None
+            grid_and_optim_outcome["delta"] = None        
         grid_and_optim_outcome["sigma_e"] = None
 
         grid_and_optim_outcome["variance_Z"] = None
@@ -375,7 +367,7 @@ class ProcessManagerSynthetic(ProcessManager):
             self.shared_dict[current_pid] = self.execution_counter.value
         
         DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
-                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel = args
+                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e = args
 
         # load data    
         with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f:
@@ -388,8 +380,9 @@ class ProcessManagerSynthetic(ProcessManager):
                 
         gridpoints_num = 100
         args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
-                parameter_space_dim, None, None, None, None, None, None, None, 
-                np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 0, 1, gridpoints_num, None, None)
+            parameter_space_dim, None, None, None, None, None, None, None, 
+            np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
+    
         
         X_list = get_evaluation_grid("X", None, args)
         X_list = [xx for xx in X_list]
@@ -397,8 +390,7 @@ class ProcessManagerSynthetic(ProcessManager):
         Z_list = [xx for xx in Z_list]
         alpha_list = get_evaluation_grid("alpha", None, args)
         beta_list = get_evaluation_grid("beta", None, args)
-        gamma_list = get_evaluation_grid("gamma", None, args)
-        mu_e_list = get_evaluation_grid("mu_e", None, args)
+        gamma_list = get_evaluation_grid("gamma", None, args)        
         sigma_e_list = get_evaluation_grid("sigma_e", None, args)    
         Phi_list = None
         phiidx_all = None
@@ -408,7 +400,7 @@ class ProcessManagerSynthetic(ProcessManager):
         # m_sobol = 12
         # if 2**m_sobol < retries*J*N:
         #     raise AttributeError("Generate more Sobol points")
-        # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d)
+        # X_list, Z_list, Phi_list, alpha_list, beta_list, gamma_list, delta_list, mu_e_list, sigma_e_list = initialise_optimisation_vector_sobol(m=m_sobol, J=J, K=N, d=d, min_sigma_e=min_sigma_e)
         xidx_all = np.arange(0, len(X_list), 1).tolist()
         zidx_all = np.arange(0, len(Z_list), 1).tolist()
         # if "Phi" in parameter_names:
@@ -417,8 +409,7 @@ class ProcessManagerSynthetic(ProcessManager):
         betaidx_all = np.arange(0, len(beta_list), 1).tolist()    
         gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
         # if "delta" in parameter_names:
-        #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()    
-        mueidx_all = np.arange(0, len(mu_e_list), 1).tolist()    
+        #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()            
         sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()     
 
         retry = 0
@@ -452,13 +443,11 @@ class ProcessManagerSynthetic(ProcessManager):
                 deltaidx = np.random.choice(deltaidx_all, size=1, replace=False)
                 delta = delta_list[deltaidx[0]]
             else:
-                delta = None        
-            mueidx = np.random.choice(mueidx_all, size=1, replace=False)
-            mu_e = mu_e_list[mueidx[0]]
+                delta = None                    
             sigmaeidx = np.random.choice(sigmaeidx_all, size=1, replace=False)
             sigma_e = sigma_e_list[sigmaeidx[0]]
             
-            x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, mu_e, sigma_e)
+            x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, sigma_e)
             # print(x0)
             nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
             if parallel:
@@ -485,8 +474,7 @@ class ProcessManagerSynthetic(ProcessManager):
                 betaidx_all.remove(betaidx[0])
                 gammaidx_all.remove(gammaidx[0])
                 if "delta" in parameter_names:
-                    deltaidx_all.remove(deltaidx[0])
-                mueidx_all.remove(mueidx[0])
+                    deltaidx_all.remove(deltaidx[0])                
                 sigmaeidx_all.remove(sigmaeidx[0])    
                 retry += 1
         
@@ -512,8 +500,7 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome["beta"] = params_hat["beta"].tolist() 
             grid_and_optim_outcome["gamma"] = params_hat["gamma"].tolist()[0]
             if "delta" in params_hat.keys():
-                grid_and_optim_outcome["delta"] = params_hat["delta"].tolist()[0]
-            grid_and_optim_outcome["mu_e"] = params_hat["mu_e"].tolist()[0]
+                grid_and_optim_outcome["delta"] = params_hat["delta"].tolist()[0]            
             grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"].tolist()[0]
             grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
             if "Phi" in params_hat.keys():
@@ -521,8 +508,7 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
             grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
             if "delta" in params_hat.keys():
-                grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]
-            grid_and_optim_outcome["variance_mu_e"] = variance_hat["mu_e"]
+                grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]            
             grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
             
             grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
@@ -547,8 +533,7 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome["beta"] = None
             grid_and_optim_outcome["gamma"] = None
             if "delta" in parameter_names:
-                grid_and_optim_outcome["delta"] = None
-            grid_and_optim_outcome["mu_e"] = None
+                grid_and_optim_outcome["delta"] = None            
             grid_and_optim_outcome["sigma_e"] = None
 
             grid_and_optim_outcome["variance_Z"] = None
@@ -557,8 +542,7 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome["variance_alpha"] = None
             grid_and_optim_outcome["variance_gamma"] = None
             if "delta" in parameter_names:
-                grid_and_optim_outcome["variance_delta"] = None
-            grid_and_optim_outcome["variance_mu_e"] = None
+                grid_and_optim_outcome["variance_delta"] = None            
             grid_and_optim_outcome["variance_sigma_e"] = None
             
             grid_and_optim_outcome["param_positions_dict"] = param_positions_dict
@@ -573,7 +557,8 @@ class ProcessManagerSynthetic(ProcessManager):
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
-        niter=None, parameter_space_dim=None, trialsmin=None, trialsmax=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10):
+        niter=None, parameter_space_dim=None, trialsmin=None, trialsmax=None, penalty_weight_Z=0.0, 
+        constant_Z=0.0, retries=10, min_sigma_e=None):
 
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
@@ -596,7 +581,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                         else:
                             pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                             args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                                    parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)    
+                                    parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e)    
                                                 
                             #####  parallelisation with Parallel Manager #####
                             manager.cleanup_finished_processes()
@@ -627,7 +612,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     else:
                         pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel)
+                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e)
                         estimate_mle(args)                  
 
     except KeyboardInterrupt:
@@ -694,10 +679,18 @@ if __name__ == "__main__":
     retries = 20
     # In parameter names keep the order fixed as is
     # full, with status quo
-    # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "mu_e", "sigma_e"]
+    # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]
     # no status quo
-    parameter_names = ["X", "Z", "alpha", "beta", "gamma", "mu_e", "sigma_e"]
+    parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2    
+
+    prior_scale_x = np.eye(d)    
+    prior_scale_z = np.eye(d)    
+    prior_scale_phi = np.eye(d)    
+    prior_scale_alpha = 1        
+    prior_scale_beta = 1    
+    prior_scale_gamma = 1        
+    prior_scale_delta = 1    
     # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto_barbera/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
@@ -706,9 +699,11 @@ if __name__ == "__main__":
     #         K = result["K"]
     #         d = result["d"]
     # full, with status quo
-    # parameter_space_dim = (K+2*J)*d + J + K + 4
+    # parameter_space_dim = (K+2*J)*d + J + K + 3
     # no status quo
-    parameter_space_dim = (K+J)*d + J + K + 3
+    parameter_space_dim = (K+J)*d + J + K + 2
+    max_signal2noise_ratio = 25 # in dB   # max snr
+    min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
@@ -717,7 +712,7 @@ if __name__ == "__main__":
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
         dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10)
+        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e)
     
     # params_out_jsonl = dict()
     # for m in range(M):
