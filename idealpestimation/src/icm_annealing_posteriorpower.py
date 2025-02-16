@@ -299,8 +299,14 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
 
-    for iiidx in range(parameter_space_dim):
-        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=iiidx, d=d)                    
+    theta_samples_list = None
+    idx_all = None
+    base2exponent = 10
+    theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
+                                                                    args, samples_list=theta_samples_list, idx_all=idx_all)
+    iiidx = 0
+    while iiidx < parameter_space_dim:
+        target_param1, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=iiidx, d=d)                    
         t0 = time.time()
         
         gamma = 0.01
@@ -316,39 +322,60 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             start = gamma if gidx==0 else all_gammas[-1]        
             all_gammas.extend(np.arange(start, upperlim, temperature_rate[gidx]))            
         N = len(all_gammas)
-        print("Annealing schedule: {}".format(N))
-        theta_samples_list = None
-        idx_all = None
-        base2exponent = 10
-        theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
-                                                                        args, samples_list=theta_samples_list, idx_all=idx_all)
-
-        #######################################    
-        testparam = target_param
-        # for alpha, beta set vector_index = vector_coordinate
-        vector_index = vector_index_in_param_matrix
-        vector_coordinate = vector_coordinate
-        if vector_coordinate is not None and vector_index is not None:
-            if testparam in ["X", "Z", "Phi"]:
-                testidx = vector_index*d + vector_coordinate
+        print("Annealing schedule: {},{}".format(N, iiidx))       
+        
+        #######################################            
+        perturb = False
+        testparam = target_param1
+        if not elementwise and testparam not in ["X", "Z", "Phi"]:
+            if target_param1 in ["X", "Z", "Phi"]:
+                teststep = d
+            elif target_param1 in ["alpha"]:
+                teststep = J
+            elif target_param1 in ["beta"]:
+                teststep = K
             else:
-                testidx = vector_coordinate
+                # skip
+                teststep = 1
+            iiidx += teststep
+            continue
+        if testparam in ["alpha", "beta"]:
+            vector_index = vector_coordinate
+        else:
+            vector_index = vector_index_in_param_matrix
+        if elementwise:
+            vector_test_coordinate = vector_coordinate
+        else:
+            vector_test_coordinate = None
+        print("vector_test_coordinate: {}".format(vector_test_coordinate))
+        if vector_test_coordinate is not None and vector_index is not None:
+            if testparam in ["X", "Z", "Phi"]:
+                testidx = vector_index*d + vector_test_coordinate
+            else:
+                testidx = vector_test_coordinate
+            print(param_positions_dict[testparam][0] + testidx)
         else:
             testidx = vector_index
-        print(param_positions_dict[testparam][0] + testidx)
-        perturb = False
+            if testparam in ["X", "Z", "Phi"]:
+                print(param_positions_dict[testparam][0] + testidx*d)
+            elif testparam in ["alpha", "beta"]:
+                print(param_positions_dict[testparam][0] + testidx)
         if testparam is not None:
             theta_perturb = None
             theta_curr = theta_true.copy()
             for param in parameter_names:
                 if param == testparam:
-                    if testidx is not None:    
+                    if vector_test_coordinate is not None:    
                         if perturb:
                             theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] += 0.1*np.linalg.norm(theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]], ord=2)
                         theta_curr[param_positions_dict[testparam][0]+testidx] = -4
-                    else:
-                        theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = [-4]*(param_positions_dict[testparam][1]-param_positions_dict[testparam][0])
-                        print(theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]])
+                    else:   
+                        if vector_index is not None:
+                            theta_curr[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d] = [-4]*d
+                            print(theta_curr[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d])
+                        else:                     
+                            theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = [-4]*(param_positions_dict[testparam][1]-param_positions_dict[testparam][0])
+                            print(theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]])
                 else:
                     if perturb:
                         theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] += 0.1*np.linalg.norm(theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]], ord=2)
@@ -357,8 +384,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                         continue
             if perturb:
                 theta_perturb = theta_curr.copy()
-            all_gammas = [1]*len(all_gammas)
-            gamma = 1
+            # all_gammas = [1]*len(all_gammas)
+            # gamma = 1
         #######################################
         
         delta_rate_prev = None
@@ -395,9 +422,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         max_halving = 2
         estimated_thetas = []
         # to plot X before it has moved for the first time
-        fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr, i, fig_posteriors, 
+        fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), i, fig_posteriors, 
                                                                                             fig_posteriors_annealed, gamma, param_positions_dict, args, 
-                                                                                            plot_arrows=True, testparam=testparam, testidx=testidx) 
+                                                                                            plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index) 
         converged = False
         random_restart = False
         while ((L is not None and l < L)) and restarts < max_restarts and (not converged):
@@ -405,19 +432,12 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while n < N and restarts < max_restarts and (not converged):
                 if elementwise:
                     i = 0                    
-                    while i < parameter_space_dim:
-                                            
+                    while i < parameter_space_dim:                                            
                         target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)                    
                         theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, Y, gamma, theta_curr, 
                                                                     param_positions_dict, L, args)                   
                         theta_curr = theta_test.copy()                    
                         gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)
-                        
-                        #########################
-                        # if target_param == testparam:
-                        #     print(theta_curr[param_positions_dict[target_param][0]:param_positions_dict[target_param][1]])
-                        #########################
-
                         if (delta_rate_prev is not None and delta_rate_prev < delta_rate) or (total_iter % 50 == 0 and total_iter > 1):    
                             plot_online = True
                         else:            
@@ -433,7 +453,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                         if testparam is not None:
                             for param in parameter_names:
                                 if param == testparam:
-                                    if testidx is not None:    
+                                    if vector_test_coordinate is not None:    
                                         testidx_val_tmp = theta_curr[param_positions_dict[testparam][0]+testidx]
                                         if perturb:
                                             theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_perturb[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()
@@ -449,10 +469,10 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
                         #########################
 
-                        if total_iter % 50 == 0:# and total_iter > parameter_space_dim:
+                        if total_iter % 100 == 0:# and total_iter > parameter_space_dim:
                             # plot posteriors during estimation        
                             fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, 
-                                                                                                                        theta_curr, i, fig_posteriors, 
+                                                                                                                        theta_curr.copy(), i, fig_posteriors, 
                                                                                                                         fig_posteriors_annealed, gamma, 
                                                                                                                         param_positions_dict, args, plot_arrows=True,
                                                                                                                         testparam=testparam, testidx=testidx)          
@@ -460,15 +480,13 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                         theta_prev = theta_curr.copy()                                            
                         total_iter += 1   
                         i += 1
-                        n += 1   
-                        print(l, n, i, converged)
-                        converged, delta_theta, random_restart = check_convergence(theta_curr, theta_prev, param_positions_dict, i, testparam=testparam, 
-                                        testidx=testidx, p=percentage_parameter_change, tol=tol)
-                        # if i==120:
-                        #     ipdb.set_trace()
-
-                    if random_restart and (not converged):  
-                        print("RANDOM RESTART???!!!")  
+                        n += 1                           
+                        converged, delta_theta, random_restart = check_convergence(theta_curr, theta_prev, param_positions_dict, i, 
+                                                                                parameter_space_dim=parameter_space_dim, testparam=testparam, 
+                                                                                testidx=testidx, p=percentage_parameter_change, tol=tol)
+                        print(l, n, i, iiidx, converged, random_restart)
+                       
+                    if random_restart and (not converged):                          
                         gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
                                                                                     delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
                                                                                     testparam=testparam)                    
@@ -485,11 +503,11 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                             gamma = 0.01 
 
                             ################################
-                            # as when starting, just not set to testparam at the edge of the grid
+                            # as when starting, just not set testparam at the edge of the grid
                             if testparam is not None:
                                 for param in parameter_names:
                                     if param == testparam:
-                                        if testidx is not None:    
+                                        if vector_test_coordinate is not None:    
                                             testidx_val_tmp = theta_curr[param_positions_dict[testparam][0]+testidx]
                                             if perturb:
                                                 theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_perturb[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()
@@ -503,36 +521,13 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
                                         if perturb:
                                             theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                                all_gammas = [1]*len(all_gammas)
-                                print(theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]])
-                                gamma = 1
+                                # all_gammas = [1]*len(all_gammas)
+                                # print(theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]])
+                                # gamma = 1
                             ################################
 
                             delta_theta = np.inf
-                            theta_prev = np.zeros((parameter_space_dim,))
-                    
-                    #########################
-                    # if end up here because of break line 402 or finish while loop 386, ensure all but testparam are set to true - needed????
-                    # if testparam is not None:
-                    #     for param in parameter_names:
-                    #         if param == testparam:
-                    #             if testidx is not None:   
-                    #                 testidx_val_tmp = theta_curr[param_positions_dict[testparam][0]+testidx]
-                    #                 if perturb:
-                    #                     theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_perturb[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()
-                    #                 else:
-                    #                     theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_true[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()    
-                    #                 theta_curr[param_positions_dict[testparam][0] + testidx] = testidx_val_tmp
-                    #             else:
-                    #                 continue                                
-                    #         else:
-                    #             theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                    #             if perturb:
-                    #                 # +/- 10% of the norm of the parameter
-                    #                 theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                    #########################
-
-                        
+                            theta_prev = np.zeros((parameter_space_dim,))                
                 else:
                     for param in parameter_names:                     
                         if param in ["X", "beta"]:  
@@ -551,40 +546,86 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                 plot_online = True
                             else:            
                                 plot_online = False                        
-                            mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, per_param_boxes = \
-                                            compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
-                                                plot_online=plot_online, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                                mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, per_param_boxes=per_param_boxes)    
+                            # mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, per_param_boxes = \
+                            #                 compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
+                            #                     plot_online=plot_online, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                            #                     mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, per_param_boxes=per_param_boxes)                            
+                            #########################
+                            if testparam is not None:
+                                for param in parameter_names:
+                                    if param == testparam:
+                                        if vector_test_coordinate is not None:    
+                                            raise NotImplementedError("Why here?!")                                           
+                                        else:
+                                            testidx_val_tmp = theta_curr[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d]                                     
+                                            if perturb:
+                                                theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_perturb[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()
+                                            else:
+                                                theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_true[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()
+                                            theta_curr[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d] = testidx_val_tmp.copy() #####
+                                    else:
+                                        theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
+                                        if perturb:
+                                            # +/- 10% of the norm of the parameter
+                                            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
+                            #########################
+                            
+                            
                             if total_iter % 50 == 0:
                                 # plot posteriors during estimation        
-                                fig_posteriors, fig_posteriors_annealed = plot_posteriors_during_estimation(Y, total_iter, per_param_heats["theta"], fig_posteriors, 
-                                                                                                            fig_posteriors_annealed, gamma, param_positions_dict, args)  
-                            delta_rate_prev = delta_rate                     
-                            delta_theta_se = (theta_curr - theta_prev)**2
-                            # delta_theta = delta_theta_se
-                            if np.allclose(np.sum(delta_theta_se), tol):                        
-                                break
-                            delta_theta = delta_theta_se/np.sum(delta_theta_se)
-                            theta_prev = theta_curr.copy()                                                                 
-                            total_iter += 1                                             
-                            if np.all(np.isclose(delta_theta, tol)):                            
-                                break
-                        if np.allclose(np.sum(delta_theta_se), tol) or np.all(np.isclose(delta_theta, tol)):                            
-                            break                
-                    half, gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, delta_rate_prev, delta_theta, temperature_rate, 
-                                                    temperature_steps, all_gammas, percentage_parameter_change, tol)
-                    if half:
+                                fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), i, fig_posteriors, 
+                                                                                                            fig_posteriors_annealed, gamma, param_positions_dict, args, 
+                                                                                                            plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index)   
+                           
+                            delta_rate_prev = delta_rate      
+                            theta_prev = theta_curr.copy()                                            
+                            total_iter += 1                               
+                            n += 1    
+                            converged, delta_theta, random_restart = check_convergence(theta_curr, theta_prev, param_positions_dict, param_positions_dict[param][1], 
+                                                                                parameter_space_dim=parameter_space_dim, testparam=testparam, 
+                                                                                testidx=testidx, p=percentage_parameter_change, tol=tol)
+                            print(l, n, iiidx, converged, random_restart)                               
+
+                                     
+                    if random_restart and (not converged):                          
+                        gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
+                                                                                    delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
+                                                                                    testparam=testparam)                    
                         halving_rate += 1
                         if (halving_rate <= max_halving):                   
                             # delta_rate_prev = None
                             restarts += 1                    
                             # keep solution
-                            estimated_thetas.append(theta_curr)
-                            # restart 
-                            theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
-                                                                                            args, samples_list=theta_samples_list, idx_all=idx_all)                                
-                            n = N
-                            gamma = 0.1
+                            estimated_thetas.append(theta_curr)                                       
+                            # random restart
+                            theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
+                                                                                            args, samples_list=theta_samples_list, idx_all=idx_all)
+                            n = N                        
+                            gamma = 0.01 
+
+                            ################################
+                            # as when starting, just not set testparam at the edge of the grid
+                            if testparam is not None:
+                                for param in parameter_names:
+                                    if param == testparam:
+                                        if vector_test_coordinate is not None:  
+                                            raise NotImplementedError("Why here?!")                                              
+                                        else:
+                                            testidx_val_tmp = theta_curr[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d]                                     
+                                            if perturb:
+                                                theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_perturb[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()
+                                            else:
+                                                theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] = theta_true[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]].copy()
+                                            theta_curr[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d] = testidx_val_tmp.copy() #####
+                                    else:
+                                        theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
+                                        if perturb:
+                                            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
+                                # all_gammas = [1]*len(all_gammas)
+                                # print(theta_curr[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]])
+                                # gamma = 1
+                            ################################
+
                             delta_theta = np.inf
                             theta_prev = np.zeros((parameter_space_dim,))
             l += 1            
@@ -592,9 +633,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             #                 compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
             #                     plot_online=True, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
             #                     mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, per_param_boxes=per_param_boxes)  
-            fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr, i, fig_posteriors, 
+            fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), i, fig_posteriors, 
                                                                                             fig_posteriors_annealed, gamma, param_positions_dict, args, 
-                                                                                            plot_arrows=True, testparam=testparam, testidx=testidx) 
+                                                                                            plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index) 
         
         if converged and (len(estimated_thetas)==0 or (not np.all(np.isclose(theta_curr, estimated_thetas[-1])))):
             estimated_thetas.append(theta_curr)
@@ -604,6 +645,20 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out)
         ##############################################################
 
+        if elementwise:
+            teststep = 1
+        else:
+            if target_param1 in ["X", "Z", "Phi"]:
+                teststep = d
+            elif target_param1 in ["alpha"]:
+                teststep = J
+            elif target_param1 in ["beta"]:
+                teststep = K
+            else:
+                # skip
+                teststep = 1
+        iiidx += teststep
+        
     return estimated_thetas
 
 def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", 
@@ -621,12 +676,12 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             if elementwise:
                 if evaluate_posterior:
                     ##############################################################################
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_individualparams_gamma1_test/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_individualparams_annealing/".format(data_location, m)
                 else:
                     DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
             else:
                 if evaluate_posterior:
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_individualvec_annealing/".format(data_location, m)
                 else:
                     raise NotImplementedError("At the moment we only evaluate the posterior with vector parameters - minimising coordinate-wise is more efficient.")
             pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
@@ -738,7 +793,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 30
+    gridpoints_num = 50
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -757,13 +812,8 @@ if __name__ == "__main__":
     prior_loc_sigmae = 3
     # b
     prior_scale_sigmae = 0.5
-    # temperature_steps = [0, 1, 2, 5, 10]
-    # temperature_rate = [1e-3, 1e-2, 1e-1, 1] #[1e-3, 1e-2, 1e-1, 1]    
-
-
-    temperature_steps = [0, 1]
-    temperature_rate = [1e-1]
-
+    temperature_steps = [0, 1, 2, 5, 10]
+    temperature_rate = [1e-3, 1e-2, 1e-1, 1] #[1e-3, 1e-2, 1e-1, 1]   
 
     max_signal2noise_ratio = 25 # in dB   # max snr
 
@@ -774,7 +824,7 @@ if __name__ == "__main__":
     sigma_e_true = 0.01
     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
     data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    total_running_processes = 50                 
+    total_running_processes = 30                 
     param_positions_dict = dict()            
     k = 0
     for param in parameter_names:
