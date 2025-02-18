@@ -133,7 +133,7 @@ def optimisation_dict2paramvectors(optim_vector, param_positions_dict, J, K, d, 
     return params_out
 
 
-def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0):
+def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, min_sigma_e=1e-6):
     
     # # for scale_e
     # def positive_constraints(x):
@@ -143,7 +143,7 @@ def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0):
     #     """Constraint: Sum of Z's should be a constant - default 0, i.e. balanced politician set"""
     #     return np.sum(x[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]])
     bounds = [(None, None)]*(n-1)
-    bounds.append((0.0, None))
+    bounds.append((min_sigma_e, None))
     
     return bounds, None
 
@@ -686,7 +686,7 @@ def halve_annealing_rate_upd_schedule(N, gamma, delta_n, temperature_rate, tempe
 
 
 def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, iteration, parameter_space_dim, d=None, testparam=None, testidx=None, p=0.2, tol=1e-6):
-
+    
     converged = False
     if testparam is None:
         # check full vector for convergence
@@ -705,7 +705,7 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
                 delta_theta = delta_theta_se/np.sum(delta_theta_se)
             else:
                 delta_theta = delta_theta_se
-            if np.all(np.isclose(delta_theta, tol)):
+            if np.all(np.isclose(delta_theta, tol)) or np.all(np.isclose(delta_theta, 1e-14)):
                 converged = True
         elif elementwise:
             delta_theta = np.abs(theta_curr[param_positions_dict[testparam][0]+testidx] - theta_prev[param_positions_dict[testparam][0]+testidx])
@@ -717,11 +717,11 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
         # check all vector, after a full iteration - add check for iteration to make sure
         if iteration >= parameter_space_dim and (np.sum(delta_theta < tol) > int(p*len(delta_theta))):        
             random_restart = True
-    else:        
+    else:                
         # check tested param only, ensure all coordinates have been updated once
-        if testidx is None:
+        if not elementwise and testidx is not None:
             if iteration >= param_positions_dict[testparam][1]:
-                if (np.sum(delta_theta[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]] < tol) > int(p*len(delta_theta[param_positions_dict[testparam][0]:param_positions_dict[testparam][1]]))):        
+                if (np.sum(delta_theta[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d] < tol) > int(p*len(delta_theta[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d]))):        
                     random_restart = True
         else:
             # no point to check when looking at specific coordinate
@@ -730,20 +730,20 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
     return converged, delta_theta, random_restart
 
 
-def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out):
+def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args):
 
-    computed_negloglik = []
+    computed_loglik = []
     for theta in estimated_thetas:
-        nll = negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z=0, constant_Z=0, debug=False)
-        computed_negloglik.append(nll)
+        loglik = log_full_likelihood(Y, theta.copy(), param_positions_dict, args)
+        computed_loglik.append(loglik[0])
     # sort in increasing order, i.e. from best to worst solution
-    sorted_idx = np.argsort(np.asarray(computed_negloglik))
+    sorted_idx = np.argsort(np.asarray(computed_loglik))
     sorted_idx_lst = sorted_idx.tolist()    
     for i in sorted_idx_lst:
         theta = estimated_thetas[i]
-        nll = computed_negloglik[i]
+        loglik = computed_loglik[i]
         params_out = dict()
-        params_out["negativeloglik"] = nll
+        params_out["loglik"] = loglik
         params_out["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")        
         params_out["elapsedtime"] = elapsedtime        
         time_obj = datetime.strptime(params_out["elapsedtime"], '%H:%M:%S.%f')
@@ -777,13 +777,14 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
     # 2D projection of solutions
     raw_symbols = SymbolValidator().values
     theta_matrix = np.array(estimated_thetas)
+    computed_loglik = np.array(computed_loglik)[sorted_idx]
     if theta_matrix.shape[0] > 1:
         theta_matrix = theta_matrix[sorted_idx, :]
         pca = PCA(n_components=2)
         components = pca.fit_transform(theta_matrix)
         fig = go.Figure()
         for i in range(components.shape[0]):
-            fig.add_trace(go.Scatter(x=[components[i, 0]], y=[components[i, 1]], marker_symbol=raw_symbols[i]))
+            fig.add_trace(go.Scatter(x=[components[i, 0]], y=[components[i, 1]], marker_symbol=raw_symbols[i], text=computed_loglik[i]))
         fig.update(layout_yaxis_range = [np.min(components[:,1])-1,np.max(components[:,1])+1])
         fix_plot_layout_and_save(fig, "{}/solution_plots/project_solutions_2D.html".format(DIR_out, sorted_idx_lst.index(i)), 
                                     xaxis_title="PC1", yaxis_title="PC2", title="", 
@@ -1117,7 +1118,7 @@ def get_evaluation_grid(param, vector_coordinate, args):
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
-    gridpoints_num_alpha_beta = gridpoints_num*50
+    gridpoints_num_alpha_beta = gridpoints_num*20
     xx_ = None
 
     if param == "alpha":
@@ -1142,7 +1143,7 @@ def get_evaluation_grid(param, vector_coordinate, args):
                 grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], gridpoints_num).tolist()                
             elif param == "X":
                 grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], gridpoints_num).tolist()                            
-        elif (d > 1 and d <= 5) and not elementwise: #vector_coordinate is None:            
+        elif (d > 1 and d <= 5) and not elementwise:
             if param == "Phi":
                 unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], gridpoints_num).tolist() for i in range(d)]
                 grid = itertools.product(*unidimensional_grid)
@@ -1231,10 +1232,15 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
         except:
             y1 = []
             y2 = []
-            print("Not enough data for both coordinates yet.")
+            print("Not enough data for both coordinates yet.")            
             pass
-        if len(y1) > 0 and len(y2) > 0 and len(y1) == len(y2):
-            # x = np.linspace(xx_[0], xx_[-1], num=len(y1))
+        if len(y1) > 0 and len(y2) > 0:
+            if len(y1) > len(y2):
+                all_theta[param][idx][1].append(all_theta[param][idx][1][-1])
+                y2 = np.asarray([itm[2] for itm in all_theta[param][idx][1]])
+            elif len(y2) > len(y1):
+                all_theta[param][idx][0].append(all_theta[param][idx][0][-1])
+                y1 = np.asarray([itm[2] for itm in all_theta[param][idx][0]])
             text_i = np.asarray(["i: {}, total i: {}".format(itm[0], itm[1]) for itm in all_theta[param][idx][0]])
             for iii in range(len(y1)):
                 fig.add_trace(
@@ -1377,13 +1383,13 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
             continue
 
         if target_param in ["gamma", "delta", "sigma_e"]:
-            if len(plotting_thetas[target_param]) == 0:
+            if len(plotting_thetas[target_param]) == 0:                
                 plotting_thetas[target_param].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
             elif len(plotting_thetas[target_param]) >= 1 and plotting_thetas[target_param][-1][2] != theta_curr[theta_i]:
                 # plot if parameter value has moved
                 plotting_thetas[target_param].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
         else:            
-            if isinstance(plotting_thetas[target_param], list) and len(plotting_thetas[target_param]) == 0:
+            if isinstance(plotting_thetas[target_param], list) and len(plotting_thetas[target_param]) == 0:                
                 plotting_thetas[target_param] = dict()
                 if target_param in ["X", "beta"]:                    
                     for kk in range(K):
@@ -1407,21 +1413,21 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
                     plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
             else:
                 if target_param in ["X", "Z", "Phi"]:                    
-                    if len(plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate]) == 0:
+                    if len(plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate]) == 0:                        
                         plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
                     elif len(plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate]) >= 1 and \
                         plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate][-1][2] != theta_curr[theta_i]:
                         # plot if parameter value has moved
                         plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
                 else:
-                    if len(plotting_thetas[target_param][vector_coordinate]) == 0:
+                    if len(plotting_thetas[target_param][vector_coordinate]) == 0:                        
                         plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
                     elif len(plotting_thetas[target_param][vector_coordinate]) >= 1 and \
                         plotting_thetas[target_param][vector_coordinate][-1][2] != theta_curr[theta_i]:
                         # plot if parameter value has moved
                         plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
 
-        if elementwise or (not elementwise and target_param in ["alpha", "beta"]):                             
+        if elementwise or (not elementwise and target_param in ["alpha", "beta", "gamma", "delta", "sigma_e"]):                                         
             fig_posteriors[target_param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=target_param, 
                         Y=Y, idx=vector_index_in_param_matrix, vector_coordinate=vector_coordinate, 
                         theta_curr=theta_curr.copy(), gamma=1, param_positions_dict=param_positions_dict, args=args, 
@@ -1443,7 +1449,7 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
                         hat_param=theta_curr[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d].copy(), iteration=iteration,
                         fig_in=fig_posteriors[param], plot_arrows=plot_arrows, all_theta=plotting_thetas)                    
             elif param in ["Z", "Phi"]:
-                for j in range(J):                
+                for j in range(J):                                    
                     if testparam is not None and testvec != j:         
                         continue
                     fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=param, Y=Y, idx=j, vector_coordinate=None, 
@@ -1452,56 +1458,56 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
                         hat_param=theta_curr[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d].copy(), iteration=iteration, 
                         fig_in=fig_posteriors[param], plot_arrows=plot_arrows, all_theta=plotting_thetas)    
         
-
-    # annealed posterior
-    for theta_i in range(parameter_space_dim):     
-        if testidx is not None and testparam is not None and param_positions_dict[testparam][0] + testidx != theta_i:
-            continue  
-        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=theta_i, d=d)     
-        if testparam is not None and testparam != target_param:
-            continue
-        if testparam is not None and not elementwise and testvec != vector_index_in_param_matrix:
-            continue
-        keyname = "param_{}_vindexParammatrix_{}_veccord_{}_gamma_{}".format(target_param, vector_index_in_param_matrix, vector_coordinate, gamma)   
-        if keyname in fig_posteriors_annealed.keys():
-            fig = fig_posteriors_annealed[keyname]             
-        else:
-            fig = go.Figure()   
-        if elementwise or (not elementwise and testparam in ["alpha", "beta"]):     
-            fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=target_param, 
-                        Y=Y, idx=vector_index_in_param_matrix, vector_coordinate=vector_coordinate, 
-                        theta_curr=theta_curr.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
-                        true_param=theta_true[theta_i], 
-                        hat_param=theta_curr[theta_i], iteration=iteration,
-                        fig_in=fig, plot_arrows=plot_arrows, all_theta=plotting_thetas)     
-    # vector 2D plots
-    if not elementwise:
-        for param in parameter_names:
-            if testparam is not None and (testparam != param): # or testidx is not None):
+    if gamma != 1:
+        # annealed posterior
+        for theta_i in range(parameter_space_dim):     
+            if testidx is not None and testparam is not None and param_positions_dict[testparam][0] + testidx != theta_i:
+                continue  
+            target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=theta_i, d=d)     
+            if testparam is not None and testparam != target_param:
                 continue
-            keyname = "param_{}_vindexParammatrix_{}_gamma_{}".format(param, vector_index_in_param_matrix, gamma)   
+            if testparam is not None and not elementwise and testvec != vector_index_in_param_matrix:
+                continue
+            keyname = "param_{}_vindexParammatrix_{}_veccord_{}_gamma_{}".format(target_param, vector_index_in_param_matrix, vector_coordinate, gamma)   
             if keyname in fig_posteriors_annealed.keys():
                 fig = fig_posteriors_annealed[keyname]             
             else:
-                fig = go.Figure()
-            if param in ["X"]:
-                for i in range(K):    
-                    if testparam is not None and testvec != i:         
-                        continue                               
-                    fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=param, Y=Y, idx=i, vector_coordinate=None, 
-                        theta_curr=theta_curr.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
-                        true_param=theta_true[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], iteration=iteration,
-                        fig_in=fig, plot_arrows=plot_arrows, all_theta=plotting_thetas)                
-            elif param in ["Z", "Phi"]:
-                for j in range(J):   
-                    if testparam is not None and testvec != j:         
-                        continue
-                    fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}//".format(DIR_out, gamma), param=param, Y=Y, idx=j, vector_coordinate=None, 
-                        theta_curr=theta_curr.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
-                        true_param=theta_true[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], 
-                        hat_param=theta_curr[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], iteration=iteration, 
-                        fig_in=fig, plot_arrows=plot_arrows, all_theta=plotting_thetas)               
+                fig = go.Figure()   
+            if elementwise or (not elementwise and target_param in ["alpha", "beta", "gamma", "delta", "sigma_e"]):     
+                fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=target_param, 
+                            Y=Y, idx=vector_index_in_param_matrix, vector_coordinate=vector_coordinate, 
+                            theta_curr=theta_curr.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
+                            true_param=theta_true[theta_i], 
+                            hat_param=theta_curr[theta_i], iteration=iteration,
+                            fig_in=fig, plot_arrows=plot_arrows, all_theta=plotting_thetas)     
+        # vector 2D plots
+        if not elementwise:
+            for param in parameter_names:
+                if testparam is not None and (testparam != param): # or testidx is not None):
+                    continue
+                keyname = "param_{}_vindexParammatrix_{}_gamma_{}".format(param, vector_index_in_param_matrix, gamma)   
+                if keyname in fig_posteriors_annealed.keys():
+                    fig = fig_posteriors_annealed[keyname]             
+                else:
+                    fig = go.Figure()
+                if param in ["X"]:
+                    for i in range(K):    
+                        if testparam is not None and testvec != i:         
+                            continue                               
+                        fig_posteriors_annealed[keyname] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=param, Y=Y, idx=i, vector_coordinate=None, 
+                            theta_curr=theta_curr.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
+                            true_param=theta_true[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], 
+                            hat_param=theta_curr[param_positions_dict[param][0]+i*d:param_positions_dict[param][0]+(i+1)*d], iteration=iteration,
+                            fig_in=fig, plot_arrows=plot_arrows, all_theta=plotting_thetas)                
+                elif param in ["Z", "Phi"]:
+                    for j in range(J):   
+                        if testparam is not None and testvec != j:         
+                            continue
+                        fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}//".format(DIR_out, gamma), param=param, Y=Y, idx=j, vector_coordinate=None, 
+                            theta_curr=theta_curr.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
+                            true_param=theta_true[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], 
+                            hat_param=theta_curr[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], iteration=iteration, 
+                            fig_in=fig, plot_arrows=plot_arrows, all_theta=plotting_thetas)               
                 
     return fig_posteriors, fig_posteriors_annealed, plotting_thetas
 

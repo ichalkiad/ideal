@@ -97,7 +97,7 @@ def maximum_likelihood_estimator(
     data=None, full_hessian=True, diag_hessian_only=True,
     loglikelihood_per_data_point=None, disp=False, niter=None, 
     jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None, 
-    subdataset_name=None, param_positions_dict=None, parallel=False):
+    subdataset_name=None, param_positions_dict=None, parallel=False, min_sigma_e=1e-6):
     """
     Estimate the maximum likelihood parameter and its variance.
 
@@ -121,7 +121,7 @@ def maximum_likelihood_estimator(
         # 'hess': '2-point'
     }                   
     # Perform maximum likelihood estimation        
-    bounds, _ = create_constraint_functions(len(initial_guess))    
+    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e)    
     if niter is not None:
         result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":1000000})
     else:
@@ -255,7 +255,8 @@ def estimate_mle(args):
                                                 optimization_method=optimisation_method, 
                                                 data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
-                                                output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
+                                                output_dir=DIR_out, subdataset_name=subdataset_name, 
+                                                param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e)          
         
         if result.success:
             break
@@ -459,7 +460,8 @@ class ProcessManagerSynthetic(ProcessManager):
                                                     optimization_method=optimisation_method, 
                                                     data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                                     loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
-                                                    output_dir=DIR_out, subdataset_name=subdataset_name, param_positions_dict=param_positions_dict, parallel=parallel)          
+                                                    output_dir=DIR_out, subdataset_name=subdataset_name, 
+                                                    param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e)          
             if result.success:
                 break
             else:                     
@@ -645,7 +647,7 @@ if __name__ == "__main__":
         M = 1
         K = 10000
         J = 1000
-        sigma_e_true = 0.5
+        sigma_e_true = 0.01
         total_running_processes = 20   
     else:
         parallel = args.parallel
@@ -692,7 +694,7 @@ if __name__ == "__main__":
     prior_scale_gamma = 1        
     prior_scale_delta = 1    
     # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_nopareto_barbera/".format(K, J, str(sigma_e_true).replace(".", ""))           
+    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]
