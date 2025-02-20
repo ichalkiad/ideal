@@ -180,14 +180,14 @@ def estimate_mle(args):
             parameter_space_dim, None, None, None, None, None, None, None, 
             np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
     
-    X_list = get_evaluation_grid("X", None, args)
+    X_list, _ = get_evaluation_grid("X", None, args)
     X_list = [xx for xx in X_list]
-    Z_list = get_evaluation_grid("Z", None, args)
+    Z_list, _ = get_evaluation_grid("Z", None, args)
     Z_list = [xx for xx in Z_list]
-    alpha_list = get_evaluation_grid("alpha", None, args)
-    beta_list = get_evaluation_grid("beta", None, args)
-    gamma_list = get_evaluation_grid("gamma", None, args)    
-    sigma_e_list = get_evaluation_grid("sigma_e", None, args)    
+    alpha_list, _ = get_evaluation_grid("alpha", None, args)
+    beta_list, _ = get_evaluation_grid("beta", None, args)
+    gamma_list, _ = get_evaluation_grid("gamma", None, args)    
+    sigma_e_list, _ = get_evaluation_grid("sigma_e", None, args)    
     Phi_list = None
     phiidx_all = None
     delta_list = None
@@ -379,20 +379,20 @@ class ProcessManagerSynthetic(ProcessManager):
         N = Y.shape[0]
         Y = Y.astype(np.int8).reshape((N, J), order="F")         
                 
-        gridpoints_num = 100
+        gridpoints_num = 200
         args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
             np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
     
         
-        X_list = get_evaluation_grid("X", None, args)
+        X_list, _ = get_evaluation_grid("X", None, args)
         X_list = [xx for xx in X_list]
-        Z_list = get_evaluation_grid("Z", None, args)
+        Z_list, _ = get_evaluation_grid("Z", None, args)
         Z_list = [xx for xx in Z_list]
-        alpha_list = get_evaluation_grid("alpha", None, args)
-        beta_list = get_evaluation_grid("beta", None, args)
-        gamma_list = get_evaluation_grid("gamma", None, args)        
-        sigma_e_list = get_evaluation_grid("sigma_e", None, args)    
+        alpha_list, _ = get_evaluation_grid("alpha", None, args)
+        beta_list, _ = get_evaluation_grid("beta", None, args)
+        gamma_list, _ = get_evaluation_grid("gamma", None, args)        
+        sigma_e_list, _ = get_evaluation_grid("sigma_e", None, args)    
         Phi_list = None
         phiidx_all = None
         delta_list = None

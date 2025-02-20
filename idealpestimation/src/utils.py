@@ -695,8 +695,6 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
             delta_theta = delta_theta_se/np.sum(delta_theta_se)
         else:
             delta_theta = delta_theta_se
-        if np.all(np.isclose(delta_theta, tol)):
-            converged = True
     else:
         if not elementwise and testidx is not None:
             # check vector portion
@@ -705,12 +703,10 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
                 delta_theta = delta_theta_se/np.sum(delta_theta_se)
             else:
                 delta_theta = delta_theta_se
-            if np.all(np.isclose(delta_theta, tol)) or np.all(np.isclose(delta_theta, 1e-14)):
-                converged = True
         elif elementwise:
             delta_theta = np.abs(theta_curr[param_positions_dict[testparam][0]+testidx] - theta_prev[param_positions_dict[testparam][0]+testidx])
-            if delta_theta <= tol:
-                converged = True
+    if np.all(delta_theta <= tol):
+        converged = True
 
     random_restart = False
     if testparam is None:
@@ -718,14 +714,16 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
         if iteration >= parameter_space_dim and (np.sum(delta_theta < tol) > int(p*len(delta_theta))):        
             random_restart = True
     else:                
-        # check tested param only, ensure all coordinates have been updated once
-        if not elementwise and testidx is not None:
-            if iteration >= param_positions_dict[testparam][1]:
-                if (np.sum(delta_theta[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d] < tol) > int(p*len(delta_theta[param_positions_dict[testparam][0]+testidx*d:param_positions_dict[testparam][0]+(testidx+1)*d]))):        
-                    random_restart = True
+        # check tested param only, ensure all coordinates have been updated once - delta_theta is already the sub-vector
+        if (not elementwise) and (testidx is not None) and (iteration >= param_positions_dict[testparam][1]):
+            if (np.sum(delta_theta < tol) > int(p*len(delta_theta))):        
+                random_restart = True
         else:
             # no point to check when looking at specific coordinate
             random_restart = False
+    
+    if converged:
+        assert random_restart
     
     return converged, delta_theta, random_restart
 
