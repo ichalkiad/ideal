@@ -721,10 +721,7 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
         else:
             # no point to check when looking at specific coordinate
             random_restart = False
-    
-    if converged:
-        assert random_restart
-    
+        
     return converged, delta_theta, random_restart
 
 
@@ -1239,7 +1236,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
             elif len(y2) > len(y1):
                 all_theta[param][idx][0].append(all_theta[param][idx][0][-1])
                 y1 = np.asarray([itm[2] for itm in all_theta[param][idx][0]])
-            text_i = np.asarray(["i: {}, total i: {}".format(itm[0], itm[1]) for itm in all_theta[param][idx][0]])
+            text_i = np.asarray(["i: {}, total i: {}, γ = {}".format(itm[0], itm[1], gamma) for itm in all_theta[param][idx][0]])
             for iii in range(len(y1)):
                 fig.add_trace(
                     go.Scatter(
@@ -1271,9 +1268,10 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     elif param in ["X", "Z", "Phi"] and (isinstance(idx, int) and isinstance(vector_coordinate, int)):
         # per coord plot of vector param
         for itm in all_theta[param][idx][vector_coordinate]:
-            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, label=dict(text="{}".format(itm[1]), textposition="top left",
-                                font=dict(size=16, family="Times New Roman"),),)
-            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}".format(itm[1]),
+            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, 
+                        label=dict(text="{}, γ = {}".format(itm[1], gamma), textposition="top left",
+                        font=dict(size=16, family="Times New Roman"),),)
+            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
                     mode="markers+lines", marker_symbol="square", marker_color="blue", 
                     name="step: {}".format(itm[1])), secondary_y=True,)
         x = np.asarray([itm[2] for itm in all_theta[param][idx][vector_coordinate]])
@@ -1297,9 +1295,10 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     elif param in ["alpha", "beta"]:
         # per coord plot of vector param
         for itm in all_theta[param][vector_coordinate]:
-            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, label=dict(text="{}".format(itm[1]), textposition="top left",
-                                font=dict(size=16, family="Times New Roman"),),)
-            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}".format(itm[1]),
+            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, 
+                        label=dict(text="{}, γ = {}".format(itm[1], gamma), textposition="top left",
+                        font=dict(size=16, family="Times New Roman"),),)
+            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
                     mode="markers+lines", marker_symbol="square", marker_color="blue", 
                     name="step: {}".format(itm[1])), secondary_y=True,)
         x = np.asarray([itm[2] for itm in all_theta[param][vector_coordinate]])
@@ -1323,9 +1322,10 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     else:
         # scalar plot
         for itm in all_theta[param]:
-            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, label=dict(text="{}".format(itm[1]), textposition="top left",
-                                font=dict(size=16, family="Times New Roman"),),)
-            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}".format(itm[1]),
+            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, 
+                        label=dict(text="{}, γ = {}".format(itm[1], gamma), textposition="top left",
+                        font=dict(size=16, family="Times New Roman"),),)
+            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
                     mode="markers+lines", marker_symbol="square", marker_color="blue", 
                     name="step: {}".format(itm[1])), secondary_y=True,)
         x = np.asarray([itm[2] for itm in all_theta[param]])
