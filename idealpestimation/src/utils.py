@@ -1044,7 +1044,7 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
     # following does not reset when a new full scan starts
     per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
     per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
-    xbox.extend([fullscan] * len(mse_x_list))
+    xbox.append(fullscan)
     if plot_online:
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_list).tolist(), 

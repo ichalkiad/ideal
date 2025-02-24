@@ -719,6 +719,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         random_restart = False
         mse_x_list = []
         mse_z_list = []
+        xbox = []
         if elementwise:
             i = 0   
             plot_online = False                 
@@ -772,7 +773,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                     compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
                                         plot_online=plot_online, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                        mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)                        
+                                        mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
+                                        xbox=xbox, plot_restarts=plot_restarts)                        
                         
                     delta_rate_prev = delta_rate                                                                        
                     total_iter += 1  
@@ -780,9 +782,10 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             
             # last entry in mse lists in the same, has been stored twice
             mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
-                                    compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, param_positions_dict=param_positions_dict,
-                                        plot_online=True, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                        mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
+                                    compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, 
+                                        param_positions_dict=param_positions_dict, plot_online=True, 
+                                        mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, 
+                                        per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
             
             # plot posteriors during estimation        
             fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
@@ -1012,7 +1015,7 @@ if __name__ == "__main__":
     tol = 1e-6    
     sigma_e_true = 0.01
     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_goodsnr_polarisedregime/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30                 
     param_positions_dict = dict()            
     k = 0
