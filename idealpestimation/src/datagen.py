@@ -1,11 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # Synthetic data generation
-# 
-# Generate synthetic data by sampling parameter values from Pareto distributions (for behaviour parameters of political engagement and lead user popularity) and Gaussian distributions (for ideal points).
-
-
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -516,7 +508,7 @@ if __name__ == "__main__":
     # dimensionality of ideal points space
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
-    sigma_e = 0.5
+    mu_e = 0
     # utility model parameters
     gamma = 0.01
     delta = 0.0
