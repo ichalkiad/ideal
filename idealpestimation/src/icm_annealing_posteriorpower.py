@@ -407,6 +407,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         max_restarts = 3
         max_halving = 2
         estimated_thetas = []
+        plot_online = True
         # to plot X before it has moved for the first time
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
                                                                                             fig_posteriors_annealed, gamma, param_positions_dict, args, 
@@ -523,7 +524,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                         theta_curr = theta_test.copy()
                         gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, 
                                                                         temperature_steps, all_gammas)                 
-                        mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                        mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                         compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
                                             plot_online=plot_online, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                                             mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
