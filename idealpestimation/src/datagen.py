@@ -2,9 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
-pio.renderers.default = 'notebook'
 import plotly.offline as pyo
-pyo.init_notebook_mode(connected=True)
 from typing import Union, Optional
 from scipy.stats import norm
 import jsonlines
@@ -556,7 +554,7 @@ if __name__ == "__main__":
                 zs1 = generate_normal_data(n_samples=J, n_dimensions=d, mu=zs_mean_1, sigma=zs_sigma_1)
                 zs = zs1.transpose()
 
-                theta, param_positions_dict = params2optimisation_dict(J, K, d, parameter_names, xs, zs, None, alpha_js, beta_is, gamma, delta, mu_e, sigma_e)    
+                theta, param_positions_dict = params2optimisation_dict(J, K, d, parameter_names, xs, zs, None, alpha_js, beta_is, gamma, delta, sigma_e)    
                 theta = np.asarray(theta)
                 params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
                 X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
