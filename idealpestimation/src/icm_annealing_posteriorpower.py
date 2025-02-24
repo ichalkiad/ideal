@@ -346,7 +346,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
             vector_test_coordinate = vector_coordinate
         else:
             vector_test_coordinate = None
-        if vector_test_coordinate is not None: # and vector_index is not None:
+        if vector_test_coordinate is not None:
             if testparam in ["X", "Z", "Phi"]:
                 testidx = vector_index*d + vector_test_coordinate
             else:
@@ -399,6 +399,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         per_param_ers["X_rot_translated_mseOverMatrix"] = []
         per_param_ers["Z_rot_translated_mseOverMatrix"] = []
         per_param_heats["theta"] = []
+        plot_restarts = []
+        xbox = []
         total_iter = 1   
         halving_rate = 0 
         restarts = 0
@@ -421,15 +423,12 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                     theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                                 Y, gamma, theta_curr.copy(), param_positions_dict, L, args)                   
                     theta_curr = theta_test.copy()                    
-                    gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)
-                    # if (delta_rate_prev is not None and delta_rate_prev < delta_rate):    
-                    #     plot_online = True
-                    # else:            
-                    #     plot_online = False                       
-                    # mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats = \
-                    #                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
-                    #                     param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
-                    #                     fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats)       
+                    gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)                   
+                    mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                                    compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
+                                        param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
+                                        fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, per_param_ers=per_param_ers, 
+                                        per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)       
 
                     #########################
                     if testparam is not None:
@@ -466,11 +465,14 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                                                                                                     testparam=testparam, testidx=testidx)                          
                     
                 if random_restart and random_restart < max_restarts: 
+                    halved = False
                     if (halving_rate <= max_halving):                           
                         gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
                                                                                 delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
                                                                                 testparam=testparam)                    
-                        halving_rate += 1                    
+                        halving_rate += 1          
+                        halved = True
+                    plot_restarts.append((l, total_iter, halved, "fullrestart"))                              
                     restarts += 1                    
                     # keep solution
                     estimated_thetas.append(theta_curr)                                       
@@ -520,15 +522,12 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                                                 param_positions_dict, L, args)     
                         theta_curr = theta_test.copy()
                         gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, 
-                                                                        temperature_steps, all_gammas)
-                        # if (delta_rate_prev is not None and delta_rate_prev < delta_rate) or (total_iter % 50 == 0 and total_iter > 1):    
-                        #     plot_online = True
-                        # else:            
-                        #     plot_online = False                        
-                        # mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, per_param_boxes = \
-                        #                 compute_and_plot_mse(theta_true, theta_curr, n, iteration=total_iter, delta_rate=delta_rate_prev, gamma_n=gamma, args=args, param_positions_dict=param_positions_dict,
-                        #                     plot_online=plot_online, fig_theta_full=fig_theta_full, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                        #                     mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, per_param_boxes=per_param_boxes)                            
+                                                                        temperature_steps, all_gammas)                 
+                        mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                                        compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
+                                            plot_online=plot_online, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                                            mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
+                                            xbox=xbox, plot_restarts=plot_restarts)                            
                         #########################
                         if testparam is not None:
                             for param in parameter_names:
@@ -564,12 +563,15 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                                                                                         fig_posteriors_annealed, gamma, param_positions_dict, args, 
                                                                                                         plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index)   
                 
-                if random_restart and restarts < max_restarts:                   
+                if random_restart and restarts < max_restarts:     
+                    halved = False              
                     if (halving_rate <= max_halving):    
                         gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
                                                                                     delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
                                                                                     testparam=testparam)                    
-                        halving_rate += 1                              
+                        halving_rate += 1
+                        halved = True
+                    plot_restarts.append((l, total_iter, halved, "fullrestart"))                              
                     restarts += 1                    
                     # keep solution
                     estimated_thetas.append(theta_curr)                                       
@@ -607,10 +609,10 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                 print(l, total_iter, converged, random_restart, restarts, halving_rate)                                      
                            
             
-        # mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats = \
-        #                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
-        #                     plot_online=True, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-        #                     mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats)  
+        mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                        compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
+                            plot_online=True, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                            mse_z_list=mse_z_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
                                                                                         fig_posteriors_annealed, gamma, param_positions_dict, args, 
                                                                                         plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index) 
@@ -618,10 +620,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         if converged and (len(estimated_thetas)==0 or (not np.all(np.isclose(theta_curr, estimated_thetas[-1])))):
             estimated_thetas.append(theta_curr)
         
-        ################## to remove #################################
         elapsedtime = str(timedelta(seconds=time.time()-t0)) 
         rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args)
-        ##############################################################
 
         if elementwise:
             teststep = 1
@@ -719,16 +719,14 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         mse_x_list = []
         mse_z_list = []
         if elementwise:
-            i = 0                    
+            i = 0   
+            plot_online = False                 
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)                    
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                             Y, gamma, theta_curr.copy(), param_positions_dict, L, args)                   
                 theta_curr = theta_test.copy()                    
-                gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)
-                if (delta_rate_prev is not None and delta_rate_prev < delta_rate):
-                    ipdb.set_trace()    
-                    plot_online = True                  
+                gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)                
                 mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
                                     param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
@@ -755,6 +753,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                                         parameter_space_dim=parameter_space_dim, testparam=testparam, 
                                                                         testidx=testidx, p=percentage_parameter_change, tol=tol)
         else:
+            plot_online = False
             for target_param in parameter_names:                     
                 if target_param in ["X", "beta"]:  
                     param_no = K                                                      
@@ -769,8 +768,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     theta_curr = theta_test.copy()
                     gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, 
                                                                     temperature_steps, all_gammas)
-                    if (delta_rate_prev is not None and delta_rate_prev < delta_rate):                              
-                        plot_online = True
                     mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                     compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
                                         plot_online=plot_online, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
