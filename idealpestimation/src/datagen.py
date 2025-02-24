@@ -379,6 +379,8 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     pathlib.Path("{}/".format(data_location)).mkdir(parents=True, exist_ok=True)
     with open("{}/Y.pickle".format(data_location), "wb") as f:
         pickle.dump(follow_matrix, f, protocol=4)
+    with open("{}/Utilities.pickle".format(data_location), "wb") as f:
+        pickle.dump(utilities_matrix, f, protocol=4)
 
     # full, with status quo
     if delta > 0:
