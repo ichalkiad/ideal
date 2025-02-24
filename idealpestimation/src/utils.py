@@ -913,9 +913,10 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
     return R, t, error
 
 
-def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta_rate, gamma_n, args, param_positions_dict,
-                         plot_online=True, fig_theta_full=None, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[],
-                         per_param_ers=dict(), per_param_heats=dict(), per_param_boxes=dict()):
+    
+def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param_positions_dict,
+                         plot_online=True, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[],
+                         per_param_ers=dict(), per_param_heats=dict(), xbox=[], plot_restarts=[]):
 
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
@@ -923,17 +924,19 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
-
-    if fig_theta_full is None:
-        fig_theta_full = go.Figure()    
+  
     # compute with full theta vector - relativised
     sse = (theta_true - theta_hat)**2
-    rel_se = sse/np.sum(sse)    
+    if not np.allclose(np.sum(sse), 1e-14):                                   
+        rel_se = sse/np.sum(sse)
+    else:
+        rel_se = sse
     per_param_heats["theta"].append(rel_se)
+    mse_theta_full.append(np.mean(sse))
     if plot_online:        
         fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
-        savename = "{}/mse_plots_theta_heatmap/theta_full_relativisedSE.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
+        pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
                                 showgrid=False, showlegend=True, print_png=True, print_html=True, 
                                 print_pdf=False)        
@@ -946,16 +949,36 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
 
     for param in parameter_names:
         se = (params_true[param] - params_hat[param])**2
-        if param in ["gamma", "delta", "mu_e", "sigma_e"]:
+        if param in ["gamma", "delta", "sigma_e"]:
+            # time series plots
             per_param_ers[param].append(se[0])
             if plot_online:
-                fig = go.Figure()
+                fig = make_subplots(specs=[[{"secondary_y": True}]])   
                 fig.add_trace(go.Scatter(
-                                        y=per_param_ers[param], 
+                                        y=per_param_ers[param], showlegend=False,
                                         x=np.arange(iteration)                                    
-                                    ))
-                savename = "{}/mse_plots_per_param_ts/{}_squarederror.html".format(DIR_out, param)
-                pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                                    ), secondary_y=False)
+                fig.add_trace(go.Scatter(
+                                        y=mse_theta_full, showlegend=True,
+                                        x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                                    ), secondary_y=True)
+                for itm in plot_restarts:
+                    scanrep, totaliterations, halvedgammas, restarted = itm
+                    if halvedgammas:
+                        vcolor = "red"
+                    else:
+                        vcolor = "green"
+                    if restarted=="fullrestart":
+                        fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
+                    else:
+                        # partial restart
+                        fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
+                savename = "{}/timeseries_plots/{}_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                 fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
                                         showgrid=False, showlegend=True, print_png=True, print_html=True, 
                                         print_pdf=False)
@@ -965,29 +988,51 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
             elif param == "Z":
                 Z_hat = np.asarray(params_hat["Z"]).reshape((d, J), order="F")   
             if len(se.shape) >= 2:
-                se = se.reshape((se.shape[0]*se.shape[1], ), order="F")
-            rel_se = se/np.sum(se)              
+                se = se.reshape((se.shape[0]*se.shape[1], ), order="F")   
+            if not np.allclose(np.sum(se), 1e-14):                                   
+                rel_se = se/np.sum(se)
+            else:
+                rel_se = se           
             per_param_heats[param].append(rel_se)   
             if plot_online:            
                 fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
-                savename = "{}/mse_plots_per_param_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
-                pathlib.Path("{}/mse_plots_per_param_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                 fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
                                         showgrid=False, showlegend=True, print_png=True, print_html=True, 
                                         print_pdf=False)            
                 parray = np.stack(per_param_heats[param])
+                # timeseries plots
                 for pidx in range(se.shape[0]):
-                    fig = go.Figure()
+                    fig = make_subplots(specs=[[{"secondary_y": True}]]) 
                     fig.add_trace(go.Scatter(
-                                            y=parray[:, pidx], 
+                                            y=parray[:, pidx], showlegend=False,
                                             x=np.arange(iteration)                                    
-                                        ))
-                    savename = "{}/mse_plots_per_param_ts/{}_idx_{}_squarederror.html".format(DIR_out, param, pidx)
-                    pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                                        ), secondary_y=False)
+                    fig.add_trace(go.Scatter(
+                                        y=mse_theta_full, showlegend=True,
+                                        x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                                    ), secondary_y=True)
+                    for itm in plot_restarts:
+                        scanrep, totaliterations, halvedgammas, restarted = itm
+                        if halvedgammas:
+                            vcolor = "red"
+                        else:
+                            vcolor = "green"
+                        if restarted=="fullrestart":
+                            fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                        font=dict(size=16, family="Times New Roman"),),)
+                        else:
+                            # partial restart
+                            fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                        font=dict(size=16, family="Times New Roman"),),)
+                    savename = "{}/timeseries_plots/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
+                    pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                     fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
-                                            showgrid=False, showlegend=False, print_png=True, print_html=True, 
+                                            showgrid=False, showlegend=True, print_png=True, print_html=True, 
                                             print_pdf=False)     
-
 
     if fig_xz is None:
         fig_xz = go.Figure()  
@@ -996,49 +1041,75 @@ def compute_and_plot_mse(theta_true, theta_hat, annealing_step, iteration, delta
     mse_x_list.append(mse_x)
     Rz, tz, mse_z = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
     mse_z_list.append(mse_z)   
+    # following does not reset when a new full scan starts
     per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
     per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
+    xbox.extend([fullscan] * len(mse_x_list))
     if plot_online:
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_list).tolist(), 
-                            x=[iteration] * len(mse_x_list),
-                            name="Users<br>Annealing step = {:.4f}<br>gamma_{}={}".format(delta_rate, iteration, gamma_n),
-                            boxpoints='outliers', line=dict(color="red")
+                            x=xbox,
+                            name="X - total iter. {}".format(iteration),
+                            boxpoints='outliers', line=dict(color="blue")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_z_list).tolist(), 
-                            x=[iteration] * len(mse_z_list),
-                            name="Politicians<br>Annealing step = {:.4f}<br>gamma_{}={}".format(delta_rate, iteration, gamma_n),
+                            x=xbox,
+                            name="Z - total iter. {}".format(iteration),
                             boxpoints='outliers', line=dict(color="green")
                             ))
-        savename = "{}/mse_plots_per_param_box/xz_rotated_translated.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_per_param_box/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fig_xz.update_layout(boxmode="group")
+        savename = "{}/xz_boxplots/MeanOverMatrix_sqaurederror_rotated_translated.html".format(DIR_out)
+        pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
                             print_png=True, print_html=True, print_pdf=False)
-        fig = go.Figure()
+        fig = make_subplots(specs=[[{"secondary_y": True}]]) 
         fig.add_trace(go.Scatter(
                                 y=per_param_ers["X_rot_translated_mseOverMatrix"], 
                                 x=np.arange(iteration),
-                                name="X - min mean sq. error<br>over matrix (under rot/transl)"
-                            ))
-        savename = "{}/mse_plots_per_param_ts/X_rot_translated_mseOverMatrix.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over parameter matrix elements", title="", 
+                                name="X - min mean sq. error<br>(under rot/transl)"
+                            ), secondary_y=False)
+        fig.add_trace(go.Scatter(
+                                y=mse_theta_full, 
+                                x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                            ), secondary_y=True)
+        savename = "{}/timeseries_plots/X_rot_translated_mseOverMatrix.html".format(DIR_out)
+        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over matrix elements", title="", 
                                 showgrid=False, showlegend=True, print_png=True, print_html=True, 
                                 print_pdf=False)
-        fig = go.Figure()
+        fig = make_subplots(specs=[[{"secondary_y": True}]]) 
         fig.add_trace(go.Scatter(
                                 y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
                                 x=np.arange(iteration),
-                                name="Z - min mean sq. error<br>over matrix (under rot/trl)"
-                            ))
-        savename = "{}/mse_plots_per_param_ts/Z_rot_translated_mseOverMatrix.html".format(DIR_out)
-        pathlib.Path("{}/mse_plots_per_param_ts/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over parameter matrix elements", title="", 
+                                name="Z - min mean sq. error<br>(under rot/trl)"
+                            ), secondary_y=False)
+        fig.add_trace(go.Scatter(
+                                y=mse_theta_full, 
+                                x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                            ), secondary_y=True)
+        for itm in plot_restarts:
+            scanrep, totaliterations, halvedgammas, restarted = itm
+            if halvedgammas:
+                vcolor = "red"
+            else:
+                vcolor = "green"
+            if restarted=="fullrestart":
+                fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+            else:
+                # partial restart
+                fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+        savename = "{}/timeseries_plots/Z_rot_translated_mseOverMatrix.html".format(DIR_out)
+        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over matrix elements", title="", 
                                 showgrid=False, showlegend=True, print_png=True, print_html=True, 
                                 print_pdf=False)
 
-    return mse_theta_full, fig_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, per_param_boxes
+    return mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox
 
 
 def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
@@ -1105,7 +1176,7 @@ def get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matr
     return post2optim
 
 
-def get_evaluation_grid(param, vector_coordinate, args):
+def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None):
 
     grid_width_std = 5    
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
@@ -1113,7 +1184,11 @@ def get_evaluation_grid(param, vector_coordinate, args):
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
-    gridpoints_num_alpha_beta = gridpoints_num*20
+    
+    if gridpoints_num_plot is not None:
+        gridpoints_num = gridpoints_num_plot
+    
+    gridpoints_num_alpha_beta = gridpoints_num**2
     xx_ = None
 
     if param == "alpha":
@@ -1170,7 +1245,9 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     f = get_posterior_for_optimisation_vec(param=param, Y=Y, idx=idx, vector_index_in_param_matrix=idx, vector_coordinate=vector_coordinate, theta=theta_true.copy(), 
                                            gamma=gamma, param_positions_dict=param_positions_dict, args=args)
     
-    xx, xx_ = get_evaluation_grid(param, vector_coordinate, args)      
+    gridpoints_num_plot = 20
+
+    xx, xx_ = get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=gridpoints_num_plot)      
     if vector_coordinate is None:        
         xxlist = [ix for ix in xx]                
     else:        
@@ -1188,7 +1265,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                         x=xx_,
                         y=yy,
                         mode='lines',
-                        name=param,
+                        name="{}: cond. posterior".format(param),
                         line=dict(
                             color='royalblue',
                             width=2
@@ -1203,7 +1280,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                         colorscale='Hot',
                         contours=dict(showlabels=True),
                         colorbar=dict(
-                            title='Posterior',
+                            title='Cond. posterior',
                             titleside='right'
                         )
                     )
@@ -1212,10 +1289,10 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
 
     if (idx is None and vector_coordinate==0 and true_param is not None) or (isinstance(idx, int) and isinstance(vector_coordinate, int)):
         # scalar param        
-        fig.add_vline(x=true_param, line_width=3, line_dash="dash", line_color="green", showlegend=True)
+        fig.add_vline(x=true_param, line_width=3, line_dash="dash", line_color="green", name="True θ", showlegend=True)
     elif isinstance(idx, int) and vector_coordinate is None:
         # surface plot
-        fig.add_trace(go.Scatter(x=[true_param[0]], y=[true_param[1]], mode="markers", marker_symbol="star", marker_color="red"))
+        fig.add_trace(go.Scatter(x=[true_param[0]], y=[true_param[1]], name="True θ", mode="markers", marker_symbol="star", marker_color="green"))
 
     if param in ["X", "Z", "Phi"] and vector_coordinate is None:
         # 2d plot
@@ -1236,15 +1313,16 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
             elif len(y2) > len(y1):
                 all_theta[param][idx][0].append(all_theta[param][idx][0][-1])
                 y1 = np.asarray([itm[2] for itm in all_theta[param][idx][0]])
-            text_i = np.asarray(["i: {}, total i: {}, γ = {}".format(itm[0], itm[1], gamma) for itm in all_theta[param][idx][0]])
+            opacitylevels = np.linspace(0.2, 1, len(y1))
+            text_i = np.asarray(["i: {}, total i: {}, γ = {:.3f}".format(itm[0], itm[1], gamma) for itm in all_theta[param][idx][0]])
             for iii in range(len(y1)):
                 fig.add_trace(
                     go.Scatter(
                         x=[y1[iii]],
                         y=[y2[iii]],
-                        mode="markers", marker_symbol="square", marker_color="blue",                    
+                        mode="markers", marker_symbol="square", marker_color="blue",            
                         marker_size=8,
-                        showlegend=True,
+                        showlegend=False,
                         text=text_i,
                         hoverinfo="text"
                     )
@@ -1259,6 +1337,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                     yref='y',
                     axref='x',
                     ayref='y',
+                    opacity=opacitylevels[iii], 
                     showarrow=True,
                     arrowhead=2,
                     arrowsize=1,
@@ -1267,13 +1346,16 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                 )        
     elif param in ["X", "Z", "Phi"] and (isinstance(idx, int) and isinstance(vector_coordinate, int)):
         # per coord plot of vector param
+        opacitylevels = np.linspace(0.2, 1, len(all_theta[param][idx][vector_coordinate]))
+        opc = 0
         for itm in all_theta[param][idx][vector_coordinate]:
-            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, 
-                        label=dict(text="{}, γ = {}".format(itm[1], gamma), textposition="top left",
+            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False, 
+                        label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
                         font=dict(size=16, family="Times New Roman"),),)
-            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
-                    mode="markers+lines", marker_symbol="square", marker_color="blue", 
+            fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma), showlegend=False, 
+                    mode="markers+lines", marker_symbol="square", marker_color="red", 
                     name="step: {}".format(itm[1])), secondary_y=True,)
+            opc += 1
         x = np.asarray([itm[2] for itm in all_theta[param][idx][vector_coordinate]])
         y = np.asarray([itm[3][0] for itm in all_theta[param][idx][vector_coordinate]])
         for iii in range(len(x)-1):        
@@ -1286,21 +1368,25 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                 yref='y2',
                 axref='x',
                 ayref='y2',
+                opacity=opacitylevels[iii],
                 showarrow=True,
                 arrowhead=2,
                 arrowsize=1,
                 arrowwidth=2,
-                arrowcolor='blue'
+                arrowcolor='red'
             )       
     elif param in ["alpha", "beta"]:
         # per coord plot of vector param
+        opacitylevels = np.linspace(0.2, 1, len(all_theta[param][vector_coordinate]))
+        opc = 0
         for itm in all_theta[param][vector_coordinate]:
-            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, 
-                        label=dict(text="{}, γ = {}".format(itm[1], gamma), textposition="top left",
+            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False, 
+                        label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
                         font=dict(size=16, family="Times New Roman"),),)
             fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
-                    mode="markers+lines", marker_symbol="square", marker_color="blue", 
+                    mode="markers+lines", marker_symbol="square", marker_color="red", showlegend=False, 
                     name="step: {}".format(itm[1])), secondary_y=True,)
+            opc += 1
         x = np.asarray([itm[2] for itm in all_theta[param][vector_coordinate]])
         y = np.asarray([itm[3][0] for itm in all_theta[param][vector_coordinate]])
         for iii in range(len(x)-1):       
@@ -1313,21 +1399,25 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                 yref='y2',
                 axref='x',
                 ayref='y2',
+                opacity=opacitylevels[iii],
                 showarrow=True,
                 arrowhead=2,
                 arrowsize=1,
                 arrowwidth=2,
-                arrowcolor='blue'
+                arrowcolor='red'
             )        
     else:
         # scalar plot
+        opacitylevels = np.linspace(0.2, 1, len(all_theta[param]))
+        opc = 0
         for itm in all_theta[param]:
-            fig.add_vline(x=itm[2], line_width=2, line_dash="dash", line_color="blue", showlegend=True, 
-                        label=dict(text="{}, γ = {}".format(itm[1], gamma), textposition="top left",
+            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False, 
+                        label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
                         font=dict(size=16, family="Times New Roman"),),)
             fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
-                    mode="markers+lines", marker_symbol="square", marker_color="blue", 
+                    mode="markers+lines", marker_symbol="square", marker_color="red", showlegend=False,
                     name="step: {}".format(itm[1])), secondary_y=True,)
+            opc += 1
         x = np.asarray([itm[2] for itm in all_theta[param]])
         y = np.asarray([itm[3][0] for itm in all_theta[param]])
         for iii in range(len(x)-1):    
@@ -1340,17 +1430,25 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                 yref='y2',
                 axref='x',
                 ayref='y2',
+                opacity=opacitylevels[iii],
                 showarrow=True,
                 arrowhead=2,
                 arrowsize=1,
                 arrowwidth=2,
-                arrowcolor='blue'
+                arrowcolor='red'
             )       
     
-    fig.update_layout(hovermode='x unified') 
+    fig.update_layout(hovermode='x unified', legend=dict(orientation="h")) 
+    if not (isinstance(idx, int) and vector_coordinate is None):
+        fig.update_layout(yaxis2=dict(title="Data loglikelihood")) 
     pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)    
     savename = "{}/{}_idx_{}_vector_coord_{}.html".format(outdir, param, idx, vector_coordinate)
-    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="Posterior", title="", showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
+    if param in ["X", "Z", "Phi"] and vector_coordinate is None:
+        yaxistitle = ""
+    else:
+        yaxistitle = "Conditional posterior"
+    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title=yaxistitle, title="", 
+                            showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
 
     return fig
 
