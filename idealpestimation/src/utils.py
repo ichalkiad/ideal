@@ -1313,7 +1313,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
             elif len(y2) > len(y1):
                 all_theta[param][idx][0].append(all_theta[param][idx][0][-1])
                 y1 = np.asarray([itm[2] for itm in all_theta[param][idx][0]])
-            opacitylevels = np.linspace(0.2, 1, len(y1))
+            opacitylevels = np.linspace(0.1, 1, len(y1))
             text_i = np.asarray(["i: {}, total i: {}, γ = {:.3f}".format(itm[0], itm[1], gamma) for itm in all_theta[param][idx][0]])
             for iii in range(len(y1)):
                 fig.add_trace(
@@ -1346,7 +1346,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
                 )        
     elif param in ["X", "Z", "Phi"] and (isinstance(idx, int) and isinstance(vector_coordinate, int)):
         # per coord plot of vector param
-        opacitylevels = np.linspace(0.2, 1, len(all_theta[param][idx][vector_coordinate]))
+        opacitylevels = np.linspace(0.1, 1, len(all_theta[param][idx][vector_coordinate]))
         opc = 0
         for itm in all_theta[param][idx][vector_coordinate]:
             fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False) 
@@ -1377,7 +1377,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
             )       
     elif param in ["alpha", "beta"]:
         # per coord plot of vector param
-        opacitylevels = np.linspace(0.2, 1, len(all_theta[param][vector_coordinate]))
+        opacitylevels = np.linspace(0.1, 1, len(all_theta[param][vector_coordinate]))
         opc = 0
         for itm in all_theta[param][vector_coordinate]:
             fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False) 
