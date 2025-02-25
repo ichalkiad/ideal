@@ -1349,9 +1349,9 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
         opacitylevels = np.linspace(0.2, 1, len(all_theta[param][idx][vector_coordinate]))
         opc = 0
         for itm in all_theta[param][idx][vector_coordinate]:
-            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False, 
-                        label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
-                        font=dict(size=16, family="Times New Roman"),),)
+            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False) 
+                        # , label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
+                        # font=dict(size=16, family="Times New Roman"),),)
             fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma), showlegend=False, 
                     mode="markers+lines", marker_symbol="square", marker_color="red", 
                     name="step: {}".format(itm[1])), secondary_y=True,)
@@ -1380,9 +1380,9 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
         opacitylevels = np.linspace(0.2, 1, len(all_theta[param][vector_coordinate]))
         opc = 0
         for itm in all_theta[param][vector_coordinate]:
-            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False, 
-                        label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
-                        font=dict(size=16, family="Times New Roman"),),)
+            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False) 
+                        # , label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
+                        # font=dict(size=16, family="Times New Roman"),),)
             fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
                     mode="markers+lines", marker_symbol="square", marker_color="red", showlegend=False, 
                     name="step: {}".format(itm[1])), secondary_y=True,)
@@ -1411,9 +1411,9 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
         opacitylevels = np.linspace(0.2, 1, len(all_theta[param]))
         opc = 0
         for itm in all_theta[param]:
-            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False, 
-                        label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
-                        font=dict(size=16, family="Times New Roman"),),)
+            fig.add_vline(x=itm[2], opacity=opacitylevels[opc], line_width=2, line_dash="dash", line_color="red", showlegend=False), 
+                        # , label=dict(text="{}, γ = {:.3f}".format(itm[1], gamma), textposition="top left",
+                        # font=dict(size=16, family="Times New Roman"),),)
             fig.add_trace(go.Scatter(x=[itm[2]], y=[itm[3][0]], text="{}, γ = {}".format(itm[1], gamma),
                     mode="markers+lines", marker_symbol="square", marker_color="red", showlegend=False,
                     name="step: {}".format(itm[1])), secondary_y=True,)
