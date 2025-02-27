@@ -326,7 +326,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         print("Annealing schedule: {},{}".format(N, iiidx))       
 
         #######################################            
-        perturb = False
+        perturb = True
         testparam = target_param1
         if not elementwise and testparam not in ["X", "Z", "Phi"]:
             if target_param1 in ["alpha"]:
@@ -373,8 +373,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                     else:
                         # fixed to true
                         continue
-            all_gammas = [1]*len(all_gammas)
-            gamma = 1
+            # all_gammas = [1]*len(all_gammas)
+            # gamma = 1
         #######################################
         
         delta_rate_prev = None
@@ -407,7 +407,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         max_restarts = 3
         max_halving = 2
         estimated_thetas = []
-        plot_online = True
+        plot_online = False
         # to plot X before it has moved for the first time
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
                                                                                             fig_posteriors_annealed, gamma, param_positions_dict, args, 
@@ -501,8 +501,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                 theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
                                 if perturb:
                                     theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                        all_gammas = [1]*len(all_gammas)
-                        gamma = 1
+                        # all_gammas = [1]*len(all_gammas)
+                        # gamma = 1
                     ################################
                     theta_prev = np.zeros((parameter_space_dim,))     
                 else:                      
@@ -600,8 +600,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                     theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
                                 else:
                                     theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                        all_gammas = [1]*len(all_gammas)
-                        gamma = 1
+                        # all_gammas = [1]*len(all_gammas)
+                        # gamma = 1
                     ################################
                     theta_prev = np.zeros((parameter_space_dim,))
                 else:                    
@@ -863,11 +863,11 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing_perturb/".format(data_location, m)
                 else:
-                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise_full_plots2paper/".format(data_location, m)
             else:
                 if evaluate_posterior:
                     DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_full_plots2paper/".format(data_location, m)
-                    # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1_testpartial2/".format(data_location, m)
+                    # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_annealing/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_annealing_perturb/".format(data_location, m)
@@ -902,9 +902,6 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                     param_positions_dict[param] = (k, k + 1)                                
                     k += 1
                 elif param == "delta":
-                    param_positions_dict[param] = (k, k + 1)                                
-                    k += 1
-                elif param == "mu_e":
                     param_positions_dict[param] = (k, k + 1)                                
                     k += 1
                 elif param == "sigma_e":
@@ -973,7 +970,7 @@ if __name__ == "__main__":
     niter = 10
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    retries = 10
+    retries = 15
     diff_iter = None
     disp = True
     # In parameter names keep the order fixed as is
@@ -1002,7 +999,7 @@ if __name__ == "__main__":
     # b
     prior_scale_sigmae = 0.5
     temperature_steps = [0, 1, 2, 5, 10]
-    temperature_rate = [1e-3, 1e-2, 1e-1, 1] #[1e-3, 1e-2, 1e-1, 1]   
+    temperature_rate = [1e-3, 1e-2, 1e-1, 1]
 
     # temperature_steps = [0, 1, 2, 5, 10]
     # temperature_rate = [0.1, 0.2, 0.5, 1] 
@@ -1015,7 +1012,7 @@ if __name__ == "__main__":
     tol = 1e-6    
     sigma_e_true = 0.01
     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_goodsnr_polarisedregime/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30                 
     param_positions_dict = dict()            
     k = 0
