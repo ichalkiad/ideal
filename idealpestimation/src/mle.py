@@ -19,7 +19,9 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
                                                             create_constraint_functions, jax, jnp, \
-                                                                time, datetime, timedelta, parse_input_arguments, negative_loglik, negative_loglik_jax
+                                                                time, datetime, timedelta, parse_input_arguments, \
+                                                                    negative_loglik, negative_loglik_jax, collect_mle_results
+
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
 def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per_data_point=None, 
@@ -693,8 +695,8 @@ if __name__ == "__main__":
     prior_scale_beta = 1    
     prior_scale_gamma = 1        
     prior_scale_delta = 1    
-    # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
+    data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]
@@ -710,29 +712,40 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
     print("Observed data points per data split: {}".format(N*J))        
-    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
-        parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e)
+    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+    #     data_location=data_location, parallel=parallel, 
+    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
+    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+    #     trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e)
+
+    param_positions_dict = dict()            
+    k = 0
+    for param in parameter_names:
+        if param == "X":
+            param_positions_dict[param] = (k, k + K*d)                       
+            k += K*d    
+        elif param in ["Z"]:
+            param_positions_dict[param] = (k, k + J*d)                                
+            k += J*d
+        elif param in ["Phi"]:            
+            param_positions_dict[param] = (k, k + J*d)                                
+            k += J*d
+        elif param == "beta":
+            param_positions_dict[param] = (k, k + K)                                   
+            k += K    
+        elif param == "alpha":
+            param_positions_dict[param] = (k, k + J)                                       
+            k += J    
+        elif param == "gamma":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+        elif param == "delta":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+        elif param == "sigma_e":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+    data_topdir = data_location
+    collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
     
-    # params_out_jsonl = dict()
-    # for m in range(M):
-    #     data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
-    #     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/{}/".format(K, J, str(sigma_e_true).replace(".", ""), m)
-    #     params_out = combine_estimate_variance_rule(data_location, J, K, d, parameter_names)    
-    #     for param in parameter_names:
-    #         if param == "X":                
-    #             params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()                        
-    #         elif param == "Z":
-    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
-    #         elif param == "Phi":            
-    #             params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()                         
-    #         elif param in ["beta", "alpha"]:
-    #             params_out_jsonl[param] = params_out[param].tolist()            
-    #         else:
-    #             params_out_jsonl[param] = params_out[param]
-    #     out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
-    #     with open(out_file, 'a') as f:         
-    #         writer = jsonlines.Writer(f)
-    #         writer.write(params_out_jsonl)
+    

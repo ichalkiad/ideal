@@ -250,7 +250,7 @@ def get_hessian_diag_jax(f, x):
     # f: function w.r.t to parameter vector x
     return hvp(f, x, jnp.ones_like(x))
     
-def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
+def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict, theta_true, param_positions_dict):
 
     params_out = dict()
     params_out["X"] = np.zeros((d*K,))
@@ -268,6 +268,8 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
             DIR_read = "{}/{}/estimation/".format(DIR_out, subdataset_name)
             path = pathlib.Path(DIR_read)  
             estimates_names = [file.name for file in path.iterdir() if file.is_file() and "estimationresult_dataset" in file.name]
+            if len(estimates_names) > 1:
+                raise AttributeError("Should have 1 output estimation file.")
             for estim in estimates_names:
                 with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
                     for result in f.iter(type=dict, skip_invalid=True):                                                              
@@ -281,11 +283,26 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
                                 params_out[param][start*d:end*d] = theta
                             else:
                                 params_out[param][start:end] = theta
+                            if param == "beta":
+                                mse_trial_m_batch_index = np.mean((theta - theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])**2)
+                            else:
+                                X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
+                                X_hat = np.asarray(theta).reshape((d, end-start), order="F")
+                                Rx, tx, mse_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                         else:                            
                             weight = result["variance_{}".format(param)]                            
                             theta = result[param]
                             all_weights.append(weight)
                             all_estimates.append(theta)
+                            if param == "Z":
+                                Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")  
+                                Z_hat = np.asarray(theta).reshape((d, J), order="F")
+                                Rz, tz, mse_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                            else:
+                                mse_trial_m_batch_index = np.mean((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2)
+
+            error_dict[param].append(mse_trial_m_batch_index)
+
         if param in ["X", "beta"]:
             params_out[param] = params_out[param]        
         else:                
@@ -301,7 +318,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names):
             weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
             params_out[param] = weighted_estimate
     
-    return params_out
+    return params_out, error_dict
 
 def parse_input_arguments():
 
@@ -446,6 +463,88 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
         
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
+
+
+def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict):
+    
+    parameter_space_dim = (K+J)*d + J + K + 2
+    theta_true = np.zeros((parameter_space_dim,))
+    with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_topdir), "r") as f:
+        for result in f.iter(type=dict, skip_invalid=True):
+            for param in parameter_names:
+                theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+
+    params_out_jsonl = dict()
+    estimation_error_per_trial_per_batch = dict()
+    estimation_error_per_trial = dict()
+    for m in range(M):
+        fig_m_over_databatches = go.Figure()
+        estimation_error_per_trial_per_batch[m] = dict()
+        for param in parameter_names:
+            estimation_error_per_trial[param] = []
+            estimation_error_per_trial_per_batch[m][param] = []
+        data_location = "{}/{}/".format(data_topdir, m)
+        params_out, estimation_error_per_trial_per_batch[m] = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
+                                                                estimation_error_per_trial_per_batch[m], theta_true, param_positions_dict)    
+        for param in parameter_names:
+            if param == "X":                
+                params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
+                X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
+                X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
+                Rx, tx, mse_x = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                estimation_error_per_trial[param].append(mse_x)
+            elif param == "Z":
+                params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
+                Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
+                Rz, tz, mse_z = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                estimation_error_per_trial[param].append(mse_z)                      
+            elif param == "Phi":            
+                params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
+                Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
+                Rphi, tphi, mse_phi = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                estimation_error_per_trial[param].append(mse_phi)                        
+            elif param in ["beta", "alpha"]:
+                params_out_jsonl[param] = params_out[param].tolist()     
+                mse = np.mean((theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])**2)  
+                estimation_error_per_trial[param].append(mse)        
+            else:
+                params_out_jsonl[param] = params_out[param]
+                mse = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])**2
+                estimation_error_per_trial[param].append(mse[0]) 
+            
+            fig_m_over_databatches.add_trace(go.Box(
+                    y=estimation_error_per_trial_per_batch[m][param], 
+                    x=[param]*len(estimation_error_per_trial_per_batch[m][param]),
+                    showlegend=False,  
+                    boxpoints='outliers'
+                    ))
+            
+        savename = "{}/mle_estimation_plots/mse_trial{}_perparam_unweighted_boxplot.html".format(data_topdir, m)
+        pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig_m_over_databatches, savename, xaxis_title="Parameter", yaxis_title="MSE Θ", title="", 
+                                showgrid=False, showlegend=True, 
+                                print_png=True, print_html=True, print_pdf=False)
+            
+        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out_jsonl)
+    
+    # box plot - mse relativised per parameter over trials
+    fig = go.Figure()
+    for param in parameter_names:
+        fig.add_trace(go.Scatter(
+                        y=estimation_error_per_trial[param], showlegend=True,
+                        x=[param]*len(estimation_error_per_trial[param])                                    
+                    ))
+    savename = "{}/mle_estimation_plots/mse_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
+    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)
+
 
 ####################### MLE #############################
 
