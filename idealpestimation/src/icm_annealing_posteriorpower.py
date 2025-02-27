@@ -326,7 +326,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         print("Annealing schedule: {},{}".format(N, iiidx))       
 
         #######################################            
-        perturb = True
+        perturb = False
         testparam = target_param1
         if not elementwise and testparam not in ["X", "Z", "Phi"]:
             if target_param1 in ["alpha"]:
@@ -373,8 +373,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                     else:
                         # fixed to true
                         continue
-            # all_gammas = [1]*len(all_gammas)
-            # gamma = 1
+            all_gammas = [1]*len(all_gammas)
+            gamma = 1
         #######################################
         
         delta_rate_prev = None
@@ -501,8 +501,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                 theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
                                 if perturb:
                                     theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                        # all_gammas = [1]*len(all_gammas)
-                        # gamma = 1
+                        all_gammas = [1]*len(all_gammas)
+                        gamma = 1
                     ################################
                     theta_prev = np.zeros((parameter_space_dim,))     
                 else:                      
@@ -600,8 +600,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                     theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_perturb[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
                                 else:
                                     theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
-                        # all_gammas = [1]*len(all_gammas)
-                        # gamma = 1
+                        all_gammas = [1]*len(all_gammas)
+                        gamma = 1
                     ################################
                     theta_prev = np.zeros((parameter_space_dim,))
                 else:                    
