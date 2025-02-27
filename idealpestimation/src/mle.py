@@ -655,7 +655,7 @@ if __name__ == "__main__":
         parallel = args.parallel
         trialsstr = args.trials
         if "-" in trialsstr:
-            trialsparts = trialsstr.split("")
+            trialsparts = trialsstr.split("-")
             Mmin = int(trialsparts[0])
             M = int(trialsparts[1])
         else:
@@ -712,40 +712,40 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
     print("Observed data points per data split: {}".format(N*J))        
-    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-    #     data_location=data_location, parallel=parallel, 
-    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
-    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-    #     trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e)
+    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e)
 
-    param_positions_dict = dict()            
-    k = 0
-    for param in parameter_names:
-        if param == "X":
-            param_positions_dict[param] = (k, k + K*d)                       
-            k += K*d    
-        elif param in ["Z"]:
-            param_positions_dict[param] = (k, k + J*d)                                
-            k += J*d
-        elif param in ["Phi"]:            
-            param_positions_dict[param] = (k, k + J*d)                                
-            k += J*d
-        elif param == "beta":
-            param_positions_dict[param] = (k, k + K)                                   
-            k += K    
-        elif param == "alpha":
-            param_positions_dict[param] = (k, k + J)                                       
-            k += J    
-        elif param == "gamma":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-        elif param == "delta":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-        elif param == "sigma_e":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-    data_topdir = data_location
-    collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
+    # param_positions_dict = dict()            
+    # k = 0
+    # for param in parameter_names:
+    #     if param == "X":
+    #         param_positions_dict[param] = (k, k + K*d)                       
+    #         k += K*d    
+    #     elif param in ["Z"]:
+    #         param_positions_dict[param] = (k, k + J*d)                                
+    #         k += J*d
+    #     elif param in ["Phi"]:            
+    #         param_positions_dict[param] = (k, k + J*d)                                
+    #         k += J*d
+    #     elif param == "beta":
+    #         param_positions_dict[param] = (k, k + K)                                   
+    #         k += K    
+    #     elif param == "alpha":
+    #         param_positions_dict[param] = (k, k + J)                                       
+    #         k += J    
+    #     elif param == "gamma":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    #     elif param == "delta":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    #     elif param == "sigma_e":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    # data_topdir = data_location
+    # collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
     
     

@@ -945,7 +945,7 @@ if __name__ == "__main__":
         parallel = args.parallel
         trialsstr = args.trials
         if "-" in trialsstr:
-            trialsparts = trialsstr.split("")
+            trialsparts = trialsstr.split("-")
             Mmin = int(trialsparts[0])
             M = int(trialsparts[1])
         else:
