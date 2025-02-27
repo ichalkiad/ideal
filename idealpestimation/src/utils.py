@@ -477,11 +477,12 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
     params_out_jsonl = dict()
     estimation_error_per_trial_per_batch = dict()
     estimation_error_per_trial = dict()
+    for param in parameter_names:
+        estimation_error_per_trial[param] = []
     for m in range(M):
         fig_m_over_databatches = go.Figure()
         estimation_error_per_trial_per_batch[m] = dict()
-        for param in parameter_names:
-            estimation_error_per_trial[param] = []
+        for param in parameter_names:            
             estimation_error_per_trial_per_batch[m][param] = []
         data_location = "{}/{}/".format(data_topdir, m)
         params_out, estimation_error_per_trial_per_batch[m] = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
@@ -536,7 +537,7 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
     fig = go.Figure()
     for param in parameter_names:
         fig.add_trace(go.Scatter(
-                        y=estimation_error_per_trial[param], showlegend=True,
+                        y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True,
                         x=[param]*len(estimation_error_per_trial[param])                                    
                     ))
     savename = "{}/mle_estimation_plots/mse_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
