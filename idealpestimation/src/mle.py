@@ -99,7 +99,7 @@ def maximum_likelihood_estimator(
     data=None, full_hessian=True, diag_hessian_only=True,
     loglikelihood_per_data_point=None, disp=False, niter=None, 
     jac=None, output_dir="/tmp/", plot_hessian=False, negloglik_jax=None, 
-    subdataset_name=None, param_positions_dict=None, parallel=False, min_sigma_e=1e-6):
+    subdataset_name=None, param_positions_dict=None, parallel=False, min_sigma_e=1e-6, args=None):
     """
     Estimate the maximum likelihood parameter and its variance.
 
@@ -123,7 +123,7 @@ def maximum_likelihood_estimator(
         # 'hess': '2-point'
     }                   
     # Perform maximum likelihood estimation        
-    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e)    
+    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args)    
     if niter is not None:
         result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":1000000})
     else:
@@ -166,7 +166,10 @@ def estimate_mle(args):
 
     current_pid = os.getpid()    
     DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
-                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e = args
+        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e, \
+        prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,\
+        prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,\
+        prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae = args
 
     # load data    
     with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f:
@@ -177,11 +180,18 @@ def estimate_mle(args):
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
     
+    # np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 
+
+
     gridpoints_num = 200
     args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
-            np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
-    
+            prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
+            prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,
+            prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
+            gridpoints_num, None, None, min_sigma_e, None)
+     
+
     X_list, _ = get_evaluation_grid("X", None, args)
     X_list = [xx for xx in X_list]
     Z_list, _ = get_evaluation_grid("Z", None, args)
@@ -258,7 +268,7 @@ def estimate_mle(args):
                                                 data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                 output_dir=DIR_out, subdataset_name=subdataset_name, 
-                                                param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e)          
+                                                param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e, args=args)          
         
         if result.success and result["variance_status"]:
             break
@@ -382,10 +392,16 @@ class ProcessManagerSynthetic(ProcessManager):
         Y = Y.astype(np.int8).reshape((N, J), order="F")         
                 
         gridpoints_num = 200
+        # args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
+        #     parameter_space_dim, None, None, None, None, None, None, None, 
+        #     np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
+
         args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
-            np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
-    
+            prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
+            prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,
+            prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
+            gridpoints_num, None, None, min_sigma_e, None)
         
         X_list, _ = get_evaluation_grid("X", None, args)
         X_list = [xx for xx in X_list]
@@ -463,7 +479,7 @@ class ProcessManagerSynthetic(ProcessManager):
                                                     data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                     loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                     output_dir=DIR_out, subdataset_name=subdataset_name, 
-                                                    param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e)          
+                                                    param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e, args=args)          
             if result.success and result["variance_status"]:
                 break
             else:                     
@@ -562,7 +578,11 @@ class ProcessManagerSynthetic(ProcessManager):
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
         niter=None, parameter_space_dim=None, trialsmin=None, trialsmax=None, penalty_weight_Z=0.0, 
-        constant_Z=0.0, retries=10, min_sigma_e=None):
+        constant_Z=0.0, retries=10, min_sigma_e=None, prior_loc_x=None, prior_scale_x=None, 
+        prior_loc_z=None, prior_scale_z=None, prior_loc_phi=None, prior_scale_phi=None,
+        prior_loc_beta=None, prior_scale_beta=None, prior_loc_alpha=None, prior_scale_alpha=None,
+        prior_loc_gamma=None, prior_scale_gamma=None, prior_loc_delta=None, prior_scale_delta=None, 
+        prior_loc_sigmae=None, prior_scale_sigmae=None):
 
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
@@ -616,7 +636,9 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     else:
                         pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e)
+                                parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
+                                prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,
+                                prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae)
                         estimate_mle(args)                  
 
     except KeyboardInterrupt:
@@ -687,14 +709,23 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2    
-
-    prior_scale_x = np.eye(d)    
-    prior_scale_z = np.eye(d)    
-    prior_scale_phi = np.eye(d)    
-    prior_scale_alpha = 1        
-    prior_scale_beta = 1    
-    prior_scale_gamma = 1        
-    prior_scale_delta = 1    
+  
+    prior_loc_x = np.zeros((d,))
+    prior_scale_x = np.eye(d)
+    prior_loc_z = np.zeros((d,))
+    prior_scale_z = np.eye(d)
+    prior_loc_phi = np.zeros((d,))
+    prior_scale_phi = np.eye(d)
+    prior_loc_alpha = 0
+    prior_scale_alpha = 1    
+    prior_loc_beta = 0
+    prior_scale_beta = 1
+    prior_loc_gamma = 0
+    prior_scale_gamma = 1    
+    prior_loc_delta = 0
+    prior_scale_delta= 1        
+    prior_loc_sigmae = 3
+    prior_scale_sigmae = 0.5
     data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
@@ -712,11 +743,17 @@ if __name__ == "__main__":
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
     print("Observed data points per data split: {}".format(N*J))        
-    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-    #     data_location=data_location, parallel=parallel, 
-    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
-    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-    #     trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e)
+    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e,
+        prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
+        prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
+        prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
+        prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+        prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae)
 
     param_positions_dict = dict()            
     k = 0
@@ -746,6 +783,6 @@ if __name__ == "__main__":
             param_positions_dict[param] = (k, k + 1)                                
             k += 1
     data_topdir = data_location
-    collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
+    # collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
     
     
