@@ -533,7 +533,7 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
     fig = go.Figure()
     for param in parameter_names:
         fig.add_trace(go.Box(
-                        y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True,
+                        y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True, name=param,
                         x=[param]*len(estimation_error_per_trial[param]), boxpoints='outliers'                                
                     ))
     savename = "{}/mle_estimation_plots/mse_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
