@@ -260,7 +260,7 @@ def estimate_mle(args):
                                                 output_dir=DIR_out, subdataset_name=subdataset_name, 
                                                 param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e)          
         
-        if result.success:
+        if result.success and result["variance_status"]:
             break
         else:              
             for xr in xidx:
@@ -278,7 +278,7 @@ def estimate_mle(args):
             sigmaeidx_all.remove(sigmaeidx[0])
             retry += 1
 
-    if result.success:
+    if result.success and result["variance_status"]:
         params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
         variance_hat = optimisation_dict2paramvectors(result["variance_diag"], param_positions_dict, J, K, d, parameter_names) 
 
@@ -460,11 +460,11 @@ class ProcessManagerSynthetic(ProcessManager):
             mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                     variance_method='jacobian', disp=True, 
                                                     optimization_method=optimisation_method, 
-                                                    data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
+                                                    data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
                                                     loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                     output_dir=DIR_out, subdataset_name=subdataset_name, 
                                                     param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e)          
-            if result.success:
+            if result.success and result["variance_status"]:
                 break
             else:                     
                 for xr in xidx:
@@ -482,7 +482,7 @@ class ProcessManagerSynthetic(ProcessManager):
                 sigmaeidx_all.remove(sigmaeidx[0])    
                 retry += 1
         
-        if result.success:
+        if result.success and result["variance_status"]:
             params_hat = optimisation_dict2params(mle, param_positions_dict, J, N, d, parameter_names)
             variance_hat = optimisation_dict2paramvectors(result["variance_diag"], param_positions_dict, J, K, d, parameter_names) 
 
@@ -680,7 +680,7 @@ if __name__ == "__main__":
     niter = None
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    retries = 20
+    retries = 30
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]

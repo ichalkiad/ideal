@@ -135,10 +135,6 @@ def optimisation_dict2paramvectors(optim_vector, param_positions_dict, J, K, d, 
 
 def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, min_sigma_e=1e-6):
     
-    # # for scale_e
-    # def positive_constraints(x):
-    #     """Constraint: scale_e should be positive - last entry in the optimisation vector"""
-    #     return x[-1]    
     # def sum_zero_constraint(x):
     #     """Constraint: Sum of Z's should be a constant - default 0, i.e. balanced politician set"""
     #     return np.sum(x[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]])
@@ -536,9 +532,9 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
     # box plot - mse relativised per parameter over trials
     fig = go.Figure()
     for param in parameter_names:
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Box(
                         y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True,
-                        x=[param]*len(estimation_error_per_trial[param])                                    
+                        x=[param]*len(estimation_error_per_trial[param]), boxpoints='outliers'                                
                     ))
     savename = "{}/mle_estimation_plots/mse_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
     fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE Θ", title="", 
