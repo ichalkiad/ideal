@@ -923,25 +923,28 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
     elif samples_list is None:
         if d > 2:
             raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
-        ipdb.set_trace()
         sampler_alpha_sigma = qmc.Sobol(d=J+2, scramble=False)   
         samples_list_alpha_sigma = sampler_alpha_sigma.random_base2(m=base2exponent)
         samples_list = np.zeros((2**base2exponent, parameter_space_dim))
         param = "alpha"
         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, :J]
         param = "gamma"
-        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, J].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
+        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
+                            samples_list_alpha_sigma[:, J].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
         param = "sigma_e"
-        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, J+1].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
+        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
+                            samples_list_alpha_sigma[:, J+1].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
         x = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))
         y = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))    
         grid_points = list(product(x, y))
         idxgrid = np.arange(0, len(grid_points), 1)
         for itmrp in range(2**base2exponent):
-            samples_list[itmrp, :(K+J)*d] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=(K+J), replace=True).tolist()]).reshape(samples_list[itmrp, :(K+J)*d].shape)
+            samples_list[itmrp, :(K+J)*d] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=(K+J), 
+                                                                            replace=True).tolist()]).reshape(samples_list[itmrp, :(K+J)*d].shape)
             param = "beta"
-            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=int(K/2), replace=True).tolist()]).reshape(samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
-        ipdb.set_trace()
+            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
+                np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=int(K/2), replace=True).tolist()]).reshape(samples_list[itmrp, 
+                                                                                            param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
         samples_list = list(samples_list)
         
 
@@ -981,7 +984,6 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = min_sigma_e
             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_sigmae) #+prior_loc_gamma
     
-    ipdb.set_trace()
     theta_curr = qmc.scale(theta_curr, lbounds, ubounds).reshape((parameter_space_dim,))
 
     return theta_curr, samples_list, idx_all
