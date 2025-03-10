@@ -938,9 +938,9 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         grid_points = list(product(x, y))
         idxgrid = np.arange(0, len(grid_points), 1)
         for itmrp in range(2**base2exponent):
-            samples_list[itmrp, :(K+J)*d] = np.random.choice(idxgrid, size=(K+J)*d, replace=True)
+            samples_list[itmrp, :(K+J)*d] = grid_points[np.random.choice(idxgrid, size=(K+J)*d, replace=True)]
             param = "beta"
-            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = np.random.choice(idxgrid, size=K, replace=True)
+            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = grid_points[np.random.choice(idxgrid, size=K, replace=True)]
         ipdb.set_trace()
         samples_list = list(samples_list)
         
