@@ -740,7 +740,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 delta_rate_prev = delta_rate                                                                    
                 total_iter += 1   
                 i += 1   
-                plot_online = False                                  
+                plot_online = False   
+                if i % 1000 == 0:
+                    print(i, l)                               
             
             if l % 10 == 0:
                 # last entry in mse lists in the same, has been stored twice
@@ -981,7 +983,7 @@ if __name__ == "__main__":
     constant_Z = 0.0
     retries = 20
     diff_iter = None
-    disp = True
+    disp = False
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]
