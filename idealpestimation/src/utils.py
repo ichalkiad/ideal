@@ -133,16 +133,37 @@ def optimisation_dict2paramvectors(optim_vector, param_positions_dict, J, K, d, 
     return params_out
 
 
-def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, min_sigma_e=1e-6):
+def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, min_sigma_e=1e-6, args=None):
     
-    # # for scale_e
-    # def positive_constraints(x):
-    #     """Constraint: scale_e should be positive - last entry in the optimisation vector"""
-    #     return x[-1]    
-    # def sum_zero_constraint(x):
-    #     """Constraint: Sum of Z's should be a constant - default 0, i.e. balanced politician set"""
-    #     return np.sum(x[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]])
-    bounds = [(None, None)]*(n-1)
+    if args is not None:
+        DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
+        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
+
+        grid_width_std = 5  
+        bounds = []
+        for param in parameter_names:
+            if param == "X":
+                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0])]*(K*d)) 
+            elif param == "Z":
+                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0])]*(J*d)) 
+            elif param == "Phi":
+                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0])]*(J*d)) 
+            elif param == "alpha":
+                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha)]*J) 
+            elif param == "beta":
+                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta)]*K) 
+            elif param == "gamma":
+                bounds.append((-grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma, grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma)) 
+            elif param == "delta":
+                bounds.append((-grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta, grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta)) 
+    else:
+        # def sum_zero_constraint(x):
+        #     """Constraint: Sum of Z's should be a constant - default 0, i.e. balanced politician set"""
+        #     return np.sum(x[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]])
+        bounds = [(None, None)]*(n-1)
     bounds.append((min_sigma_e, None))
     
     return bounds, None
@@ -536,9 +557,9 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
     # box plot - mse relativised per parameter over trials
     fig = go.Figure()
     for param in parameter_names:
-        fig.add_trace(go.Scatter(
-                        y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True,
-                        x=[param]*len(estimation_error_per_trial[param])                                    
+        fig.add_trace(go.Box(
+                        y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_error_per_trial[param]), boxpoints='outliers'                                
                     ))
     savename = "{}/mle_estimation_plots/mse_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
     fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE Θ", title="", 
