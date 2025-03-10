@@ -927,7 +927,7 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         ipdb.set_trace()
         sampler_alpha_sigma = qmc.Sobol(d=J+2, scramble=False)   
         samples_list_alpha_sigma = sampler_alpha_sigma.random_base2(m=base2exponent)
-        samples_list = np.zeros((base2exponent, parameter_space_dim))
+        samples_list = np.zeros((2**base2exponent, parameter_space_dim))
         param = "alpha"
         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, :J]
         param = "sigma_e"
@@ -936,7 +936,7 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         y = np.linspace(0, 1, math.ceil(np.sqrt(((K+J)*d+K)/3)))    
         grid_points = list(product(x, y))
         idxgrid = np.arange(0, len(grid_points), 1)
-        for itmrp in range(base2exponent):
+        for itmrp in range(2**base2exponent):
             samples_list[itmrp, :(K+J)*d] = np.random.choice(idxgrid, size=(K+J)*d, replace=True)
             param = "beta"
             samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = np.random.choice(idxgrid, size=K, replace=True)
