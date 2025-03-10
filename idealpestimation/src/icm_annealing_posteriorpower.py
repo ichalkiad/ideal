@@ -707,8 +707,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     max_partial_restarts = 5
     max_halving = 2
     
-    # to plot X before it has moved for the first time
-    fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), 
+    if K < 1000:
+        # to plot X before it has moved for the first time
+        fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), 
                                                                                     total_iter, fig_posteriors, fig_posteriors_annealed, gamma, 
                                                                                     param_positions_dict, args, plot_arrows=True, testparam=testparam, 
                                                                                     testidx=testidx, testvec=vector_index) 

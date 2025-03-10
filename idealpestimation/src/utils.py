@@ -1597,7 +1597,7 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
     else:
         yaxistitle = "Conditional posterior"
     fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title=yaxistitle, title="", 
-                            showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
+                            showgrid=False, showlegend=True, print_png=True, print_html=False, print_pdf=False)
 
     return fig
 
