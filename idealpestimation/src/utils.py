@@ -930,8 +930,10 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         samples_list = np.zeros((2**base2exponent, parameter_space_dim))
         param = "alpha"
         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, :J]
+        param = "gamma"
+        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, J]
         param = "sigma_e"
-        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, J:]
+        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, J+1]
         x = np.linspace(0, 1, math.ceil(np.sqrt(((K+J)*d+K)/3)))
         y = np.linspace(0, 1, math.ceil(np.sqrt(((K+J)*d+K)/3)))    
         grid_points = list(product(x, y))
