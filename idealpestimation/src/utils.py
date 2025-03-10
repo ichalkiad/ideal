@@ -920,7 +920,6 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
     if samples_list is None and parameter_space_dim <= 21201:
         sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
         samples_list = list(sampler.random_base2(m=base2exponent))       
-        idx_all = np.arange(0, len(samples_list), 1).tolist()
     elif samples_list is None:
         if d > 2:
             raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
@@ -943,7 +942,10 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
             param = "beta"
             samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = np.random.choice(idxgrid, size=K, replace=True)
         ipdb.set_trace()
-    
+        samples_list = list(samples_list)
+        
+
+    idx_all = np.arange(0, len(samples_list), 1).tolist()
     idx = np.random.choice(idx_all, size=1, replace=False)[0]
     theta_curr = np.asarray(samples_list[idx]).reshape((1, parameter_space_dim))
     idx_all.remove(idx)   
