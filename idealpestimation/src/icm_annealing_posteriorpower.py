@@ -701,10 +701,12 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     total_iter = 1   
     halving_rate = 0 
     restarts = 0
-    max_restarts = 3
-    max_partial_restarts = 2
-    max_halving = 2
     estimated_thetas = []
+
+    max_restarts = 5
+    max_partial_restarts = 5
+    max_halving = 2
+    
     # to plot X before it has moved for the first time
     fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), 
                                                                                     total_iter, fig_posteriors, fig_posteriors_annealed, gamma, 
@@ -739,18 +741,19 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 i += 1   
                 plot_online = False                                  
             
-            # last entry in mse lists in the same, has been stored twice
-            mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
-                                compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, 
-                                    param_positions_dict=param_positions_dict, plot_online=True, mse_theta_full=mse_theta_full, 
-                                    fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, per_param_ers=per_param_ers, 
-                                    per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)      
-            # plot posteriors during estimation        
-            fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, 
-                                                                                                        theta_curr.copy(), total_iter, fig_posteriors, 
-                                                                                                        fig_posteriors_annealed, gamma, 
-                                                                                                        param_positions_dict, args, plot_arrows=True,
-                                                                                                        testparam=testparam, testidx=testidx)  
+            if l % 10 == 0:
+                # last entry in mse lists in the same, has been stored twice
+                mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                                    compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, 
+                                        param_positions_dict=param_positions_dict, plot_online=True, mse_theta_full=mse_theta_full, 
+                                        fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, per_param_ers=per_param_ers, 
+                                        per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)      
+                # plot posteriors during estimation        
+                fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, 
+                                                                                                            theta_curr.copy(), total_iter, fig_posteriors, 
+                                                                                                            fig_posteriors_annealed, gamma, 
+                                                                                                            param_positions_dict, args, plot_arrows=True,
+                                                                                                            testparam=testparam, testidx=testidx)  
             converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, i, 
                                                                         parameter_space_dim=parameter_space_dim, testparam=testparam, 
                                                                         testidx=testidx, p=percentage_parameter_change, tol=tol)
@@ -780,17 +783,18 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     total_iter += 1  
                     plot_online = False                                 
             
-            # last entry in mse lists in the same, has been stored twice
-            mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
-                                    compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, 
-                                        param_positions_dict=param_positions_dict, plot_online=True, 
-                                        mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, 
-                                        per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
-            
-            # plot posteriors during estimation        
-            fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
-                                                                                    fig_posteriors_annealed, gamma, param_positions_dict, args, 
-                                                                                    plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index)                               
+            if l % 10 == 0:
+                # last entry in mse lists in the same, has been stored twice
+                mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                                        compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, 
+                                            param_positions_dict=param_positions_dict, plot_online=True, 
+                                            mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, 
+                                            per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
+                
+                # plot posteriors during estimation        
+                fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
+                                                                                        fig_posteriors_annealed, gamma, param_positions_dict, args, 
+                                                                                        plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index)                               
             converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, total_iter, 
                                                                         parameter_space_dim=parameter_space_dim, d=d, testparam=testparam, 
                                                                         testidx=testidx, p=percentage_parameter_change, tol=tol) 
@@ -857,16 +861,16 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:                    
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_full_plots2paper/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_full/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing_perturb/".format(data_location, m)
                 else:
-                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise_full_plots2paper/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise_full/".format(data_location, m)
             else:
                 if evaluate_posterior:
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_full_plots2paper/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_full/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_annealing/".format(data_location, m)
@@ -967,10 +971,10 @@ if __name__ == "__main__":
         jax.config.update("jax_traceback_filtering", "off")
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 10
+    niter = 100
     penalty_weight_Z = 0.0
     constant_Z = 0.0
-    retries = 15
+    retries = 20
     diff_iter = None
     disp = True
     # In parameter names keep the order fixed as is
@@ -1012,7 +1016,8 @@ if __name__ == "__main__":
     tol = 1e-6    
     sigma_e_true = 0.01
     # data_location = "/home/ioannischalkiadakis/ideal/idealpestimation/data_K{}_J{}_sigmae{}_nopareto/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30                 
     param_positions_dict = dict()            
     k = 0
