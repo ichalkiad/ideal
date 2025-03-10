@@ -940,7 +940,7 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         for itmrp in range(2**base2exponent):
             samples_list[itmrp, :(K+J)*d] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=(K+J), replace=True).tolist()]).reshape(samples_list[itmrp, :(K+J)*d].shape)
             param = "beta"
-            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=int(K/2), replace=True).tolist()]).reshape(samples_list[itmrp, :(K+J)*d].shape)
+            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=int(K/2), replace=True).tolist()]).reshape(samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
         ipdb.set_trace()
         samples_list = list(samples_list)
         
