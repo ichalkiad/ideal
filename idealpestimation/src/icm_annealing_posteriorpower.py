@@ -168,9 +168,9 @@ def optimise_posterior_elementwise(param, idx, vector_index_in_param_matrix, vec
             }                               
             bounds = create_constraint_functions_icm(parameter_space_dim, vector_coordinate, param=param, param_positions_dict=param_positions_dict, args=args)    
             if diff_iter is not None:
-                result = minimize(minus_f, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":diff_iter, "maxls":20})
+                result = minimize(minus_f, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":diff_iter, "maxls":1000000})
             else:
-                result = minimize(minus_f, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxls":20})
+                result = minimize(minus_f, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxls":1000000})
             
             param_estimate = result.x[0]          
             

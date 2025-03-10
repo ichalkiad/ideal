@@ -123,7 +123,7 @@ def maximum_likelihood_estimator(
         # 'hess': '2-point'
     }                   
     # Perform maximum likelihood estimation        
-    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args)    
+    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=None)  #######################    
     if niter is not None:
         result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":1000000})
     else:
