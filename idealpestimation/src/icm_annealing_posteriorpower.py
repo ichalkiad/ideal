@@ -859,10 +859,6 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         theta_true=None, percentage_parameter_change=1, min_sigma_e=None):
 
         for m in range(trialsmin, trialsmax, 1):
-            with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_location, m), "r") as f:
-                for result in f.iter(type=dict, skip_invalid=True):
-                    for param in parameter_names:
-                        theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
             if elementwise:
                 if evaluate_posterior:                    
                     DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_full/".format(data_location, m)
@@ -916,6 +912,10 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                     param_positions_dict[param] = (k, k + 1)                                
                     k += 1
 
+            with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_location, m), "r") as f:
+                for result in f.iter(type=dict, skip_invalid=True):
+                    for param in parameter_names:
+                        theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
             args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                     parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
                     prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
@@ -1022,33 +1022,6 @@ if __name__ == "__main__":
     # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
     data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30                 
-    param_positions_dict = dict()            
-    k = 0
-    for param in parameter_names:
-        if param == "X":
-            param_positions_dict[param] = (k, k + K*d)                       
-            k += K*d    
-        elif param in ["Z"]:
-            param_positions_dict[param] = (k, k + J*d)                                
-            k += J*d
-        elif param in ["Phi"]:            
-            param_positions_dict[param] = (k, k + J*d)                                
-            k += J*d
-        elif param == "beta":
-            param_positions_dict[param] = (k, k + K)                                   
-            k += K    
-        elif param == "alpha":
-            param_positions_dict[param] = (k, k + J)                                       
-            k += J    
-        elif param == "gamma":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-        elif param == "delta":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
-        elif param == "sigma_e":
-            param_positions_dict[param] = (k, k + 1)                                
-            k += 1
     # full, with status quo
     # parameter_space_dim = (K+2*J)*d + J + K + 3
     # no status quo
@@ -1098,6 +1071,34 @@ if __name__ == "__main__":
     # theta_curr = theta_true.copy()
     # outdir = "{}/posterior_plots/".format(data_location)
     # pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
+
+    # param_positions_dict = dict()            
+    # k = 0
+    # for param in parameter_names:
+    #     if param == "X":
+    #         param_positions_dict[param] = (k, k + K*d)                       
+    #         k += K*d    
+    #     elif param in ["Z"]:
+    #         param_positions_dict[param] = (k, k + J*d)                                
+    #         k += J*d
+    #     elif param in ["Phi"]:            
+    #         param_positions_dict[param] = (k, k + J*d)                                
+    #         k += J*d
+    #     elif param == "beta":
+    #         param_positions_dict[param] = (k, k + K)                                   
+    #         k += K    
+    #     elif param == "alpha":
+    #         param_positions_dict[param] = (k, k + J)                                       
+    #         k += J    
+    #     elif param == "gamma":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    #     elif param == "delta":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
+    #     elif param == "sigma_e":
+    #         param_positions_dict[param] = (k, k + 1)                                
+    #         k += 1
     
     # for param in parameter_names:
     #     outdir = "{}/posterior_plots/{}/".format(data_location, param)
