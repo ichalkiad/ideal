@@ -656,7 +656,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     testidx = None 
     vector_index = None
     theta_samples_list = None
-    base2exponent = 10
+    base2exponent = 5
     idx_all = None
     theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
                                                                 args, samples_list=theta_samples_list, idx_all=idx_all)

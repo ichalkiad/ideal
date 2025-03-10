@@ -19,6 +19,7 @@ import itertools
 from sklearn.decomposition import PCA
 from plotly.validators.scatter.marker import SymbolValidator
 from plotly.subplots import make_subplots
+from itertools import product
 
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
@@ -916,10 +917,30 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
 
-    if samples_list is None:
+    if samples_list is None and parameter_space_dim <= 21201:
         sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
         samples_list = list(sampler.random_base2(m=base2exponent))       
         idx_all = np.arange(0, len(samples_list), 1).tolist()
+    elif samples_list is None:
+        if d > 2:
+            raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
+        ipdb.set_trace()
+        sampler_alpha_sigma = qmc.Sobol(d=J+2, scramble=False)   
+        samples_list_alpha_sigma = sampler_alpha_sigma.random_base2(m=base2exponent)
+        samples_list = np.zeros((base2exponent, parameter_space_dim))
+        param = "alpha"
+        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, :J]
+        param = "sigma_e"
+        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, J:]
+        x = np.linspace(0, 1, math.ceil(np.sqrt(((K+J)*d+K)/3)))
+        y = np.linspace(0, 1, math.ceil(np.sqrt(((K+J)*d+K)/3)))    
+        grid_points = list(product(x, y))
+        idxgrid = np.arange(0, len(grid_points), 1)
+        for itmrp in range(base2exponent):
+            samples_list[itmrp, :(K+J)*d] = np.random.choice(idxgrid, size=(K+J)*d, replace=True)
+            param = "beta"
+            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = np.random.choice(idxgrid, size=K, replace=True)
+        ipdb.set_trace()
     
     idx = np.random.choice(idx_all, size=1, replace=False)[0]
     theta_curr = np.asarray(samples_list[idx]).reshape((1, parameter_space_dim))
@@ -956,6 +977,7 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = min_sigma_e
             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_sigmae) #+prior_loc_gamma
     
+    ipdb.set_trace()
     theta_curr = qmc.scale(theta_curr, lbounds, ubounds).reshape((parameter_space_dim,))
 
     return theta_curr, samples_list, idx_all
