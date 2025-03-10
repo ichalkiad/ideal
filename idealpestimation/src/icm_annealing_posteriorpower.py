@@ -859,6 +859,10 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         theta_true=None, percentage_parameter_change=1, min_sigma_e=None):
 
         for m in range(trialsmin, trialsmax, 1):
+            with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_location, m), "r") as f:
+                for result in f.iter(type=dict, skip_invalid=True):
+                    for param in parameter_names:
+                        theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
             if elementwise:
                 if evaluate_posterior:                    
                     DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_full/".format(data_location, m)
@@ -1051,10 +1055,6 @@ if __name__ == "__main__":
     # no status quo
     parameter_space_dim = (K+J)*d + J + K + 2
     theta_true = np.zeros((parameter_space_dim,))
-    with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), "r") as f:
-        for result in f.iter(type=dict, skip_invalid=True):
-            for param in parameter_names:
-                theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
     main(J=J, K=K, d=d, total_running_processes=total_running_processes, 
         data_location=data_location, parallel=parallel, 
