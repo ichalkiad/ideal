@@ -394,7 +394,7 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     print("Observed data points per data split: {}".format(N*J))
     # subset rows (users)   
     Ninit = N
-    for nbs in range(1, 2, 1):
+    for nbs in range(1, 6, 1):
         N = Ninit*nbs
         print("Subset row number: {}".format(N))
         print("Observed data points per data split: {}".format(N*J))
@@ -540,9 +540,9 @@ if __name__ == "__main__":
     # trials
     M = 1 # 10
     # number of leaders
-    Js = [10] #100, 500, 1000]
+    Js = [100] #, 500, 1000]
     # number of followers
-    Ks = [30] # [10000]
+    Ks = [2000] # [10000]
     sigma_es = [0.01]#, 0.1, 0.25, 0.5, 1.0]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
@@ -578,8 +578,8 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
-                    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
+                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)
                     time.sleep(1)

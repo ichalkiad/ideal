@@ -310,7 +310,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                             else:
                                 X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
                                 X_hat = np.asarray(theta).reshape((d, end-start), order="F")
-                                Rx, tx, mse_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                                Rx, tx, mse_trial_m_batch_index, _ = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                         else:                            
                             weight = result["variance_{}".format(param)]                            
                             theta = result[param]
@@ -319,11 +319,12 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                             if param == "Z":
                                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")  
                                 Z_hat = np.asarray(theta).reshape((d, J), order="F")
-                                Rz, tz, mse_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                                Rz, tz, mse_trial_m_batch_index, _ = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                             else:
                                 mse_trial_m_batch_index = np.mean((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2)
-
-            error_dict[param].append(mse_trial_m_batch_index)
+            
+            if error_dict is not None:
+                error_dict[param].append(mse_trial_m_batch_index)
 
         if param in ["X", "beta"]:
             params_out[param] = params_out[param]        
@@ -568,6 +569,73 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
                             print_png=True, print_html=True, 
                             print_pdf=False)
 
+
+
+def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict):
+    
+    parameter_space_dim = (K+J)*d + J + K + 2
+    theta_true = np.zeros((parameter_space_dim,))
+    with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_topdir), "r") as f:
+        for result in f.iter(type=dict, skip_invalid=True):
+            for param in parameter_names:
+                theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+
+    params_out_jsonl = dict()
+    estimation_error_per_trial = dict()
+    for param in parameter_names:
+        estimation_error_per_trial[param] = dict()
+    for batchsize in batchsizes:            
+        estimation_error_per_trial[param][batchsize] = []
+        for m in range(M):            
+            data_location = "{}/{}/{}/".format(data_topdir, m, batchsize)
+            params_out, _ = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
+                                                            None, theta_true, param_positions_dict)    
+            for param in parameter_names:
+                if param == "X":                
+                    params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
+                    X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
+                    X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
+                    Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                    estimation_error_per_trial[param][batchsize].append(float(mse_x))
+                elif param == "Z":
+                    params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
+                    Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                    Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
+                    Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                    estimation_error_per_trial[param][batchsize].append(float(mse_z))              
+                elif param == "Phi":            
+                    params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
+                    Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                    Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
+                    Rphi, tphi, mse_phi, mse_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                    estimation_error_per_trial[param][batchsize].append(float(mse_phi))
+                elif param in ["beta", "alpha"]:
+                    params_out_jsonl[param] = params_out[param].tolist()     
+                    mse = np.sum(((theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2)/len(params_out_jsonl[param])
+                    estimation_error_per_trial[param][batchsize].append(float(mse))
+                else:
+                    params_out_jsonl[param] = params_out[param]
+                    mse = ((theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2
+                    estimation_error_per_trial[param][batchsize].append(float(mse[0])) 
+                                  
+        out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out_jsonl)
+    
+    # box plot - mse relativised per parameter over trials    
+    for param in parameter_names:
+        fig = go.Figure()
+        for batchsize in batchsizes:
+            fig.add_trace(go.Box(
+                            y=np.asarray(estimation_error_per_trial[param][batchsize]).tolist(), showlegend=True, name=param,
+                            x=[batchsize]*len(estimation_error_per_trial[param][batchsize]), boxpoints='outliers'                                
+                        ))
+        savename = "{}/mle_estimation_plots/mse_overAllTrials_{}_weighted_boxplot.html".format(data_topdir, param)
+        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE Θ", title="", 
+                                showgrid=False, showlegend=True, 
+                                print_png=True, print_html=True, 
+                                print_pdf=False)
 
 ####################### MLE #############################
 
@@ -1234,7 +1302,7 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
         savename = "{}/xz_boxplots/relative_mse.html".format(DIR_out)
         pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
-                            print_png=True, print_html=False, print_pdf=False)
+                            print_png=True, print_html=True, print_pdf=False)
         figX = make_subplots(specs=[[{"secondary_y": True}]]) 
         figX.add_trace(go.Scatter(
                                 y=per_param_ers["X_rot_translated_mseOverMatrix"], 
