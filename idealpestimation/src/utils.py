@@ -514,19 +514,19 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
                 params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                 X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                 X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
-                Rx, tx, mse_x = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                 estimation_error_per_trial[param].append(mse_x)
             elif param == "Z":
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                Rz, tz, mse_z = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                 estimation_error_per_trial[param].append(mse_z)                      
             elif param == "Phi":            
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                Rphi, tphi, mse_phi = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                Rphi, tphi, mse_phi, mse_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
                 estimation_error_per_trial[param].append(mse_phi)                        
             elif param in ["beta", "alpha"]:
                 params_out_jsonl[param] = params_out[param].tolist()     
@@ -1051,7 +1051,11 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
     
     # Compute the residual error
     # error = np.linalg.norm(param_true - (param_hat @ R + t), 'fro')
-    error = np.sum((param_true - (param_hat @ R + t))**2)/(param_true.shape[0]*param_true.shape[1])
+    # error = np.sum((param_true - (param_hat @ R + t))**2)/(param_true.shape[0]*param_true.shape[1])
+    # relative error
+    error = np.sum(((param_true - (param_hat @ R + t))/param_true)**2)/(param_true.shape[0]*param_true.shape[1])
+    # non-rotated/non-translated relative error
+    error_nonRT = np.sum(((param_true - param_hat)/param_true)**2)/(param_true.shape[0]*param_true.shape[1])
     
     orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
     det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
@@ -1059,13 +1063,14 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
     if not (orthogonality_error < 1e-10 and det_is_one and t_shape_correct):
         raise AttributeError("Error in solving projection problem?")
     
-    return R, t, error
+    return R, t, error, error_nonRT
 
 
     
 def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param_positions_dict,
-                         plot_online=True, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[],
-                         per_param_ers=dict(), per_param_heats=dict(), xbox=[], plot_restarts=[]):
+                        plot_online=True, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[],
+                        mse_x_nonRT_list=[], mse_z_nonRT_list=[], per_param_ers=dict(), 
+                        per_param_heats=dict(), xbox=[], plot_restarts=[]):
 
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
@@ -1074,20 +1079,18 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
   
-    # compute with full theta vector - relativised
-    sse = (theta_true - theta_hat)**2
-    if not np.allclose(np.sum(sse), 1e-14):                                   
-        rel_se = sse/np.sum(sse)
-    else:
-        rel_se = sse
+    # compute with full theta vector - relative
+    sse = ((theta_true - theta_hat)/theta_true)**2
+    rel_se = sse/len(sse)
     per_param_heats["theta"].append(rel_se)
-    mse_theta_full.append(np.mean(sse))
+    # total relative error
+    mse_theta_full.append(float(np.sum(rel_se)))
     if plot_online:        
         fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
         savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
         pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                 print_pdf=False)        
 
     # compute min achievable mse for X, Z under rotation and scaling
@@ -1096,11 +1099,11 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
     Z_true = np.asarray(params_true["Z"]).reshape((d, J), order="F")                         
     params_hat = optimisation_dict2params(theta_hat, param_positions_dict, J, K, d, parameter_names)
 
-    for param in parameter_names:
-        se = (params_true[param] - params_hat[param])**2
+    for param in parameter_names:        
         if param in ["gamma", "delta", "sigma_e"]:
+            rel_se = np.sum((((params_true[param] - params_hat[param])/params_true[param])**2))/len(params_true[param])
             # time series plots
-            per_param_ers[param].append(se[0])
+            per_param_ers[param].append(float(rel_se))
             if plot_online:
                 fig = make_subplots(specs=[[{"secondary_y": True}]])   
                 fig.add_trace(go.Scatter(
@@ -1129,39 +1132,43 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                 savename = "{}/timeseries_plots/{}_squarederror.html".format(DIR_out, param)
                 pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                 fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
-                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                         print_pdf=False)
         else:
             if param == "X":
-                X_hat = np.asarray(params_hat["X"]).reshape((d, K), order="F")       
+                X_hat = np.asarray(params_hat[param]).reshape((d, K), order="F")       
+                X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
+                X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
+                se = (((X_true_vec - X_hat_vec)/X_true_vec)**2)/len(X_true_vec)                
             elif param == "Z":
-                Z_hat = np.asarray(params_hat["Z"]).reshape((d, J), order="F")   
-            if len(se.shape) >= 2:
-                se = se.reshape((se.shape[0]*se.shape[1], ), order="F")   
-            if not np.allclose(np.sum(se), 1e-14):                                   
-                rel_se = se/np.sum(se)
+                Z_hat = np.asarray(params_hat[param]).reshape((d, J), order="F")          
+                Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
+                Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
+                se = (((Z_true_vec - Z_hat_vec)/Z_true_vec)**2)/len(Z_true_vec) 
             else:
-                rel_se = se           
-            per_param_heats[param].append(rel_se)   
-            if plot_online:            
+                se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])
+            
+            per_param_heats[param].append(se)   
+            rel_se = float(np.sum(se))            
+            if plot_online:  
                 fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
                 savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
                 pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                 fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                         print_pdf=False)            
                 parray = np.stack(per_param_heats[param])
                 # timeseries plots
-                for pidx in range(se.shape[0]):
+                for pidx in range(parray.shape[1]):
                     fig = make_subplots(specs=[[{"secondary_y": True}]]) 
                     fig.add_trace(go.Scatter(
-                                            y=parray[:, pidx], showlegend=False,
-                                            x=np.arange(iteration)                                    
-                                        ), secondary_y=False)
+                                    y=parray[:, pidx], showlegend=False,
+                                    x=np.arange(iteration)                                    
+                                ), secondary_y=False)
                     fig.add_trace(go.Scatter(
-                                        y=mse_theta_full, showlegend=True,
-                                        x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                    ), secondary_y=True)
+                                    y=mse_theta_full, showlegend=True,
+                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                                ), secondary_y=True)
                     for itm in plot_restarts:
                         scanrep, totaliterations, halvedgammas, restarted = itm
                         if halvedgammas:
@@ -1180,19 +1187,23 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                     savename = "{}/timeseries_plots/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
                     pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                     fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
-                                            showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                            showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                             print_pdf=False)     
 
     if fig_xz is None:
         fig_xz = go.Figure()  
     # mean error over all elements of the matrices  
-    Rx, tx, mse_x = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+    Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
     mse_x_list.append(mse_x)
-    Rz, tz, mse_z = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+    mse_x_nonRT_list.append(mse_x_nonRT)
+    Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
     mse_z_list.append(mse_z)   
+    mse_z_nonRT_list.append(mse_z_nonRT)
     # following does not reset when a new full scan starts
     per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
     per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
+    per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
+    per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)
     xbox.append(fullscan)
     if plot_online:
         fig_xz.add_trace(go.Box(
@@ -1202,38 +1213,46 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                             boxpoints='outliers', line=dict(color="blue")
                             ))
         fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_x_nonRT_list).tolist(), 
+                            x=xbox, opacity=0.5,
+                            name="X (nonRT) - total iter. {}".format(iteration),
+                            boxpoints='outliers', line=dict(color="blue")
+                            ))
+        fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_z_list).tolist(), 
                             x=xbox,
                             name="Z - total iter. {}".format(iteration),
                             boxpoints='outliers', line=dict(color="green")
                             ))
+        fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_z_nonRT_list).tolist(), 
+                            x=xbox, opacity=0.5,
+                            name="Z (nonRT) - total iter. {}".format(iteration),
+                            boxpoints='outliers', line=dict(color="green")
+                            ))
         fig_xz.update_layout(boxmode="group")
-        savename = "{}/xz_boxplots/MeanOverMatrix_sqaurederror_rotated_translated.html".format(DIR_out)
+        savename = "{}/xz_boxplots/relative_mse.html".format(DIR_out)
         pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
-                            print_png=True, print_html=True, print_pdf=False)
-        fig = make_subplots(specs=[[{"secondary_y": True}]]) 
-        fig.add_trace(go.Scatter(
+                            print_png=True, print_html=False, print_pdf=False)
+        figX = make_subplots(specs=[[{"secondary_y": True}]]) 
+        figX.add_trace(go.Scatter(
                                 y=per_param_ers["X_rot_translated_mseOverMatrix"], 
                                 x=np.arange(iteration),
-                                name="X - min mean sq. error<br>(under rot/transl)"
+                                name="X - min MSE<br>(under rot/transl)"
                             ), secondary_y=False)
-        fig.add_trace(go.Scatter(
+        figX.add_trace(go.Scatter(
                                 y=mse_theta_full, 
                                 x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                             ), secondary_y=True)
-        savename = "{}/timeseries_plots/X_rot_translated_mseOverMatrix.html".format(DIR_out)
-        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over matrix elements", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=True, 
-                                print_pdf=False)
-        fig = make_subplots(specs=[[{"secondary_y": True}]]) 
-        fig.add_trace(go.Scatter(
+        
+        figZ = make_subplots(specs=[[{"secondary_y": True}]]) 
+        figZ.add_trace(go.Scatter(
                                 y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
                                 x=np.arange(iteration),
-                                name="Z - min mean sq. error<br>(under rot/trl)"
+                                name="Z - min MSE<br>(under rot/trl)"
                             ), secondary_y=False)
-        fig.add_trace(go.Scatter(
+        figZ.add_trace(go.Scatter(
                                 y=mse_theta_full, 
                                 x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                             ), secondary_y=True)
@@ -1244,21 +1263,32 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
             else:
                 vcolor = "green"
             if restarted=="fullrestart":
-                fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+                figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                             label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                             font=dict(size=16, family="Times New Roman"),),)
             else:
                 # partial restart
-                fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                             label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                             font=dict(size=16, family="Times New Roman"),),)
-        savename = "{}/timeseries_plots/Z_rot_translated_mseOverMatrix.html".format(DIR_out)
+                figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+        savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
         pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE over matrix elements", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=True, 
+        fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                print_pdf=False)
+        savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_mse.html".format(DIR_out)
+        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(figZ, savenameZ, xaxis_title="", yaxis_title="MSE", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                 print_pdf=False)
 
-    return mse_theta_full, mse_x_list, mse_z_list, fig_xz, per_param_ers, per_param_heats, xbox
+    return mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox
 
 
 def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
