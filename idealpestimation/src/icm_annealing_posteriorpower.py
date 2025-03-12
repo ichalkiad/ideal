@@ -675,8 +675,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     print("Annealing schedule: {}".format(N))       
 
     rng = np.random.default_rng()
-    print_probab_per_coord_iter = 1 #0.05
-    print_probab_per_full_scan_iter = 1 #0.1
+    print_probab_per_coord_iter = 0.05
+    print_probab_per_full_scan_iter = 0.1
 
     delta_rate_prev = None
     mse_theta_full = []
@@ -711,8 +711,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     restarts = 0
     estimated_thetas = []
 
-    max_restarts = 2
-    max_partial_restarts = 3
+    max_restarts = 5
+    max_partial_restarts = 5
     max_halving = 2
     
     if K < 100:
@@ -988,7 +988,7 @@ if __name__ == "__main__":
         jax.config.update("jax_traceback_filtering", "off")
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 10
+    niter = 50
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 20
@@ -1032,9 +1032,9 @@ if __name__ == "__main__":
 
     tol = 1e-6    
     #/home/ioannischalkiadakis/ideal
-    data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_polarisedregime/data_K{}_J{}_sigmae{}_4poles/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30                 
     # full, with status quo
     # parameter_space_dim = (K+2*J)*d + J + K + 3
@@ -1073,6 +1073,7 @@ if __name__ == "__main__":
     ##     ))
     ## fig.show()
     
+    # For posterior plotting: run in vector mode
     # args = (data_location, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, niter, tol,                     
     #         parameter_space_dim, 0, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
     #         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
@@ -1082,7 +1083,6 @@ if __name__ == "__main__":
     #         Y = pickle.load(f)
     # Y = Y.astype(np.int8).reshape((K, J), order="F")    
     
-    # theta_curr = theta_true.copy()
     # outdir = "{}/posterior_plots/".format(data_location)
     # pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)     
 
@@ -1113,6 +1113,11 @@ if __name__ == "__main__":
     #     elif param == "sigma_e":
     #         param_positions_dict[param] = (k, k + 1)                                
     #         k += 1
+    # with jsonlines.open("{}/0/synthetic_gen_parameters.jsonl".format(data_location), "r") as f:
+    #     for result in f.iter(type=dict, skip_invalid=True):
+    #         for param in parameter_names:
+    #             theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+    # theta_curr = theta_true.copy()
     
     # for param in parameter_names:
     #     outdir = "{}/posterior_plots/{}/".format(data_location, param)

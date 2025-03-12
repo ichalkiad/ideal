@@ -418,56 +418,56 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     print("Subset row number: {}".format(N))
     print("Observed data points per data split: {}".format(N*J))
     # subset rows (users)   
-    # Ninit = N
-    # for nbs in range(1, 2, 1):
-    #     N = Ninit*nbs
-    #     print("Subset row number: {}".format(N))
-    #     print("Observed data points per data split: {}".format(N*J))
+    Ninit = N
+    for nbs in range(1, 2, 1):
+        N = Ninit*nbs
+        print("Subset row number: {}".format(N))
+        print("Observed data points per data split: {}".format(N*J))
 
-    #     for i in range(0, K, N):
-    #         from_row = i 
-    #         to_row = np.min([i+N, K])
-    #         # print(from_row, to_row)
-    #         if i+2*N > K:
-    #             to_row = K
-    #         pathlib.Path("{}/{}/dataset_{}_{}".format(data_location, N, from_row, to_row)).mkdir(parents=True, exist_ok=True)
-    #         with open("{}/{}/dataset_{}_{}/dataset_{}_{}.pickle".format(data_location, N, from_row, to_row, from_row, to_row), "wb") as f:
-    #             pickle.dump(follow_matrix[from_row:to_row, :], f, protocol=4)             
-    #         fig = plot_array_heatmap(
-    #             utilities_matrix[from_row:to_row, :],
-    #             title="Computed utilities",
-    #             colorscale="sunsetdark",
-    #             colorbar=dict(x=0.3, thickness=10, title='U'),            
-    #             xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-    #             )  
-    #         probabfig = plot_array_heatmap(
-    #             utilities_mat_probab[from_row:to_row, :],
-    #             title="Pij CDF matrix",
-    #             colorscale="Viridis", boundcolorscale=True,
-    #             colorbar=dict(thickness=15, title='CDF'),
-    #             xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-    #             )  
-    #         errfig = plot_array_heatmap(
-    #             stochastic_component[from_row:to_row, :],
-    #             title="Error component - SNR = {} dB".format(snr),
-    #             colorbar=dict(thickness=15, title='E'),
-    #             colorscale="blues",
-    #             xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-    #         )    
-    #         followfig = plot_array_heatmap(
-    #                 follow_matrix[from_row:to_row, :].astype(np.int8),
-    #                 title="Following",
-    #                 xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=False
-    #             )    
-    #         allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data")        
-    #         fix_plot_layout_and_save(allplots, "{}/{}/dataset_{}_{}/utilities_following_relationships.html".format(data_location, N, from_row, to_row), 
-    #                                 xaxis_title="", yaxis_title="", title="Synthetic data", showgrid=False, showlegend=False,
-    #                                 print_png=True, print_html=True, print_pdf=False)
-    #         fix_plot_layout_and_save(probabfig, "{}/{}/dataset_{}_{}/utilities_mat_probab.html".format(data_location, N, from_row, to_row), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
-    #                             showgrid=False, showlegend=False,
-    #                             print_png=True, print_html=True, print_pdf=False)        
-    #         if i+2*N > K:
-    #             break
+        for i in range(0, K, N):
+            from_row = i 
+            to_row = np.min([i+N, K])
+            # print(from_row, to_row)
+            if i+2*N > K:
+                to_row = K
+            pathlib.Path("{}/{}/dataset_{}_{}".format(data_location, N, from_row, to_row)).mkdir(parents=True, exist_ok=True)
+            with open("{}/{}/dataset_{}_{}/dataset_{}_{}.pickle".format(data_location, N, from_row, to_row, from_row, to_row), "wb") as f:
+                pickle.dump(follow_matrix[from_row:to_row, :], f, protocol=4)             
+            fig = plot_array_heatmap(
+                utilities_matrix[from_row:to_row, :],
+                title="Computed utilities",
+                colorscale="sunsetdark",
+                colorbar=dict(x=0.3, thickness=10, title='U'),            
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
+                )  
+            probabfig = plot_array_heatmap(
+                utilities_mat_probab[from_row:to_row, :],
+                title="Pij CDF matrix",
+                colorscale="Viridis", boundcolorscale=True,
+                colorbar=dict(thickness=15, title='CDF'),
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
+                )  
+            errfig = plot_array_heatmap(
+                stochastic_component[from_row:to_row, :],
+                title="Error component - SNR = {} dB".format(snr),
+                colorbar=dict(thickness=15, title='E'),
+                colorscale="blues",
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
+            )    
+            followfig = plot_array_heatmap(
+                    follow_matrix[from_row:to_row, :].astype(np.int8),
+                    title="Following",
+                    xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=False
+                )    
+            allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data")        
+            fix_plot_layout_and_save(allplots, "{}/{}/dataset_{}_{}/utilities_following_relationships.html".format(data_location, N, from_row, to_row), 
+                                    xaxis_title="", yaxis_title="", title="Synthetic data", showgrid=False, showlegend=False,
+                                    print_png=True, print_html=True, print_pdf=False)
+            fix_plot_layout_and_save(probabfig, "{}/{}/dataset_{}_{}/utilities_mat_probab.html".format(data_location, N, from_row, to_row), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
+                                showgrid=False, showlegend=False,
+                                print_png=True, print_html=True, print_pdf=False)        
+            if i+2*N > K:
+                break
 
     # plots
     fig = plot_array_heatmap(

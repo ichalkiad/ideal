@@ -1541,6 +1541,19 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
         # surface plot
         fig.add_trace(go.Scatter(x=[true_param[0]], y=[true_param[1]], name="True θ", mode="markers", marker_symbol="star", marker_color="green"))
 
+    # if only plotting density
+    if all_theta is None:
+        fig.update_layout(hovermode='x unified', legend=dict(orientation="h"))         
+        pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)    
+        savename = "{}/{}_idx_{}_vector_coord_{}.html".format(outdir, param, idx, vector_coordinate)
+        if param in ["X", "Z", "Phi"] and vector_coordinate is None:
+            yaxistitle = ""
+        else:
+            yaxistitle = "Conditional posterior"
+        fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title=yaxistitle, title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, print_pdf=False)
+        return fig
+
     if param in ["X", "Z", "Phi"] and vector_coordinate is None:
         # 2d plot
         if d != 2:
