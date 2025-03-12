@@ -16,7 +16,7 @@ from sklearn.utils import check_random_state
 from idealpestimation.src.utils import p_ij_arg, params2optimisation_dict, optimisation_dict2params
 
 
-def generate_normal_data(n_samples, n_dimensions, mu=0, sigma=1):
+def generate_normal_data(n_samples, n_dimensions, mu=0, sigma=1, rng=None):
     """
     Generate multi-dimensional normally distributed data.
     
@@ -25,8 +25,7 @@ def generate_normal_data(n_samples, n_dimensions, mu=0, sigma=1):
     - n_dimensions: Number of dimensions
     - mu: Mean of the normal distribution
     - sigma: Standard deviation of the normal distribution
-    """
-    rng = np.random.default_rng()
+    """    
     if n_dimensions == 1:
         return rng.normal(mu, sigma, n_samples)
     else:
@@ -340,7 +339,7 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 
 def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=None, z_var=None, 
-                            alpha_var=None, beta_var=None, debug=False):
+                            alpha_var=None, beta_var=None, debug=False, rng=None):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, distance_func, param_positions_dict, use_jax=False)    
@@ -368,7 +367,7 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
         
     # utilities_matrix = generate_normal_data(n_samples=K, n_dimensions=J, mu=0.6*np.ones((J,)), sigma=0.1*np.eye(J))
     sigma_noise = sigma_e*np.eye(J)
-    stochastic_component = generate_normal_data(n_samples=K, n_dimensions=J, mu=mu_e*np.ones((J,)), sigma=sigma_noise)
+    stochastic_component = generate_normal_data(n_samples=K, n_dimensions=J, mu=mu_e*np.ones((J,)), sigma=sigma_noise, rng=rng)
     pijs += stochastic_component
     utilities_mat_probab = norm.cdf(pijs, loc=mu_e, scale=sigma_e)
     follow_matrix = utilities_mat_probab > 0.5 
@@ -395,7 +394,7 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     print("Observed data points per data split: {}".format(N*J))
     # subset rows (users)   
     Ninit = N
-    for nbs in range(1, 6, 1):
+    for nbs in range(1, 2, 1):
         N = Ninit*nbs
         print("Subset row number: {}".format(N))
         print("Observed data points per data split: {}".format(N*J))
@@ -499,8 +498,10 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
                 title=""
             )
     fig.layout.height = 700    
-    fix_plot_layout_and_save(fig, "{}/network_users_vis.html".format(data_location), xaxis_title="", yaxis_title="", title="Ideal points", showgrid=False, showlegend=False,
-                                 print_png=True, print_html=True, print_pdf=False)
+    fix_plot_layout_and_save(fig, "{}/network_users_vis.html".format(data_location), 
+                            xaxis_title="", yaxis_title="", title="Ideal points", 
+                            showgrid=False, showlegend=False, print_png=True, 
+                            print_html=True, print_pdf=False)
 
 
 if __name__ == "__main__":
@@ -510,6 +511,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
     check_random_state(seed_value)
+    rng = np.random.default_rng()
 
     # dimensionality of ideal points space
     d = 2
@@ -549,15 +551,15 @@ if __name__ == "__main__":
             for sigma_e in sigma_es:
                 parameter_space_dim = (K+J)*d + J + K + 2
 
-                alpha_js = generate_normal_data(n_samples=J, n_dimensions=1, mu=alpha_mean, sigma=alpha_var)                
-                beta_is = generate_normal_data(n_samples=K, n_dimensions=1, mu=beta_mean, sigma=beta_var)
+                alpha_js = generate_normal_data(n_samples=J, n_dimensions=1, mu=alpha_mean, sigma=alpha_var, rng=rng)                
+                beta_is = generate_normal_data(n_samples=K, n_dimensions=1, mu=beta_mean, sigma=beta_var, rng=rng)
 
                 # followers' ideal points
                 # K x d
-                xs = generate_normal_data(n_samples=K, n_dimensions=d, mu=xs_mean_1, sigma=xs_sigma_1)
+                xs = generate_normal_data(n_samples=K, n_dimensions=d, mu=xs_mean_1, sigma=xs_sigma_1, rng=rng)
                 xs = xs.transpose()
                 # leaders' ideal points - unimodal distribution
-                zs1 = generate_normal_data(n_samples=J, n_dimensions=d, mu=zs_mean_1, sigma=zs_sigma_1)
+                zs1 = generate_normal_data(n_samples=J, n_dimensions=d, mu=zs_mean_1, sigma=zs_sigma_1, rng=rng)
                 zs = zs1.transpose()
 
                 theta, param_positions_dict = params2optimisation_dict(J, K, d, parameter_names, xs, zs, None, alpha_js, beta_is, gamma, delta, sigma_e)    
@@ -576,10 +578,10 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
-                    # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
+                    # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
-                                        alpha_var=alpha_var, beta_var=beta_var, debug=False)
+                                        alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)
                     time.sleep(1)
 
                     # Save parameters
