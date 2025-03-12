@@ -394,50 +394,56 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     print("Subset row number: {}".format(N))
     print("Observed data points per data split: {}".format(N*J))
     # subset rows (users)   
-    for i in range(0, K, N):
-        from_row = i 
-        to_row = np.min([i+N, K])
-        # print(from_row, to_row)
-        if i+2*N > K:
-            to_row = K
-        pathlib.Path("{}/dataset_{}_{}".format(data_location, from_row, to_row)).mkdir(parents=True, exist_ok=True)
-        with open("{}/dataset_{}_{}/dataset_{}_{}.pickle".format(data_location, from_row, to_row, from_row, to_row), "wb") as f:
-            pickle.dump(follow_matrix[from_row:to_row, :], f, protocol=4)             
-        fig = plot_array_heatmap(
-            utilities_matrix[from_row:to_row, :],
-            title="Computed utilities",
-            colorscale="sunsetdark",
-            colorbar=dict(x=0.3, thickness=10, title='U'),            
-            xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-            )  
-        probabfig = plot_array_heatmap(
-            utilities_mat_probab[from_row:to_row, :],
-            title="Pij CDF matrix",
-            colorscale="Viridis", boundcolorscale=True,
-            colorbar=dict(thickness=15, title='CDF'),
-            xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-            )  
-        errfig = plot_array_heatmap(
-            stochastic_component[from_row:to_row, :],
-            title="Error component - SNR = {} dB".format(snr),
-            colorbar=dict(thickness=15, title='E'),
-            colorscale="blues",
-            xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-        )    
-        followfig = plot_array_heatmap(
-                follow_matrix[from_row:to_row, :].astype(np.int8),
-                title="Following",
-                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=False
+    Ninit = N
+    for nbs in range(1, 6, 1):
+        N = Ninit*nbs
+        print("Subset row number: {}".format(N))
+        print("Observed data points per data split: {}".format(N*J))
+
+        for i in range(0, K, N):
+            from_row = i 
+            to_row = np.min([i+N, K])
+            # print(from_row, to_row)
+            if i+2*N > K:
+                to_row = K
+            pathlib.Path("{}/{}/dataset_{}_{}".format(data_location, N, from_row, to_row)).mkdir(parents=True, exist_ok=True)
+            with open("{}/{}/dataset_{}_{}/dataset_{}_{}.pickle".format(data_location, N, from_row, to_row, from_row, to_row), "wb") as f:
+                pickle.dump(follow_matrix[from_row:to_row, :], f, protocol=4)             
+            fig = plot_array_heatmap(
+                utilities_matrix[from_row:to_row, :],
+                title="Computed utilities",
+                colorscale="sunsetdark",
+                colorbar=dict(x=0.3, thickness=10, title='U'),            
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
+                )  
+            probabfig = plot_array_heatmap(
+                utilities_mat_probab[from_row:to_row, :],
+                title="Pij CDF matrix",
+                colorscale="Viridis", boundcolorscale=True,
+                colorbar=dict(thickness=15, title='CDF'),
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
+                )  
+            errfig = plot_array_heatmap(
+                stochastic_component[from_row:to_row, :],
+                title="Error component - SNR = {} dB".format(snr),
+                colorbar=dict(thickness=15, title='E'),
+                colorscale="blues",
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
             )    
-        allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data")        
-        fix_plot_layout_and_save(allplots, "{}/dataset_{}_{}/utilities_following_relationships.html".format(data_location, from_row, to_row), 
-                                xaxis_title="", yaxis_title="", title="Synthetic data", showgrid=False, showlegend=False,
-                                print_png=True, print_html=True, print_pdf=False)
-        fix_plot_layout_and_save(probabfig, "{}/dataset_{}_{}/utilities_mat_probab.html".format(data_location, from_row, to_row), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
-                             showgrid=False, showlegend=False,
-                             print_png=True, print_html=True, print_pdf=False)        
-        if i+2*N > K:
-            break
+            followfig = plot_array_heatmap(
+                    follow_matrix[from_row:to_row, :].astype(np.int8),
+                    title="Following",
+                    xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=False
+                )    
+            allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data")        
+            fix_plot_layout_and_save(allplots, "{}/{}/dataset_{}_{}/utilities_following_relationships.html".format(data_location, N, from_row, to_row), 
+                                    xaxis_title="", yaxis_title="", title="Synthetic data", showgrid=False, showlegend=False,
+                                    print_png=True, print_html=True, print_pdf=False)
+            fix_plot_layout_and_save(probabfig, "{}/{}/dataset_{}_{}/utilities_mat_probab.html".format(data_location, N, from_row, to_row), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
+                                showgrid=False, showlegend=False,
+                                print_png=True, print_html=True, print_pdf=False)        
+            if i+2*N > K:
+                break
 
     # plots
     fig = plot_array_heatmap(
@@ -530,22 +536,20 @@ if __name__ == "__main__":
 
     # Generate synthetic data
     # trials
-    M = 10
+    M = 1 # 10
     # number of leaders
-    Js = [100, 500, 1000]
+    Js = [10] #100, 500, 1000]
     # number of followers
-    Ks = [10000]
-    sigma_es = [0.001, 0.1, 0.25, 0.5, 1.0]
+    Ks = [30] # [10000]
+    sigma_es = [0.01]#, 0.1, 0.25, 0.5, 1.0]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:
         for J in Js:
             for sigma_e in sigma_es:
-                parameter_space_dim = (K+J)*d + J + K + 3
+                parameter_space_dim = (K+J)*d + J + K + 2
 
-                alpha_js = generate_normal_data(n_samples=J-1, n_dimensions=1, mu=alpha_mean, sigma=alpha_var).tolist()
-                alpha_js.append(0)
-                alpha_js = np.asarray(alpha_js)
+                alpha_js = generate_normal_data(n_samples=J, n_dimensions=1, mu=alpha_mean, sigma=alpha_var)                
                 beta_is = generate_normal_data(n_samples=K, n_dimensions=1, mu=beta_mean, sigma=beta_var)
 
                 # followers' ideal points
@@ -572,7 +576,7 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
                     # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False)
