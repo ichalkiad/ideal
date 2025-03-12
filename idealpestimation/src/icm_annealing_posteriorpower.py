@@ -958,7 +958,7 @@ if __name__ == "__main__":
         M = 1
         K = 30
         J = 10
-        sigma_e_true = 0.5
+        sigma_e_true = 0.01
         total_running_processes = 20   
         elementwise = False
         evaluate_posterior = True
