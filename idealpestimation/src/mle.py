@@ -125,9 +125,9 @@ def maximum_likelihood_estimator(
     # Perform maximum likelihood estimation        
     bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=None)  #######################    
     if niter is not None:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":1000000})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":2000000})
     else:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":1000000})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":2000000})
     
     mle = result.x          
 
@@ -172,8 +172,11 @@ def estimate_mle(args):
         prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae = args
 
     # load data    
-    with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f:
+    batchsize = 256
+    with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f: ############
         Y = pickle.load(f)
+
+
     from_row = int(subdataset_name.split("_")[1])
     to_row = int(subdataset_name.split("_")[2])
     # since each batch has N rows    
@@ -295,9 +298,12 @@ def estimate_mle(args):
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
-        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
-        hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+        elapsedtime = timedelta(seconds=time.time()-t0)            
+        total_seconds = int(elapsedtime.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60            
+        grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
         grid_and_optim_outcome["parameter names"] = parameter_names
@@ -328,9 +334,12 @@ def estimate_mle(args):
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
-        time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
-        hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+        elapsedtime = timedelta(seconds=time.time()-t0)            
+        total_seconds = int(elapsedtime.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60            
+        grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
         grid_and_optim_outcome["parameter names"] = parameter_names
@@ -382,9 +391,11 @@ class ProcessManagerSynthetic(ProcessManager):
         DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
                                                                             parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e = args
 
-        # load data    
-        with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f:
+        # load data  
+        batchsize = 256
+        with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f: ############
             Y = pickle.load(f)
+
         from_row = int(subdataset_name.split("_")[1])
         to_row = int(subdataset_name.split("_")[2])
         # since each batch has N rows
@@ -504,10 +515,13 @@ class ProcessManagerSynthetic(ProcessManager):
 
             grid_and_optim_outcome = dict()
             grid_and_optim_outcome["PID"] = current_pid
-            grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
-            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+            grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")            
+            elapsedtime = timedelta(seconds=time.time()-t0)            
+            total_seconds = int(elapsedtime.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60            
+            grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
             grid_and_optim_outcome["elapsedtime_hours"] = hours
             grid_and_optim_outcome["retry"] = retry
             grid_and_optim_outcome["parameter names"] = parameter_names
@@ -538,9 +552,12 @@ class ProcessManagerSynthetic(ProcessManager):
             grid_and_optim_outcome = dict()
             grid_and_optim_outcome["PID"] = current_pid
             grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            grid_and_optim_outcome["elapsedtime"] = str(timedelta(seconds=time.time()-t0))   
-            time_obj = datetime.strptime(grid_and_optim_outcome["elapsedtime"], '%H:%M:%S.%f')
-            hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+            elapsedtime = timedelta(seconds=time.time()-t0)            
+            total_seconds = int(elapsedtime.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60            
+            grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
             grid_and_optim_outcome["elapsedtime_hours"] = hours
             grid_and_optim_outcome["retry"] = retry
             grid_and_optim_outcome["parameter names"] = parameter_names
@@ -592,17 +609,26 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             manager.create_results_dict(optim_target="all")    
             while True:
                 for m in range(trialsmin, trialsmax, 1):
-                    path = pathlib.Path("{}/{}".format(data_location, m))  
+
+                    batchsize = 256
+                    path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
+
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
                     for dataset_index in range(len(subdatasets_names)):                    
-                        subdataset_name = subdatasets_names[dataset_index]                        
-                        DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name)
+                        subdataset_name = subdatasets_names[dataset_index]  
+
+                        DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
+
                         from_row = int(subdataset_name.split("_")[1])
                         to_row = int(subdataset_name.split("_")[2])
                         # if all have completed, following never exits the while loop
-                        if pathlib.Path(DIR_out).is_dir() and pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists():
-                            continue
+                        estimationfiles = [file.name for file in pathlib.Path(DIR_out).iterdir() if file.is_file() and ".png" in file.name]
+                        if pathlib.Path(DIR_out).is_dir() and \
+                            pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists() and\
+                                len(estimationfiles) > 0:      
+                                continue
                         else:
+                            print(DIR_out)
                             pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                             args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                                     parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e)    
@@ -624,16 +650,25 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     break       
         else:
             for m in range(trialsmin, trialsmax, 1):
-                path = pathlib.Path("{}/{}".format(data_location, m))  
+                batchsize = 256
+                path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
+
                 subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                 for dataset_index in range(len(subdatasets_names)):               
-                    subdataset_name = subdatasets_names[dataset_index]                    
-                    DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name)
+                    subdataset_name = subdatasets_names[dataset_index]            
+
+                    DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
+
                     from_row = int(subdataset_name.split("_")[1])
                     to_row = int(subdataset_name.split("_")[2])
-                    if pathlib.Path(DIR_out).is_dir() and pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists():
-                        continue
+
+                    estimationfiles = [file.name for file in pathlib.Path(DIR_out).iterdir() if file.is_file() and ".png" in file.name]
+                    if pathlib.Path(DIR_out).is_dir() and \
+                            pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists() and\
+                                len(estimationfiles) > 0:      
+                                continue
                     else:
+                        print(DIR_out)
                         pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                                 parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
@@ -726,7 +761,7 @@ if __name__ == "__main__":
     prior_scale_delta= 1        
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
-    data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
@@ -747,7 +782,7 @@ if __name__ == "__main__":
         data_location=data_location, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
         dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=10, min_sigma_e=min_sigma_e,
+        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
         prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
         prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
         prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
