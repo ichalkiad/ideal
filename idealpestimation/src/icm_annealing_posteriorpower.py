@@ -681,8 +681,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     N = len(all_gammas)
     print("Annealing schedule: {}".format(N))       
 
-    # rng = np.random.default_rng()
-    # print_probab_per_coord_iter = 1
+    rng = np.random.default_rng()
+    print_probab_per_coord_iter = 0.25
     # print_probab_per_full_scan_iter = 0.6
 
     delta_rate_prev = None
@@ -747,8 +747,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                             Y, gamma, theta_curr.copy(), param_positions_dict, L, args)                   
                 theta_curr = theta_test.copy()                    
                 gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)                
-                # if rng.binomial(1, print_probab_per_coord_iter, 1) == 1:
-                mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                if rng.binomial(1, print_probab_per_coord_iter, 1) == 1:
+                    mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
                                     param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
                                     fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
@@ -780,7 +780,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                                         testidx=testidx, p=percentage_parameter_change, tol=tol)
         else:
             plot_online = False
-            for target_param in parameter_names:                     
+
+            t0 = time.time()
+            for target_param in parameter_names:          
                 if target_param in ["X", "beta"]:  
                     param_no = K                                                      
                 elif target_param in ["Z", "Phi", "alpha"]:
@@ -794,7 +796,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     theta_curr = theta_test.copy()
                     gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, 
                                                                     temperature_steps, all_gammas)
-                    mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                    if rng.binomial(1, print_probab_per_coord_iter, 1) == 1:
+                        mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
                                     plot_online=plot_online, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                                     mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, 
@@ -808,6 +811,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 if total_iter % 1000 == 0:
                     print(total_iter, l)                               
             
+            elapsedtime = str(timedelta(seconds=time.time()-t0))   
+            print(elapsedtime)
             ipdb.set_trace()
             # last entry in mse lists in the same, has been stored twice
             mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
