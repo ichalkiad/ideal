@@ -564,12 +564,12 @@ if __name__ == "__main__":
 
     # Generate synthetic data
     # trials
-    M = 1 # 10
+    M = 10
     # number of leaders
-    Js = [100] #, 500, 1000]
+    Js = [100, 500, 1000]
     # number of followers
-    Ks = [1000] # [10000]
-    sigma_es = [0.01]#, 0.1, 0.25, 0.5, 1.0]
+    Ks = [10000]
+    sigma_es = [0.001, 0.1, 0.25, 0.5]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:
@@ -604,7 +604,7 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_polarisedregime/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
                     # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)

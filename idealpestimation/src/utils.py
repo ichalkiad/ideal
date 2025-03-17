@@ -413,9 +413,9 @@ def parse_input_arguments():
     
     return parser.parse_args()
 
-def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
+def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False, numbafast=True):
 
-    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names, numbafast=True)    
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
     errscale = sigma_e
@@ -430,16 +430,15 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
                 _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
     
-    # if numbafast:    
-    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
-    gamma = params_hat["gamma"][0]
-    alpha = params_hat["alpha"]
-    beta = params_hat["beta"]
-    pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
-    # else:
-    pij_arg1 = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
-    assert np.allclose(pij_arg1, pij_arg)
-
+    if numbafast:    
+        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
+        gamma = params_hat["gamma"][0]
+        alpha = params_hat["alpha"]
+        beta = params_hat["beta"]
+        pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
+    else:
+        pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+    
     philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
     log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
     nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
@@ -591,22 +590,31 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
     
     parameter_space_dim = (K+J)*d + J + K + 2
     theta_true = np.zeros((parameter_space_dim,))
-    with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_topdir), "r") as f:
+    with jsonlines.open("{}/0/synthetic_gen_parameters.jsonl".format(data_topdir), "r") as f:
         for result in f.iter(type=dict, skip_invalid=True):
             for param in parameter_names:
                 theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
-
+    
     params_out_jsonl = dict()
     estimation_error_per_trial = dict()
+    estimation_error_per_trial_per_batch = dict()
     for param in parameter_names:
         estimation_error_per_trial[param] = dict()
-    for batchsize in batchsizes:            
-        estimation_error_per_trial[param][batchsize] = []
-        for m in range(M):            
+    for batchsize in batchsizes:                    
+        print(batchsize)
+        for m in range(M):   
+            fig_m_over_databatches = go.Figure()
+            estimation_error_per_trial_per_batch[m] = dict()
+            estimation_error_per_trial_per_batch[m][batchsize] = dict()
+            for param in parameter_names:            
+                estimation_error_per_trial_per_batch[m][batchsize][param] = []                     
             data_location = "{}/{}/{}/".format(data_topdir, m, batchsize)
-            params_out, _ = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
-                                                            None, theta_true, param_positions_dict)    
+            params_out, estimation_error_per_trial_per_batch[m][batchsize] = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
+                                                            estimation_error_per_trial_per_batch[m][batchsize], theta_true, param_positions_dict)    
             for param in parameter_names:
+                print(param)
+                if batchsize not in estimation_error_per_trial[param].keys():
+                    estimation_error_per_trial[param][batchsize] = []
                 if param == "X":                
                     params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                     X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
@@ -633,12 +641,24 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
                     params_out_jsonl[param] = params_out[param]
                     mse = ((theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2
                     estimation_error_per_trial[param][batchsize].append(float(mse[0])) 
+        
+               
+                fig_m_over_databatches.add_trace(go.Box(
+                    y=estimation_error_per_trial_per_batch[m][batchsize][param], 
+                    x=[param]*len(estimation_error_per_trial_per_batch[m][batchsize][param]),
+                    showlegend=False,  
+                    boxpoints='outliers'
+                    ))
+            savename = "{}/mle_estimation_plots/mse_trial{}_perparam_unweighted_boxplot_batchsize{}.html".format(data_topdir, m, batchsize)
+            pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)     
+            fix_plot_layout_and_save(fig_m_over_databatches, savename, xaxis_title="Parameter", yaxis_title="MSE Θ", title="", 
+                                    showgrid=False, showlegend=True, 
+                                    print_png=True, print_html=True, print_pdf=False)
                                   
         out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
         with open(out_file, 'a') as f:         
             writer = jsonlines.Writer(f)
             writer.write(params_out_jsonl)
-    
     # box plot - mse relativised per parameter over trials    
     for param in parameter_names:
         fig = go.Figure()
@@ -648,6 +668,7 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
                             x=[batchsize]*len(estimation_error_per_trial[param][batchsize]), boxpoints='outliers'                                
                         ))
         savename = "{}/mle_estimation_plots/mse_overAllTrials_{}_weighted_boxplot.html".format(data_topdir, param)
+        pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE Θ", title="", 
                                 showgrid=False, showlegend=True, 
                                 print_png=True, print_html=True, 
@@ -1022,49 +1043,40 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
         # fig.show()
  
 
-def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, args, samples_list=None, idx_all=None):
+def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, args, samples_list=None, idx_all=None, rng=None):
 
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
-        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
-        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
+    try:
+        DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
+            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+            prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
+            gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
+    except:
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method,\
+            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z,\
+                constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z,\
+                    prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
+                        prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
+                            prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
 
     if samples_list is None and parameter_space_dim <= 21201:
         sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
         samples_list = list(sampler.random_base2(m=base2exponent))       
-    elif samples_list is None:
+    elif samples_list is None and parameter_space_dim > 21201:
         if d > 2:
             raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
-        sampler_alpha_sigma = qmc.Sobol(d=J+2, scramble=False)   
-        samples_list_alpha_sigma = sampler_alpha_sigma.random_base2(m=base2exponent)
-        samples_list = np.zeros((2**base2exponent, parameter_space_dim))
-        param = "alpha"
-        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, :J]
-        param = "gamma"
-        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
-                            samples_list_alpha_sigma[:, J].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
-        param = "sigma_e"
-        samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
-                            samples_list_alpha_sigma[:, J+1].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
-        x = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))
-        y = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))    
-        grid_points = list(product(x, y))
-        idxgrid = np.arange(0, len(grid_points), 1)
-        for itmrp in range(2**base2exponent):
-            samples_list[itmrp, :(K+J)*d] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=(K+J), 
-                                                                            replace=True).tolist()]).reshape(samples_list[itmrp, :(K+J)*d].shape)
-            param = "beta"
-            samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
-                np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=int(K/2), replace=True).tolist()]).reshape(samples_list[itmrp, 
-                                                                                            param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
-        samples_list = list(samples_list)
-        
-
+        sampler = qmc.Sobol(d=21201, scramble=False)    
+        base2exponent = 15
+        samples = sampler.random_base2(m=base2exponent)
+        samplesreshape = samples[1:,:].reshape((-1,1))
+        samplesselect = rng.choice(samplesreshape, 15*parameter_space_dim, replace=False)
+        samples = samplesselect.reshape((15, parameter_space_dim))
+        samples_list = list(samples)       
+    
     idx_all = np.arange(0, len(samples_list), 1).tolist()
     idx = np.random.choice(idx_all, size=1, replace=False)[0]
     theta_curr = np.asarray(samples_list[idx]).reshape((1, parameter_space_dim))
-    idx_all.remove(idx)   
+    idx_all.remove(idx)       
 
     lbounds = np.zeros((parameter_space_dim,))
     ubounds = np.ones((parameter_space_dim,))
@@ -1100,6 +1112,87 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
     theta_curr = qmc.scale(theta_curr, lbounds, ubounds).reshape((parameter_space_dim,))
 
     return theta_curr, samples_list, idx_all
+
+
+
+# def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, args, samples_list=None, idx_all=None):
+
+#     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
+#         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+#         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+#         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
+#         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
+
+#     if samples_list is None and parameter_space_dim <= 21201:
+#         sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
+#         samples_list = list(sampler.random_base2(m=base2exponent))       
+#     elif samples_list is None:
+#         if d > 2:
+#             raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
+#         sampler_alpha_sigma = qmc.Sobol(d=J+2, scramble=False)   
+#         samples_list_alpha_sigma = sampler_alpha_sigma.random_base2(m=base2exponent)
+#         samples_list = np.zeros((2**base2exponent, parameter_space_dim))
+#         param = "alpha"
+#         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, :J]
+#         param = "gamma"
+#         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
+#                             samples_list_alpha_sigma[:, J].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
+#         param = "sigma_e"
+#         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
+#                             samples_list_alpha_sigma[:, J+1].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
+#         x = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))
+#         y = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))    
+#         grid_points = list(product(x, y))
+#         idxgrid = np.arange(0, len(grid_points), 1)
+#         for itmrp in range(2**base2exponent):
+#             samples_list[itmrp, :(K+J)*d] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=(K+J), 
+#                                                                             replace=True).tolist()]).reshape(samples_list[itmrp, :(K+J)*d].shape)
+#             param = "beta"
+#             samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
+#                 np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=int(K/2), replace=True).tolist()]).reshape(samples_list[itmrp, 
+#                                                                                             param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
+#         samples_list = list(samples_list)
+        
+
+#     idx_all = np.arange(0, len(samples_list), 1).tolist()
+#     idx = np.random.choice(idx_all, size=1, replace=False)[0]
+#     theta_curr = np.asarray(samples_list[idx]).reshape((1, parameter_space_dim))
+#     idx_all.remove(idx)   
+
+#     lbounds = np.zeros((parameter_space_dim,))
+#     ubounds = np.ones((parameter_space_dim,))
+#     for param in parameter_names:
+#         if param == "X":
+#             # assume homogeneous variance
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_x[0, 0])+prior_loc_x[0]
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_x[0, 0])+prior_loc_x[0]
+#         elif param == "Z":
+#             # assume homogeneous variance
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_z[0, 0])+prior_loc_z[0]
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_z[0, 0])+prior_loc_z[0]
+#         elif param == "Phi":
+#             # assume homogeneous variance
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_phi[0, 0])+prior_loc_phi[0]
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_phi[0, 0])+prior_loc_phi[0]
+#         elif param == "alpha":
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_alpha)+prior_loc_alpha
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_alpha)+prior_loc_alpha
+#         elif param == "beta":
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_beta)+prior_loc_beta
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_beta)+prior_loc_beta
+#         elif param == "gamma":
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_gamma)+prior_loc_gamma
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_gamma)+prior_loc_gamma
+#         elif param == "delta":
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_delta)+prior_loc_delta
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_delta)+prior_loc_delta        
+#         elif param == "sigma_e":
+#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = min_sigma_e
+#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_sigmae) #+prior_loc_gamma
+    
+#     theta_curr = qmc.scale(theta_curr, lbounds, ubounds).reshape((parameter_space_dim,))
+
+#     return theta_curr, samples_list, idx_all
 
 
 def update_annealing_temperature(gamma_prev, total_iter, temperature_rate, temperature_steps, all_gammas=None):

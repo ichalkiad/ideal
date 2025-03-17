@@ -20,7 +20,8 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
                                                             create_constraint_functions, jax, jnp, \
                                                                 time, datetime, timedelta, parse_input_arguments, \
-                                                                    negative_loglik, negative_loglik_jax, collect_mle_results
+                                                                    negative_loglik, negative_loglik_jax, collect_mle_results, \
+                                                                        collect_mle_results_batchsize_analysis, sample_theta_curr_init
 
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
@@ -169,11 +170,11 @@ def estimate_mle(args):
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e, \
         prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,\
         prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,\
-        prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae = args
+        prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
 
     # load data    
     batchsize = 256
-    with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f: ############
+    with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f: ############
         Y = pickle.load(f)
 
 
@@ -183,10 +184,41 @@ def estimate_mle(args):
     N = Y.shape[0]
     Y = Y.astype(np.int8).reshape((N, J), order="F")         
     
-    # np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, 
+    theta_samples_list = None
+    base2exponent = 10
+    idx_all = None
+    parameter_space_dim_theta = (N+J)*d + J + N + 2
+    param_positions_dict_theta = dict()            
+    k = 0
+    for param in parameter_names:
+        if param == "X":
+            param_positions_dict[param] = (k, k + N*d)                       
+            k += N*d    
+        elif param in ["Z"]:
+            param_positions_dict[param] = (k, k + J*d)                                
+            k += J*d
+        elif param in ["Phi"]:            
+            param_positions_dict[param] = (k, k + J*d)                                
+            k += J*d
+        elif param == "beta":
+            param_positions_dict[param] = (k, k + N)                                   
+            k += K    
+        elif param == "alpha":
+            param_positions_dict[param] = (k, k + J)                                       
+            k += J    
+        elif param == "gamma":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+        elif param == "delta":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+        elif param == "sigma_e":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1    
+    theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim_theta, base2exponent, param_positions_dict_theta, 
+                                                                args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
 
-
-    gridpoints_num = 200
+    """gridpoints_num = 200
     args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
             parameter_space_dim, None, None, None, None, None, None, None, 
             prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
@@ -221,14 +253,14 @@ def estimate_mle(args):
     gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
     # if "delta" in parameter_names:
     #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()        
-    sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()   
+    sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()   """
 
     retry = 0
     t0 = time.time()
     while retry < retries:   
         print("Retry: {}".format(retry))
 
-        xidx = np.random.choice(xidx_all, size=N, replace=False)
+        """xidx = np.random.choice(xidx_all, size=N, replace=False)
         Xrem = [X_list[ii] for ii in xidx]
         X = np.asarray(Xrem).reshape((d, N), order="F")
         zidx = np.random.choice(zidx_all, size=J, replace=False)
@@ -256,9 +288,10 @@ def estimate_mle(args):
         else:
             delta = None                
         sigmaeidx = np.random.choice(sigmaeidx_all, size=1, replace=False)
-        sigma_e = sigma_e_list[sigmaeidx[0]]
+        sigma_e = sigma_e_list[sigmaeidx[0]]"""
         
-        x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, sigma_e)
+        # x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, sigma_e)
+        x0 = theta_curr.copy()
         # print(x0)
         nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
         if parallel:
@@ -275,20 +308,22 @@ def estimate_mle(args):
         
         if result.success and result["variance_status"]:
             break
-        else:              
-            for xr in xidx:
-                xidx_all.remove(xr)                
-            for zr in zidx:
-                zidx_all.remove(zr)                
-            if "Phi" in parameter_names:
-                for phir in phiidx:
-                    phiidx_all.remove(phir)
-            alphaidx_all.remove(alphaidx[0])
-            betaidx_all.remove(betaidx[0])
-            gammaidx_all.remove(gammaidx[0])
-            if "delta" in parameter_names:
-                deltaidx_all.remove(deltaidx[0])            
-            sigmaeidx_all.remove(sigmaeidx[0])
+        else:    
+            theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
+                                                                            args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)          
+            # for xr in xidx:
+            #     xidx_all.remove(xr)                
+            # for zr in zidx:
+            #     zidx_all.remove(zr)                
+            # if "Phi" in parameter_names:
+            #     for phir in phiidx:
+            #         phiidx_all.remove(phir)
+            # alphaidx_all.remove(alphaidx[0])
+            # betaidx_all.remove(betaidx[0])
+            # gammaidx_all.remove(gammaidx[0])
+            # if "delta" in parameter_names:
+            #     deltaidx_all.remove(deltaidx[0])            
+            # sigmaeidx_all.remove(sigmaeidx[0])
             retry += 1
 
     if result.success and result["variance_status"]:
@@ -388,12 +423,16 @@ class ProcessManagerSynthetic(ProcessManager):
             self.execution_counter.value += 1
             self.shared_dict[current_pid] = self.execution_counter.value
         
-        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, niter, \
-                                                                            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e = args
-
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method,\
+            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z,\
+                constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z,\
+                    prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
+                        prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
+                            prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
+        
         # load data  
         batchsize = 256
-        with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f: ############
+        with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f: ############
             Y = pickle.load(f)
 
         from_row = int(subdataset_name.split("_")[1])
@@ -401,8 +440,41 @@ class ProcessManagerSynthetic(ProcessManager):
         # since each batch has N rows
         N = Y.shape[0]
         Y = Y.astype(np.int8).reshape((N, J), order="F")         
-                
-        gridpoints_num = 200
+        
+        theta_samples_list = None 
+        base2exponent = 10
+        idx_all = None
+        parameter_space_dim_theta = (N+J)*d + J + N + 2
+        param_positions_dict_theta = dict()            
+        k = 0
+        for param in parameter_names:
+            if param == "X":
+                param_positions_dict[param] = (k, k + N*d)                       
+                k += N*d    
+            elif param in ["Z"]:
+                param_positions_dict[param] = (k, k + J*d)                                
+                k += J*d
+            elif param in ["Phi"]:            
+                param_positions_dict[param] = (k, k + J*d)                                
+                k += J*d
+            elif param == "beta":
+                param_positions_dict[param] = (k, k + N)                                   
+                k += K    
+            elif param == "alpha":
+                param_positions_dict[param] = (k, k + J)                                       
+                k += J    
+            elif param == "gamma":
+                param_positions_dict[param] = (k, k + 1)                                
+                k += 1
+            elif param == "delta":
+                param_positions_dict[param] = (k, k + 1)                                
+                k += 1
+            elif param == "sigma_e":
+                param_positions_dict[param] = (k, k + 1)                                
+                k += 1    
+        theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim_theta, base2exponent, param_positions_dict_theta, 
+                                                                            args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)  
+        """gridpoints_num = 200
         # args = (None, None, None, None, None, J, N, d, dst_func, None, None, 
         #     parameter_space_dim, None, None, None, None, None, None, None, 
         #     np.zeros((d,)), np.eye(d), np.zeros((d,)), np.eye(d), None, None, 0, 1, 0, 1, 0, 1, None, None, 0, 1, gridpoints_num, None, None, min_sigma_e, None)
@@ -440,14 +512,14 @@ class ProcessManagerSynthetic(ProcessManager):
         gammaidx_all = np.arange(0, len(gamma_list), 1).tolist()
         # if "delta" in parameter_names:
         #     deltaidx_all = np.arange(0, len(delta_list), 1).tolist()            
-        sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()     
+        sigmaeidx_all = np.arange(0, len(sigma_e_list), 1).tolist()     """
 
         retry = 0
         t0 = time.time()
         while retry < retries:   
             print("Retry: {}".format(retry))
 
-            xidx = np.random.choice(xidx_all, size=N, replace=False)
+            """xidx = np.random.choice(xidx_all, size=N, replace=False)
             Xrem = [X_list[ii] for ii in xidx]
             X = np.asarray(Xrem).reshape((d, N), order="F")
             zidx = np.random.choice(zidx_all, size=J, replace=False)
@@ -477,7 +549,9 @@ class ProcessManagerSynthetic(ProcessManager):
             sigmaeidx = np.random.choice(sigmaeidx_all, size=1, replace=False)
             sigma_e = sigma_e_list[sigmaeidx[0]]
             
-            x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, sigma_e)
+            x0, param_positions_dict = params2optimisation_dict(J, N, d, parameter_names, X, Z, Phi, alpha, beta, gamma, delta, sigma_e)"""
+            
+            x0 = theta_curr.copy()
             # print(x0)
             nloglik = lambda x: negative_loglik(x, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
             if parallel:
@@ -493,20 +567,22 @@ class ProcessManagerSynthetic(ProcessManager):
                                                     param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e, args=args)          
             if result.success and result["variance_status"]:
                 break
-            else:                     
-                for xr in xidx:
-                    xidx_all.remove(xr)                
-                for zr in zidx:
-                    zidx_all.remove(zr)                
-                if "Phi" in parameter_names:
-                    for phir in phiidx:
-                        phiidx_all.remove(phir)
-                alphaidx_all.remove(alphaidx[0])
-                betaidx_all.remove(betaidx[0])
-                gammaidx_all.remove(gammaidx[0])
-                if "delta" in parameter_names:
-                    deltaidx_all.remove(deltaidx[0])                
-                sigmaeidx_all.remove(sigmaeidx[0])    
+            else:
+                theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
+                                                                            args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)                      
+                # for xr in xidx:
+                #     xidx_all.remove(xr)                
+                # for zr in zidx:
+                #     zidx_all.remove(zr)                
+                # if "Phi" in parameter_names:
+                #     for phir in phiidx:
+                #         phiidx_all.remove(phir)
+                # alphaidx_all.remove(alphaidx[0])
+                # betaidx_all.remove(betaidx[0])
+                # gammaidx_all.remove(gammaidx[0])
+                # if "delta" in parameter_names:
+                #     deltaidx_all.remove(deltaidx[0])                
+                # sigmaeidx_all.remove(sigmaeidx[0])    
                 retry += 1
         
         if result.success and result["variance_status"]:
@@ -599,7 +675,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
         prior_loc_z=None, prior_scale_z=None, prior_loc_phi=None, prior_scale_phi=None,
         prior_loc_beta=None, prior_scale_beta=None, prior_loc_alpha=None, prior_scale_alpha=None,
         prior_loc_gamma=None, prior_scale_gamma=None, prior_loc_delta=None, prior_scale_delta=None, 
-        prior_loc_sigmae=None, prior_scale_sigmae=None):
+        prior_loc_sigmae=None, prior_scale_sigmae=None, param_positions_dict=None, rng=None):
 
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
@@ -611,18 +687,19 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                 for m in range(trialsmin, trialsmax, 1):
 
                     batchsize = 256
-                    path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
+                    path = pathlib.Path("{}/{}/".format(data_location, m))  #########
 
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
                     for dataset_index in range(len(subdatasets_names)):                    
                         subdataset_name = subdatasets_names[dataset_index]  
 
-                        DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
+                        DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name) #########
 
                         from_row = int(subdataset_name.split("_")[1])
                         to_row = int(subdataset_name.split("_")[2])
                         # if all have completed, following never exits the while loop
-                        estimationfiles = [file.name for file in pathlib.Path(DIR_out).iterdir() if file.is_file() and ".png" in file.name]
+                        if pathlib.Path(DIR_out).is_dir():
+                            estimationfiles = [file.name for file in pathlib.Path(DIR_out).iterdir() if file.is_file() and ".png" in file.name]
                         if pathlib.Path(DIR_out).is_dir() and \
                             pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists() and\
                                 len(estimationfiles) > 0:      
@@ -631,7 +708,11 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                             print(DIR_out)
                             pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True) 
                             args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
-                                    parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e)    
+                                    parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, 
+                                    constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z, 
+                                    prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, 
+                                    prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, 
+                                    prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng)    
                                                 
                             #####  parallelisation with Parallel Manager #####
                             manager.cleanup_finished_processes()
@@ -651,18 +732,18 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
         else:
             for m in range(trialsmin, trialsmax, 1):
                 batchsize = 256
-                path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
+                path = pathlib.Path("{}/{}/".format(data_location, m))  #########
 
                 subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                 for dataset_index in range(len(subdatasets_names)):               
                     subdataset_name = subdatasets_names[dataset_index]            
 
-                    DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
+                    DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name) #########
 
                     from_row = int(subdataset_name.split("_")[1])
                     to_row = int(subdataset_name.split("_")[2])
-
-                    estimationfiles = [file.name for file in pathlib.Path(DIR_out).iterdir() if file.is_file() and ".png" in file.name]
+                    if pathlib.Path(DIR_out).is_dir():
+                        estimationfiles = [file.name for file in pathlib.Path(DIR_out).iterdir() if file.is_file() and ".png" in file.name]
                     if pathlib.Path(DIR_out).is_dir() and \
                             pathlib.Path("{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)).exists() and\
                                 len(estimationfiles) > 0:      
@@ -673,7 +754,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                                 parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
                                 prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,
-                                prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae)
+                                prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng)
                         estimate_mle(args)                  
 
     except KeyboardInterrupt:
@@ -697,7 +778,8 @@ if __name__ == "__main__":
     seed_value = 9125
     random.seed(seed_value)
     np.random.seed(seed_value)
-    
+    rng = np.random.default_rng()
+
     args = parse_input_arguments()
     
     if args.trials is None or args.K is None or args.J is None or args.sigmae is None:
@@ -762,7 +844,7 @@ if __name__ == "__main__":
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
     data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
-    # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
+    # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]
@@ -777,19 +859,7 @@ if __name__ == "__main__":
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
     # for distributing per N rows
     N = math.ceil(parameter_space_dim/J)
-    print("Observed data points per data split: {}".format(N*J))        
-    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
-        parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
-        prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
-        prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
-        prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
-        prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
-        prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae)
-
+    print("Observed data points per data split: {}".format(N*J))    
     param_positions_dict = dict()            
     k = 0
     for param in parameter_names:
@@ -816,8 +886,21 @@ if __name__ == "__main__":
             k += 1
         elif param == "sigma_e":
             param_positions_dict[param] = (k, k + 1)                                
-            k += 1
+            k += 1    
+    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+        data_location=data_location, parallel=parallel, 
+        parameter_names=parameter_names, optimisation_method=optimisation_method, 
+        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
+        prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
+        prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
+        prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
+        prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+        prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, rng=rng)
+
+
     data_topdir = data_location
     # collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
-    
+    collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
     

@@ -660,6 +660,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
 
+    rng = np.random.default_rng()
     testparam = None
     testidx = None 
     vector_index = None
@@ -667,7 +668,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     base2exponent = 5
     idx_all = None
     theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
-                                                                args, samples_list=theta_samples_list, idx_all=idx_all)
+                                                                args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
     
     gamma = 0.1
     l = 0
@@ -682,7 +683,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     N = len(all_gammas)
     print("Annealing schedule: {}".format(N))       
 
-    # rng = np.random.default_rng()
     # print_probab_per_coord_iter = 0.25
     # print_probab_per_full_scan_iter = 0.6
 
@@ -840,14 +840,14 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 # random restart, only for unconverged coordinates
                 uncovergedpart = np.argwhere(delta_theta > tol)
                 theta_curr_full_upd, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
-                                                                                args, samples_list=theta_samples_list, idx_all=idx_all)
+                                                                                args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
                 theta_curr[uncovergedpart] = theta_curr_full_upd[uncovergedpart].copy()                      
                 gamma = 0.1
                 plot_restarts.append((l, total_iter, halved, "partialrestart"))
             else:                                                                        
                 # random restart, completely from scratch
                 theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
-                                                                                args, samples_list=theta_samples_list, idx_all=idx_all)                     
+                                                                                args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)                     
                 gamma = 0.1
                 theta_prev = np.zeros((parameter_space_dim,))  
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
@@ -887,16 +887,16 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:                    
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_fulltestlatest/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing_perturb/".format(data_location, m)
                 else:
-                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise_fulltestlatest/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
             else:
                 if evaluate_posterior:
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_fulltestlatest/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_test_new_thetacurrgen/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_annealing/".format(data_location, m)
@@ -1013,7 +1013,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 50
+    gridpoints_num = 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -1027,7 +1027,7 @@ if __name__ == "__main__":
     prior_loc_gamma = 0
     prior_scale_gamma = 1    
     prior_loc_delta = 0
-    prior_scale_delta= 1        
+    prior_scale_delta = 1        
     # a
     prior_loc_sigmae = 3
     # b
@@ -1047,8 +1047,8 @@ if __name__ == "__main__":
     tol = 1e-6    
     #/home/ioannischalkiadakis/ideal
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_polarisedregime/data_K{}_J{}_sigmae{}_4poles/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30                 
     # full, with status quo
     # parameter_space_dim = (K+2*J)*d + J + K + 3
