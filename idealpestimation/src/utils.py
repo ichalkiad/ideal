@@ -775,6 +775,30 @@ def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
               
     return ret
 
+def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=False):
+    
+    if use_jax:
+        return log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=True)
+
+    if log_cdfx.ndim == 0 or (log_cdfx.size == 1):
+        if log_cdfx < -0.693:
+            return np.log1p(-np.exp(log_cdfx))
+        else:
+            return norm.logcdf(-x, loc=mean, scale=variance)
+    
+    ret = np.zeros_like(log_cdfx, dtype=float)
+    case1_mask = log_cdfx < -0.693
+    case2_mask = ~case1_mask    
+    # Case 1: CDF(x) < 0.5
+    if np.any(case1_mask):
+        ret[case1_mask] = np.log1p(-np.exp(log_cdfx[case1_mask]))    
+    # Case 2: CDF(x) >= 0.5
+    if np.any(case2_mask):
+        adjusted_x = -x[case2_mask]
+        ret[case2_mask] = norm.logcdf(adjusted_x, loc=mean, scale=variance)
+    
+    return ret
+
 
 def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
     """
@@ -812,7 +836,7 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
             retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
             return np.array(retvallist)
  
-@numba.jit(nopython=True, parallel=True)
+@numba.jit(nopython=True, parallel=True, cache=True)
 def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
     
     phi = np.zeros((K, Z.shape[1]), dtype=np.float64)
@@ -822,7 +846,7 @@ def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
                  
     return phi
 
-@numba.jit(nopython=True)
+@numba.jit(nopython=True, cache=True)
 def p_i_arg_numbafast(xi, Z, alpha, betai, gamma):
     
     x_broadcast = xi[:, np.newaxis]    
@@ -1115,86 +1139,6 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
 
 
 
-# def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, args, samples_list=None, idx_all=None):
-
-#     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
-#         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-#         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-#         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
-#         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
-
-#     if samples_list is None and parameter_space_dim <= 21201:
-#         sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
-#         samples_list = list(sampler.random_base2(m=base2exponent))       
-#     elif samples_list is None:
-#         if d > 2:
-#             raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
-#         sampler_alpha_sigma = qmc.Sobol(d=J+2, scramble=False)   
-#         samples_list_alpha_sigma = sampler_alpha_sigma.random_base2(m=base2exponent)
-#         samples_list = np.zeros((2**base2exponent, parameter_space_dim))
-#         param = "alpha"
-#         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = samples_list_alpha_sigma[:, :J]
-#         param = "gamma"
-#         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
-#                             samples_list_alpha_sigma[:, J].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
-#         param = "sigma_e"
-#         samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
-#                             samples_list_alpha_sigma[:, J+1].reshape(samples_list[:, param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
-#         x = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))
-#         y = np.linspace(0, 1, math.ceil(np.sqrt((K+J)*d+K)))    
-#         grid_points = list(product(x, y))
-#         idxgrid = np.arange(0, len(grid_points), 1)
-#         for itmrp in range(2**base2exponent):
-#             samples_list[itmrp, :(K+J)*d] = np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=(K+J), 
-#                                                                             replace=True).tolist()]).reshape(samples_list[itmrp, :(K+J)*d].shape)
-#             param = "beta"
-#             samples_list[itmrp, param_positions_dict[param][0]:param_positions_dict[param][1]] = \
-#                 np.asarray([grid_points[igp] for igp in np.random.choice(idxgrid, size=int(K/2), replace=True).tolist()]).reshape(samples_list[itmrp, 
-#                                                                                             param_positions_dict[param][0]:param_positions_dict[param][1]].shape)
-#         samples_list = list(samples_list)
-        
-
-#     idx_all = np.arange(0, len(samples_list), 1).tolist()
-#     idx = np.random.choice(idx_all, size=1, replace=False)[0]
-#     theta_curr = np.asarray(samples_list[idx]).reshape((1, parameter_space_dim))
-#     idx_all.remove(idx)   
-
-#     lbounds = np.zeros((parameter_space_dim,))
-#     ubounds = np.ones((parameter_space_dim,))
-#     for param in parameter_names:
-#         if param == "X":
-#             # assume homogeneous variance
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_x[0, 0])+prior_loc_x[0]
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_x[0, 0])+prior_loc_x[0]
-#         elif param == "Z":
-#             # assume homogeneous variance
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_z[0, 0])+prior_loc_z[0]
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_z[0, 0])+prior_loc_z[0]
-#         elif param == "Phi":
-#             # assume homogeneous variance
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_phi[0, 0])+prior_loc_phi[0]
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_phi[0, 0])+prior_loc_phi[0]
-#         elif param == "alpha":
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_alpha)+prior_loc_alpha
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_alpha)+prior_loc_alpha
-#         elif param == "beta":
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_beta)+prior_loc_beta
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_beta)+prior_loc_beta
-#         elif param == "gamma":
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_gamma)+prior_loc_gamma
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_gamma)+prior_loc_gamma
-#         elif param == "delta":
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = -5*np.sqrt(prior_scale_delta)+prior_loc_delta
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_delta)+prior_loc_delta        
-#         elif param == "sigma_e":
-#             lbounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = min_sigma_e
-#             ubounds[param_positions_dict[param][0]:param_positions_dict[param][1]] = 5*np.sqrt(prior_scale_sigmae) #+prior_loc_gamma
-    
-#     theta_curr = qmc.scale(theta_curr, lbounds, ubounds).reshape((parameter_space_dim,))
-
-#     return theta_curr, samples_list, idx_all
-
-
 def update_annealing_temperature(gamma_prev, total_iter, temperature_rate, temperature_steps, all_gammas=None):
 
     delta_n = None
@@ -1260,9 +1204,13 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
     # error = np.linalg.norm(param_true - (param_hat @ R + t), 'fro')
     # error = np.sum((param_true - (param_hat @ R + t))**2)/(param_true.shape[0]*param_true.shape[1])
     # relative error
-    error = np.sum(((param_true - (param_hat @ R + t))/param_true)**2)/(param_true.shape[0]*param_true.shape[1])
+    reconstructed = param_hat @ R + t
+    rec = reconstructed.reshape((param_true.shape[0]*param_true.shape[1],), order="F")
+    true_reshaped = param_true.reshape((param_true.shape[0]*param_true.shape[1],), order="F")
+    error = np.sum(((true_reshaped - rec)/true_reshaped)**2)/len(rec)
     # non-rotated/non-translated relative error
-    error_nonRT = np.sum(((param_true - param_hat)/param_true)**2)/(param_true.shape[0]*param_true.shape[1])
+    hat_reshaped = param_hat.reshape((param_hat.shape[0]*param_hat.shape[1],), order="F")
+    error_nonRT = np.sum(((true_reshaped - hat_reshaped)/true_reshaped)**2)/len(rec)
     
     orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
     det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
@@ -1565,7 +1513,7 @@ def get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matr
 
 def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None):
 
-    grid_width_std = 5    
+    grid_width_std = 2 #5    
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
@@ -2238,8 +2186,12 @@ def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, d
     else:
         pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict) 
     
-    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)   
+    if debug:
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+        assert np.allclose(log1mcdfs, log1mcdfsbase)       
+    
     logpx_i = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(xi, mean=prior_loc_x, cov=prior_scale_x))
     if debug:
         assert(np.allclose(logpx_i, _logpx_i))
@@ -2275,7 +2227,11 @@ def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_name
         pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)      
     
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)   
+    if debug:
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+        assert np.allclose(log1mcdfs, log1mcdfsbase)       
+
     logpx_il = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(x_il, mean=prior_loc_x, cov=prior_scale_x))
     if debug:
         assert(np.allclose(logpx_il, _logpx_il))
@@ -2365,7 +2321,11 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
         pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)  
     
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    if debug:
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+        assert np.allclose(log1mcdfs, log1mcdfsbase)
+
     logpz_i = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z))
     if debug:
         assert(np.allclose(logpz_i, _logpz_i))
@@ -2408,7 +2368,11 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
         pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)     
     
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)   
+    if debug:
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+        assert np.allclose(log1mcdfs, log1mcdfsbase)       
+    
     logpz_il = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(z_il, mean=prior_loc_z, cov=prior_scale_z))
     if debug:
         assert(np.allclose(logpz_il, _logpz_il))
@@ -2452,8 +2416,12 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
     else:
         pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)      
     
-    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)   
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e) 
+    if debug:     
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)
+        assert np.allclose(log1mcdfs, log1mcdfsbase)
+
     logpalpha_j = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
     if debug:
         assert(np.allclose(logpalpha_j, _logpalpha_j))
@@ -2489,7 +2457,11 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
         pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
         
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)   
+    if debug:
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+        assert np.allclose(log1mcdfs, log1mcdfsbase)
+
     logpbeta_k = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta))
     if debug:
         assert(np.allclose(logpbeta_k, _logpbeta_k))
@@ -2525,7 +2497,11 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
         pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
         
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+    if debug:
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+        assert np.allclose(log1mcdfs, log1mcdfsbase)
+
     logpgamma = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma))
     if debug:
         assert(np.allclose(logpgamma, _logpgamma))
@@ -2585,7 +2561,11 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
         pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)    
     
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
-    log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)
+    if debug:
+        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+        assert np.allclose(log1mcdfs, log1mcdfsbase)
+
     logpsigma_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + tig.logpdf(sigma_e))   
     if debug:
         assert(np.allclose(logpsigma_e, _logpsigma_e)) 
