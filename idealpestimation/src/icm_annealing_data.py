@@ -24,7 +24,7 @@ class ProcessManagerSyntheticDataAnnealing(ProcessManager):
             self.shared_dict[current_pid] = self.execution_counter.value
         
         t0 = time.time()
-        s, Y_annealed, temperature_rate, temperature_steps, percentage_parameter_change,\
+        k_prev, s, Y_annealed, temperature_rate, temperature_steps, percentage_parameter_change,\
             fastrun, True, y_rows, theta_part_annealing, theta, elapsedtime, param_positions_dict,\
                 DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
                     parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
@@ -43,8 +43,8 @@ class ProcessManagerSyntheticDataAnnealing(ProcessManager):
         theta = icm_posterior_power_annealing(Y_annealed, param_positions_dict, icm_args,
                                     temperature_rate=temperature_rate, temperature_steps=temperature_steps, 
                                     percentage_parameter_change=percentage_parameter_change, 
-                                    fastrun=fastrun, data_annealing=True, annealing_rows=y_rows, 
-                                    theta_part_annealing=theta_part_annealing)
+                                    fastrun=fastrun, data_annealing=False, annealing_rows=None, 
+                                    theta_part_annealing=None)
         elapsedtime = str(timedelta(seconds=time.time()-t0))   
         # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration
         theta_part_annealing = rank_and_plot_solutions(theta, elapsedtime, Y_annealed, J, y_rows, d, parameter_names, 
@@ -151,13 +151,14 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                 try:   
                     manager.create_results_dict(optim_target="all")  
                     t0 = time.time()
+                    k_prev = 0
                     while True:       
                         for s in range(temperature_rate[0], temperature_rate[1], temperature_steps[0]):
                             y_rows = int(round(s*K))
-                            Y_annealed = Y[0:y_rows, :]       
+                            Y_annealed = Y[k_prev:y_rows, :]       
 
-                            worker_args = (s, Y_annealed, temperature_rate, temperature_steps, percentage_parameter_change, 
-                                        fastrun, True, y_rows, theta_part_annealing, theta, elapsedtime, param_positions_dict, 
+                            worker_args = (k_prev, s, Y_annealed, temperature_rate, temperature_steps, percentage_parameter_change, 
+                                        fastrun, True, y_rows-k_prev, theta_part_annealing, theta, elapsedtime, param_positions_dict, 
                                         DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                                         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
                                         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
@@ -172,7 +173,8 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                 manager.cleanup_finished_processes()
                                 current_count = manager.current_process_count()                                                                                                                                                   
                             if current_count < total_running_processes:
-                                manager.spawn_process(args=(worker_args,))                                                  
+                                manager.spawn_process(args=(worker_args,))      
+                            k_prev += y_rows                                            
                             # Wait before next iteration
                             time.sleep(1)  
                             ################################################## 
