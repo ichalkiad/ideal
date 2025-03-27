@@ -20,7 +20,8 @@ from idealpestimation.src.utils import sample_theta_curr_init, \
                                                             plot_posteriors_during_estimation, \
                                                                 get_parameter_name_and_vector_coordinate,\
                                                                     get_posterior_for_optimisation_vec,\
-                                                                        rank_and_plot_solutions, get_evaluation_grid, check_convergence
+                                                                        rank_and_plot_solutions, get_evaluation_grid, check_convergence,\
+                                                                            data_annealing_init_theta_given_theta_prev
 
 
 
@@ -652,7 +653,8 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
 
 
 def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rate=None, temperature_steps=None, 
-                                plot_online=True, percentage_parameter_change=1, fastrun=False):
+                                plot_online=True, percentage_parameter_change=1, fastrun=False, 
+                                data_annealing=False, annealing_rows=None, theta_part_annealing=None):
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -670,18 +672,27 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
                                                                 args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
     
+    
     gamma = 0.1
     l = 0
     i = 0    
     theta_prev = np.zeros((parameter_space_dim,))
 
-    all_gammas = []
-    for gidx in range(len(temperature_steps[1:])):
-        upperlim = temperature_steps[1+gidx]        
-        start = gamma if gidx==0 else all_gammas[-1]        
-        all_gammas.extend(np.arange(start, upperlim, temperature_rate[gidx]))            
-    N = len(all_gammas)
-    print("Annealing schedule: {}".format(N))       
+    if data_annealing:
+        gamma = 1
+        all_gammas = np.ones((10,))
+        if theta_part_annealing is not None:
+            theta_curr = data_annealing_init_theta_given_theta_prev(theta_curr.copy(), theta_part_annealing, 
+                                                            K, J, d, param_positions_dict, 
+                                                            parameter_names, annealing_rows)
+    else:
+        all_gammas = []
+        for gidx in range(len(temperature_steps[1:])):
+            upperlim = temperature_steps[1+gidx]        
+            start = gamma if gidx==0 else all_gammas[-1]        
+            all_gammas.extend(np.arange(start, upperlim, temperature_rate[gidx]))            
+        N = len(all_gammas)
+        print("Annealing schedule: {}".format(N))       
 
     # print_probab_per_coord_iter = 0.25
     # print_probab_per_full_scan_iter = 0.6
@@ -842,14 +853,20 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 uncovergedpart = np.argwhere(delta_theta > tol)
                 theta_curr_full_upd, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
                                                                                 args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
-                theta_curr[uncovergedpart] = theta_curr_full_upd[uncovergedpart].copy()                      
-                gamma = 0.1
+                theta_curr[uncovergedpart] = theta_curr_full_upd[uncovergedpart].copy()    
+                if data_annealing:
+                    gamma = 1
+                else:                  
+                    gamma = 0.1
                 plot_restarts.append((l, total_iter, halved, "partialrestart"))
             else:                                                                        
                 # random restart, completely from scratch
                 theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict,
                                                                                 args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)                     
-                gamma = 0.1
+                if data_annealing:
+                    gamma = 1
+                else: 
+                    gamma = 0.1
                 theta_prev = np.zeros((parameter_space_dim,))  
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
         else:

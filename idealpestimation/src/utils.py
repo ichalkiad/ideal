@@ -998,6 +998,7 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
 
 def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args):
 
+    best_theta = None
     computed_loglik = []
     for theta_set in estimated_thetas:
         theta = theta_set[0]
@@ -1008,6 +1009,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
     sorted_idx_lst = sorted_idx.tolist()    
     for i in sorted_idx_lst:
         theta = estimated_thetas[i][0]
+        best_theta = theta.copy()
         mse_x_RT = estimated_thetas[i][1]
         mse_z_RT = estimated_thetas[i][2]
         mse_x_nonRT = estimated_thetas[i][3]
@@ -1065,6 +1067,8 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
                                     xaxis_title="PC1", yaxis_title="PC2", title="", 
                                     showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
         # fig.show()
+    
+    return best_theta
  
 
 def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, args, samples_list=None, idx_all=None, rng=None):
@@ -1137,6 +1141,28 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
 
     return theta_curr, samples_list, idx_all
 
+
+def data_annealing_init_theta_given_theta_prev(theta_curr, theta_prev, K, J, d, param_positions_dict, parameter_names, annealing_rows):
+
+    for param in parameter_names:
+        if param == "X":
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + d*annealing_rows] = theta_prev[0:d*annealing_rows].copy()
+        elif param in ["Z"]:
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows:d*annealing_rows+d*J].copy()
+        elif param in ["Phi"]:            
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J:d*annealing_rows+2*d*J].copy()
+        elif param == "beta":
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + annealing_rows] = theta_prev[d*annealing_rows+2*d*J:d*annealing_rows+2*d*J+annealing_rows].copy()
+        elif param == "alpha":
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows:d*annealing_rows+2*d*J+annealing_rows+J].copy()
+        elif param == "gamma":
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J:d*annealing_rows+2*d*J+annealing_rows+J+1].copy()
+        elif param == "delta":
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J+1:d*annealing_rows+2*d*J+annealing_rows+J+2].copy()
+        elif param == "sigma_e":
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J+2:d*annealing_rows+2*d*J+annealing_rows+J+3].copy()
+
+    return theta_curr
 
 
 def update_annealing_temperature(gamma_prev, total_iter, temperature_rate, temperature_steps, all_gammas=None):
