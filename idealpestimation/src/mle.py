@@ -75,7 +75,8 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
             if diag_hessian_only:   
                 if parallel:
                     variance = np.diag(estimation_result.hess_inv * np.eye(len(params)))
-                else:             
+                else:    
+                    ipdb.set_trace()         
                     params_jax = jnp.asarray(params)                  
                     hess_jax = get_hessian_diag_jax(nloglik_jax, params_jax)                                     
                     variance = -1/np.asarray(hess_jax)            
@@ -126,9 +127,9 @@ def maximum_likelihood_estimator(
     # Perform maximum likelihood estimation        
     bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=None)  #######################    
     if niter is not None:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":2000000})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":1000000}) #2000000
     else:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":2000000})
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":1000000}) #2000000
     
     mle = result.x          
 
@@ -173,8 +174,8 @@ def estimate_mle(args):
         prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
 
     # load data    
-    batchsize = 256
-    with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f: ############
+    batchsize = 304
+    with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f: ############
         Y = pickle.load(f)
 
 
@@ -301,7 +302,7 @@ def estimate_mle(args):
         mle, result = maximum_likelihood_estimator(nloglik, initial_guess=x0, 
                                                 variance_method='jacobian', disp=True, 
                                                 optimization_method=optimisation_method, 
-                                                data=Y, full_hessian=True, diag_hessian_only=False, plot_hessian=True,   
+                                                data=Y, full_hessian=False, diag_hessian_only=True, plot_hessian=False,   
                                                 loglikelihood_per_data_point=None, niter=niter, negloglik_jax=nloglik_jax, 
                                                 output_dir=DIR_out, subdataset_name=subdataset_name, 
                                                 param_positions_dict=param_positions_dict, parallel=parallel, min_sigma_e=min_sigma_e, args=args)          
@@ -431,8 +432,8 @@ class ProcessManagerSynthetic(ProcessManager):
                             prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
         
         # load data  
-        batchsize = 256
-        with open("{}/{}/{}/{}.pickle".format(data_location, m, subdataset_name, subdataset_name), "rb") as f: ############
+        batchsize = 304
+        with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f: ############
             Y = pickle.load(f)
 
         from_row = int(subdataset_name.split("_")[1])
@@ -686,14 +687,14 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             while True:
                 for m in range(trialsmin, trialsmax, 1):
 
-                    batchsize = 256
-                    path = pathlib.Path("{}/{}/".format(data_location, m))  #########
+                    batchsize = 304
+                    path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
 
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
                     for dataset_index in range(len(subdatasets_names)):                    
                         subdataset_name = subdatasets_names[dataset_index]  
 
-                        DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name) #########
+                        DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
 
                         from_row = int(subdataset_name.split("_")[1])
                         to_row = int(subdataset_name.split("_")[2])
@@ -731,14 +732,14 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     break       
         else:
             for m in range(trialsmin, trialsmax, 1):
-                batchsize = 256
-                path = pathlib.Path("{}/{}/".format(data_location, m))  #########
+                batchsize = 304
+                path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
 
                 subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                 for dataset_index in range(len(subdatasets_names)):               
                     subdataset_name = subdatasets_names[dataset_index]            
 
-                    DIR_out = "{}/{}/{}/estimation/".format(DIR_top, m, subdataset_name) #########
+                    DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
 
                     from_row = int(subdataset_name.split("_")[1])
                     to_row = int(subdataset_name.split("_")[2])
@@ -843,7 +844,7 @@ if __name__ == "__main__":
     prior_scale_delta= 1        
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
@@ -900,7 +901,7 @@ if __name__ == "__main__":
         prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, rng=rng)
 
 
-    data_topdir = data_location
+    # data_topdir = data_location
     # collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
-    collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
+    # collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
     
