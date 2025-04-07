@@ -67,8 +67,8 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
     
-    min_logcdf_val = norm.cdf(loc - threshold_std_no*scale, loc, scale)
-    max_logcdf_val = norm.cdf(loc + threshold_std_no*scale, loc, scale)
+    min_logcdf_val = norm.logcdf(loc - threshold_std_no*scale, loc, scale)
+    max_logcdf_val = norm.logcdf(loc + threshold_std_no*scale, loc, scale)
 
     if isinstance(x, np.ndarray):
         res = np.zeros(x.shape)
@@ -82,9 +82,9 @@ def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
     if len(gtval) > 0:
         res[gtval] = max_logcdf_val
     if len(inval) > 0:
-        res[inval] = norm.cdf(x[inval], loc, scale)
+        res[inval] = norm.logcdf(x[inval], loc, scale)
     
-    return res, ltval, gtval, inval
+    return res, inval
 
 
 def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
@@ -136,18 +136,22 @@ def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
     pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
     
     t0 = time.time()
-    logcdfs = norm.cdf(pijs, loc=0, scale=sigma_e)   
-    print(str(timedelta(seconds=time.time()-t0)))
-    t0 = time.time()
-    logcdfs_fast, ltval, gtval, inval = norm_logcdf_thresholdapprox(pijs, 0, sigma_e, threshold_std_no=4)   #### CHANGE TO LOG!
+    logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e)  
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e)
     print(str(timedelta(seconds=time.time()-t0)))
     
-    print((logcdfs-logcdfs_fast))
-    print((logcdfs-logcdfs_fast)**2)
-    print(((logcdfs-logcdfs_fast)**2).sum()/(K*J))
-
-    ipdb.set_trace()
-    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e)
+    t0 = time.time()
+    logcdfs_fast, inval = norm_logcdf_thresholdapprox(pijs, 0, sigma_e, threshold_std_no=6)
+    log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=True, threshold_std_no=6)
+    print(str(timedelta(seconds=time.time()-t0)))
+    
+    print(np.allclose(logcdfs[inval], logcdfs_fast[inval]))
+    print(np.allclose(log1mcdfs[inval], log1mcdfs_fast[inval]))
+    print(logcdfs[inval])
+    print(logcdfs_fast[inval])
+    # print((logcdfs-logcdfs_fast))
+    # print((logcdfs-logcdfs_fast)**2)
+    # print(((logcdfs-logcdfs_fast)**2).sum()/(K*J))
 
 
 
@@ -863,7 +867,7 @@ def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
  
      return ret
 
-def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=False):
+def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=False, approxfast=False, threshold_std_no=5):
     
     if use_jax:
         return log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=True)
@@ -872,7 +876,12 @@ def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=Fa
         if log_cdfx < -0.693:
             return np.log1p(-np.exp(log_cdfx))
         else:
-            return norm.logcdf(-x, loc=mean, scale=variance)
+            if approxfast:
+                ipdb.set_trace()
+                retval, _ = norm_logcdf_thresholdapprox(-x, loc=mean, scale=variance, threshold_std_no=threshold_std_no)
+                return retval
+            else:
+                return norm.logcdf(-x, loc=mean, scale=variance)
     
     ret = np.zeros_like(log_cdfx, dtype=float)
     case1_mask = log_cdfx < -0.693
@@ -883,7 +892,12 @@ def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=Fa
     # Case 2: CDF(x) >= 0.5
     if np.any(case2_mask):
         adjusted_x = -x[case2_mask]
-        ret[case2_mask] = norm.logcdf(adjusted_x, loc=mean, scale=variance)
+        if approxfast:
+            ipdb.set_trace()
+            retval, _ = norm_logcdf_thresholdapprox(adjusted_x, loc=mean, scale=variance, threshold_std_no=threshold_std_no)
+            ret[case2_mask] = retval
+        else:
+            ret[case2_mask] = norm.logcdf(adjusted_x, loc=mean, scale=variance)
     
     return ret
 
