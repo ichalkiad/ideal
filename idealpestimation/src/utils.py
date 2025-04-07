@@ -63,7 +63,93 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
             pio.write_image(fig, savename.replace(".html", ".pdf"), engine="kaleido")
         if print_png:
             pio.write_image(fig, savename.replace("html", "png"), width=1540, height=871, scale=1)
-            
+
+
+def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
+    
+    min_logcdf_val = norm.cdf(loc - threshold_std_no*scale, loc, scale)
+    max_logcdf_val = norm.cdf(loc + threshold_std_no*scale, loc, scale)
+
+    if isinstance(x, np.ndarray):
+        res = np.zeros(x.shape)
+    
+    ltval = np.nonzero(x <= loc-threshold_std_no*scale)
+    gtval = np.nonzero(x >= loc+threshold_std_no*scale)
+    inval = np.nonzero((x > loc-threshold_std_no*scale) & (x < loc+threshold_std_no*scale))
+
+    if len(ltval) > 0:
+        res[ltval] = min_logcdf_val
+    if len(gtval) > 0:
+        res[gtval] = max_logcdf_val
+    if len(inval) > 0:
+        res[inval] = norm.cdf(x[inval], loc, scale)
+    
+    return res, ltval, gtval, inval
+
+
+def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
+
+    parameter_space_dim = (K+J)*d + J + K + 2
+    theta_true = np.zeros((parameter_space_dim,))
+
+    param_positions_dict = dict()            
+    k = 0
+    for param in parameter_names:
+        if param == "X":
+            param_positions_dict[param] = (k, k + K*d)                       
+            k += K*d    
+        elif param in ["Z"]:
+            param_positions_dict[param] = (k, k + J*d)                                
+            k += J*d
+        elif param in ["Phi"]:            
+            param_positions_dict[param] = (k, k + J*d)                                
+            k += J*d
+        elif param == "beta":
+            param_positions_dict[param] = (k, k + K)                                   
+            k += K    
+        elif param == "alpha":
+            param_positions_dict[param] = (k, k + J)                                       
+            k += J    
+        elif param == "gamma":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+        elif param == "delta":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+        elif param == "sigma_e":
+            param_positions_dict[param] = (k, k + 1)                                
+            k += 1
+
+    with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_location, m), "r") as f:
+        for result in f.iter(type=dict, skip_invalid=True):
+            for param in parameter_names:
+                theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+    
+    params_hat = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
+    gamma = params_hat["gamma"][0]
+    alpha = params_hat["alpha"]
+    beta = params_hat["beta"]
+    sigma_e = params_hat["sigma_e"]
+    
+    pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
+    
+    t0 = time.time()
+    logcdfs = norm.cdf(pijs, loc=0, scale=sigma_e)   
+    print(str(timedelta(seconds=time.time()-t0)))
+    t0 = time.time()
+    logcdfs_fast, ltval, gtval, inval = norm_logcdf_thresholdapprox(pijs, 0, sigma_e, threshold_std_no=4)   #### CHANGE TO LOG!
+    print(str(timedelta(seconds=time.time()-t0)))
+    
+    print((logcdfs-logcdfs_fast))
+    print((logcdfs-logcdfs_fast)**2)
+    print(((logcdfs-logcdfs_fast)**2).sum()/(K*J))
+
+    ipdb.set_trace()
+    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e)
+
+
 
 ####################### MLE #############################
 
@@ -139,13 +225,15 @@ def optimisation_dict2paramvectors(optim_vector, param_positions_dict, J, K, d, 
 
 def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, min_sigma_e=1e-6, args=None):
     
-    if args is not None:
-        DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
-        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
-        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
 
+    if args is not None:
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method,\
+            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z,\
+                constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z,\
+                    prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
+                        prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
+                            prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
+        
         grid_width_std = 5  
         bounds = []
         for param in parameter_names:
@@ -715,65 +803,65 @@ def create_constraint_functions_icm(n, vector_coordinate=None, param=None, param
 
 
 def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
-    """
-    Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
-    """    
-    if use_jax:
-        if len(log_cdfx.shape)==0 or (isinstance(log_cdfx, jnp.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
-            if log_cdfx < -0.693:  #log(0.5)
-                # If CDF(x) < 0.5, direct computation is stable  
-                ret = jnp.log1p(-jnp.exp(log_cdfx))
-            else: 
-                # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
-                ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)       
-        else:
-            ret = jnp.zeros(log_cdfx.shape)    
-            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                idx_case1 = jnp.argwhere(log_cdfx < -0.693)
-                if idx_case1.size > 0:
-                    ret.at[log_cdfx < -0.693].set(jnp.log1p(-jnp.exp(log_cdfx[log_cdfx < -0.693])))                  
-            else:
-                idx_case1 = jnp.argwhere(log_cdfx < -0.693).flatten()       
-                if idx_case1.size > 0:
-                    ret.at[idx_case1].set(jnp.log1p(-np.exp(log_cdfx[idx_case1])))          
-
-            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                idx_case2 = jnp.argwhere(log_cdfx >= -0.693)
-                if idx_case2.size > 0:
-                    ret.at[log_cdfx >= -0.693].set(jax.scipy.stats.norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance))
-            else:
-                idx_case2 = jnp.argwhere(log_cdfx >= -0.693).flatten()    
-                if idx_case2.size > 0:                
-                    ret.at[idx_case2].set(jax.scipy.stats.norm.logcdf(-x[idx_case2], loc=mean, scale=variance))       
-    else:
-        if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
-            if log_cdfx < -0.693:  #log(0.5)
-                # If CDF(x) < 0.5, direct computation is stable  
-                ret = np.log1p(-np.exp(log_cdfx))
-            else: 
-                # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
-                ret = norm.logcdf(-x, loc=mean, scale=variance)       
-        else:                          
-            ret = np.zeros(log_cdfx.shape)                
-            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                idx_case1 = np.argwhere(log_cdfx < -0.693)
-                if idx_case1.size > 0:
-                    ret[log_cdfx < -0.693] = np.log1p(-np.exp(log_cdfx[log_cdfx < -0.693]))                     
-            else:
-                idx_case1 = np.argwhere(log_cdfx < -0.693).flatten()       
-                if idx_case1.size > 0:
-                    ret[idx_case1] = np.log1p(-np.exp(log_cdfx[idx_case1]))             
-
-            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                idx_case2 = np.argwhere(log_cdfx >= -0.693)
-                if idx_case2.size > 0:
-                    ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
-            else:
-                idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
-                if idx_case2.size > 0:                
-                    ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)   
-              
-    return ret
+     """
+     Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
+     """    
+     if use_jax:
+         if len(log_cdfx.shape)==0 or (isinstance(log_cdfx, jnp.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
+             if log_cdfx < -0.693:  #log(0.5)
+                 # If CDF(x) < 0.5, direct computation is stable  
+                 ret = jnp.log1p(-jnp.exp(log_cdfx))
+             else: 
+                 # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+                 ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)       
+         else:
+             ret = jnp.zeros(log_cdfx.shape)    
+             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                 idx_case1 = jnp.argwhere(log_cdfx < -0.693)
+                 if idx_case1.size > 0:
+                     ret.at[log_cdfx < -0.693].set(jnp.log1p(-jnp.exp(log_cdfx[log_cdfx < -0.693])))                  
+             else:
+                 idx_case1 = jnp.argwhere(log_cdfx < -0.693).flatten()       
+                 if idx_case1.size > 0:
+                     ret.at[idx_case1].set(jnp.log1p(-np.exp(log_cdfx[idx_case1])))          
+ 
+             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                 idx_case2 = jnp.argwhere(log_cdfx >= -0.693)
+                 if idx_case2.size > 0:
+                     ret.at[log_cdfx >= -0.693].set(jax.scipy.stats.norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance))
+             else:
+                 idx_case2 = jnp.argwhere(log_cdfx >= -0.693).flatten()    
+                 if idx_case2.size > 0:                
+                     ret.at[idx_case2].set(jax.scipy.stats.norm.logcdf(-x[idx_case2], loc=mean, scale=variance))       
+     else:
+         if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
+             if log_cdfx < -0.693:  #log(0.5)
+                 # If CDF(x) < 0.5, direct computation is stable  
+                 ret = np.log1p(-np.exp(log_cdfx))
+             else: 
+                 # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+                 ret = norm.logcdf(-x, loc=mean, scale=variance)       
+         else:                          
+             ret = np.zeros(log_cdfx.shape)                
+             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                 idx_case1 = np.argwhere(log_cdfx < -0.693)
+                 if idx_case1.size > 0:
+                     ret[log_cdfx < -0.693] = np.log1p(-np.exp(log_cdfx[log_cdfx < -0.693]))                     
+             else:
+                 idx_case1 = np.argwhere(log_cdfx < -0.693).flatten()       
+                 if idx_case1.size > 0:
+                     ret[idx_case1] = np.log1p(-np.exp(log_cdfx[idx_case1]))             
+ 
+             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                 idx_case2 = np.argwhere(log_cdfx >= -0.693)
+                 if idx_case2.size > 0:
+                     ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
+             else:
+                 idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
+                 if idx_case2.size > 0:                
+                     ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)   
+ 
+     return ret
 
 def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=False):
     
@@ -1053,7 +1141,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
     
     # 2D projection of solutions
     raw_symbols = SymbolValidator().values
-    theta_matrix = np.array(estimated_thetas)
+    theta_matrix = np.array([th[0] for th in estimated_thetas])
     computed_loglik = np.array(computed_loglik)[sorted_idx]
     if theta_matrix.shape[0] > 1:
         theta_matrix = theta_matrix[sorted_idx, :]
@@ -1151,22 +1239,34 @@ def data_annealing_init_theta_given_theta_prev(theta_curr, theta_prev, K, J, d, 
             theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows:d*annealing_rows+d*J].copy()
         elif param in ["Phi"]:            
             theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J:d*annealing_rows+2*d*J].copy()
-        elif param == "beta":
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + annealing_rows] = theta_prev[d*annealing_rows+2*d*J:d*annealing_rows+2*d*J+annealing_rows].copy()
         elif param == "alpha":
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows:d*annealing_rows+2*d*J+annealing_rows+J].copy()
+            if "Phi" in parameter_names:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J:d*annealing_rows+2*d*J+J].copy()
+            else:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J:d*annealing_rows+d*J+J].copy()
+        elif param == "beta":
+            if "Phi" in parameter_names:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + annealing_rows] = theta_prev[d*annealing_rows+2*d*J+J:d*annealing_rows+2*d*J+annealing_rows].copy()
+            else:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + annealing_rows] = theta_prev[d*annealing_rows+d*J+J:d*annealing_rows+d*J+J+annealing_rows].copy()
         elif param == "gamma":
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J:d*annealing_rows+2*d*J+annealing_rows+J+1].copy()
+            if "Phi" in parameter_names:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J:d*annealing_rows+2*d*J+annealing_rows+J+1].copy()
+            else:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J+annealing_rows+J:d*annealing_rows+d*J+annealing_rows+J+1].copy()
         elif param == "delta":
             theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J+1:d*annealing_rows+2*d*J+annealing_rows+J+2].copy()
         elif param == "sigma_e":
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J+2:d*annealing_rows+2*d*J+annealing_rows+J+3].copy()
+            if "Phi" in parameter_names:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J+2:d*annealing_rows+2*d*J+annealing_rows+J+3].copy()
+            else:
+                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J+annealing_rows+J+1:d*annealing_rows+d*J+annealing_rows+J+2].copy()
 
     return theta_curr
 
 
 def update_annealing_temperature(gamma_prev, total_iter, temperature_rate, temperature_steps, all_gammas=None):
-
+    
     delta_n = None
     if all_gammas is None:        
         if (gamma_prev >= temperature_steps[0] and gamma_prev <= temperature_steps[1]):
@@ -1276,8 +1376,8 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
     if plot_online and fastrun is False:        
         # compute min achievable mse for X, Z under rotation and scaling
         params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
-        X_true = np.asarray(params_true["X"]).reshape((d, K), order="F")       
-        Z_true = np.asarray(params_true["Z"]).reshape((d, J), order="F")                         
+        X_true = np.asarray(params_true["X"]) # .reshape((d, K), order="F")       
+        Z_true = np.asarray(params_true["Z"]) # .reshape((d, J), order="F")                         
         params_hat = optimisation_dict2params(theta_hat, param_positions_dict, J, K, d, parameter_names)
 
         for param in parameter_names:        
@@ -1317,15 +1417,15 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                             print_pdf=False)
             else:
                 if param == "X":
-                    X_hat = np.asarray(params_hat[param]).reshape((d, K), order="F")       
+                    X_hat = np.asarray(params_hat[param]) #.reshape((d, K), order="F")       
                     X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
                     X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
-                    se = (((X_true_vec - X_hat_vec)/X_true_vec)**2)/len(X_true_vec)                
+                    se = (((X_true_vec - X_hat_vec)/X_true_vec)**2)/(d*K)                
                 elif param == "Z":
-                    Z_hat = np.asarray(params_hat[param]).reshape((d, J), order="F")          
+                    Z_hat = np.asarray(params_hat[param]) #.reshape((d, J), order="F")          
                     Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
                     Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
-                    se = (((Z_true_vec - Z_hat_vec)/Z_true_vec)**2)/len(Z_true_vec) 
+                    se = (((Z_true_vec - Z_hat_vec)/Z_true_vec)**2)/(d*J) 
                 else:
                     se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])
                 
@@ -1539,7 +1639,7 @@ def get_posterior_for_optimisation_vec(param, Y, idx, vector_index_in_param_matr
 
 def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None):
 
-    grid_width_std = 2 #5    
+    grid_width_std = 5    
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
@@ -1975,7 +2075,7 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
                     for j in range(J):   
                         if testparam is not None and testvec != j:         
                             continue
-                        fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}//".format(DIR_out, gamma), param=param, Y=Y, idx=j, vector_coordinate=None, 
+                        fig_posteriors[param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors_annealed_gamma_{}/".format(DIR_out, gamma), param=param, Y=Y, idx=j, vector_coordinate=None, 
                             theta_curr=theta_curr.copy(), gamma=gamma, param_positions_dict=param_positions_dict, args=args, 
                             true_param=theta_true[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], 
                             hat_param=theta_curr[param_positions_dict[param][0]+j*d:param_positions_dict[param][0]+(j+1)*d], iteration=iteration, 
