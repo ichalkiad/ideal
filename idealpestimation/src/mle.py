@@ -77,6 +77,7 @@ def variance_estimation(estimation_result, loglikelihood=None, loglikelihood_per
                     variance = np.diag(estimation_result.hess_inv * np.eye(len(params)))
                 else:    
                     ipdb.set_trace()         
+                    variance = np.diag(estimation_result.hess_inv * np.eye(len(params)))   ################################ REMOVE
                     params_jax = jnp.asarray(params)                  
                     hess_jax = get_hessian_diag_jax(nloglik_jax, params_jax)                                     
                     variance = -1/np.asarray(hess_jax)            
@@ -125,11 +126,11 @@ def maximum_likelihood_estimator(
         # 'hess': '2-point'
     }                   
     # Perform maximum likelihood estimation        
-    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=None)  #######################    
+    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=args)  #######################    currently with box constraints
     if niter is not None:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":1000000}) #2000000
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":4000000}) #2000000
     else:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":1000000}) #2000000
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":4000000}) #2000000
     
     mle = result.x          
 
@@ -172,6 +173,7 @@ def estimate_mle(args):
         prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,\
         prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,\
         prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
+    
 
     # load data    
     batchsize = 304
@@ -430,7 +432,7 @@ class ProcessManagerSynthetic(ProcessManager):
                     prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
-        
+                
         # load data  
         batchsize = 304
         with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f: ############
