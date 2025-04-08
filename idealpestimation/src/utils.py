@@ -67,18 +67,20 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
     
-    min_logcdf_val = norm.logcdf(loc - threshold_std_no*scale, loc, scale)
-    max_logcdf_val = norm.logcdf(loc + threshold_std_no*scale, loc, scale)
+    # min_logcdf_val = norm.logcdf(loc - 100*threshold_std_no*scale, loc, scale)
+    max_logcdf_val = 0 #norm.logcdf(loc + threshold_std_no*scale, loc, scale)
 
     if isinstance(x, np.ndarray):
         res = np.zeros(x.shape)
     
-    ltval = np.nonzero(x <= loc-threshold_std_no*scale)
+    # ltval = np.nonzero(x <= loc-100*threshold_std_no*scale)
     gtval = np.nonzero(x >= loc+threshold_std_no*scale)
-    inval = np.nonzero((x > loc-threshold_std_no*scale) & (x < loc+threshold_std_no*scale))
+    inval = np.nonzero( (x < loc+threshold_std_no*scale)) #(x > loc-threshold_std_no*scale) &
 
-    if len(ltval) > 0:
-        res[ltval] = min_logcdf_val
+    # if len(ltval) > 0:
+    #     # print([i for i in x[ltval]])
+    #     res[ltval] = min_logcdf_val
+    #     # ipdb.set_trace()
     if len(gtval) > 0:
         res[gtval] = max_logcdf_val
     if len(inval) > 0:
@@ -142,7 +144,7 @@ def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
     
     t0 = time.time()
     logcdfs_fast, inval = norm_logcdf_thresholdapprox(pijs, 0, sigma_e, threshold_std_no=6)
-    log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=True, threshold_std_no=6)
+    log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=False, threshold_std_no=6)
     print(str(timedelta(seconds=time.time()-t0)))
     
     print(np.allclose(logcdfs[inval], logcdfs_fast[inval]))
@@ -813,10 +815,10 @@ def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
      if use_jax:
          if len(log_cdfx.shape)==0 or (isinstance(log_cdfx, jnp.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
              if log_cdfx < -0.693:  #log(0.5)
-                 # If CDF(x) < 0.5, direct computation is stable  
+                 # CDF(x) < 0.5, direct computation is stable  
                  ret = jnp.log1p(-jnp.exp(log_cdfx))
              else: 
-                 # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+                 # CDF(x) >= 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
                  ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)       
          else:
              ret = jnp.zeros(log_cdfx.shape)    
@@ -876,12 +878,7 @@ def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=Fa
         if log_cdfx < -0.693:
             return np.log1p(-np.exp(log_cdfx))
         else:
-            if approxfast:
-                ipdb.set_trace()
-                retval, _ = norm_logcdf_thresholdapprox(-x, loc=mean, scale=variance, threshold_std_no=threshold_std_no)
-                return retval
-            else:
-                return norm.logcdf(-x, loc=mean, scale=variance)
+            return norm.logcdf(-x, loc=mean, scale=variance)
     
     ret = np.zeros_like(log_cdfx, dtype=float)
     case1_mask = log_cdfx < -0.693
@@ -892,12 +889,7 @@ def log_complement_from_log_cdf_vec_fast(log_cdfx, x, mean, variance, use_jax=Fa
     # Case 2: CDF(x) >= 0.5
     if np.any(case2_mask):
         adjusted_x = -x[case2_mask]
-        if approxfast:
-            ipdb.set_trace()
-            retval, _ = norm_logcdf_thresholdapprox(adjusted_x, loc=mean, scale=variance, threshold_std_no=threshold_std_no)
-            ret[case2_mask] = retval
-        else:
-            ret[case2_mask] = norm.logcdf(adjusted_x, loc=mean, scale=variance)
+        ret[case2_mask] = norm.logcdf(adjusted_x, loc=mean, scale=variance)
     
     return ret
 
