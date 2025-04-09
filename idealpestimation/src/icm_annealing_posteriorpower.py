@@ -1081,6 +1081,17 @@ if __name__ == "__main__":
     data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30      
 
+    # with open("/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K10000_J100_sigmae0001/0/Utilities.pickle", "rb") as f:
+    #     utilities = pickle.load(f)
+    # ipdb.set_trace()
+    # fig = go.Figure()
+    # sigma_e_true_num = 0.001
+    # fig.add_trace(go.Scatter(y=utilities.reshape((K*J,))/sigma_e_true_num))
+    # fig.add_hline(y=3/sigma_e_true_num)
+    # fig.add_hline(y=-3/sigma_e_true_num)
+    # fig.show()
+    # ipdb.set_trace()
+
     test_fastapprox_cdf(parameter_names, data_location, 0, K, J, d)
     sys.exit(0)
 

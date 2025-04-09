@@ -67,26 +67,40 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
     
-    # min_logcdf_val = norm.logcdf(loc - 100*threshold_std_no*scale, loc, scale)
-    max_logcdf_val = 0 #norm.logcdf(loc + threshold_std_no*scale, loc, scale)
+    x = x.reshape((x.shape[0]*x.shape[1],))
+    xx = (x-x.mean())/x.std()
+
+    min_logcdf_val = norm.logcdf(-threshold_std_no, loc=0, scale=1)
+    max_logcdf_val = norm.logcdf(threshold_std_no, loc=0, scale=1)
 
     if isinstance(x, np.ndarray):
         res = np.zeros(x.shape)
     
-    # ltval = np.nonzero(x <= loc-100*threshold_std_no*scale)
-    gtval = np.nonzero(x >= loc+threshold_std_no*scale)
-    inval = np.nonzero( (x < loc+threshold_std_no*scale)) #(x > loc-threshold_std_no*scale) &
+    ltval = np.nonzero(xx <= -threshold_std_no)
+    gtval = np.nonzero(xx >= threshold_std_no)
+    inval = np.nonzero((xx > -threshold_std_no) & (xx < threshold_std_no)) #(x > loc-threshold_std_no*scale) &
 
-    # if len(ltval) > 0:
-    #     # print([i for i in x[ltval]])
-    #     res[ltval] = min_logcdf_val
-    #     # ipdb.set_trace()
+    if len(ltval) > 0:
+        # print([i for i in x[ltval]])
+        res[ltval] = min_logcdf_val
+        # ipdb.set_trace()
     if len(gtval) > 0:
         res[gtval] = max_logcdf_val
     if len(inval) > 0:
-        res[inval] = norm.logcdf(x[inval], loc, scale)
+        res[inval] = norm.logcdf(xx[inval], loc=0, scale=1)
     
-    return res, inval
+    # ipdb.set_trace()
+    # x = x.reshape((10000*100,))
+    # t0 = time.time()
+    # norm.logcdf(x, loc, scale/1000)
+    # print(str(timedelta(seconds=time.time()-t0)))
+    # xx = (x-x.mean())/x.std()
+    # t0 = time.time()
+    # norm.logcdf(xx, loc=0, scale=1)
+    # print(str(timedelta(seconds=time.time()-t0)))
+    # ipdb.set_trace()
+    
+    return res, ltval
 
 
 def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
@@ -143,8 +157,8 @@ def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
     print(str(timedelta(seconds=time.time()-t0)))
     
     t0 = time.time()
-    logcdfs_fast, inval = norm_logcdf_thresholdapprox(pijs, 0, sigma_e, threshold_std_no=6)
-    log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=False, threshold_std_no=6)
+    logcdfs_fast, inval = norm_logcdf_thresholdapprox(pijs, 0, sigma_e, threshold_std_no=3)
+    log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=False, threshold_std_no=3)
     print(str(timedelta(seconds=time.time()-t0)))
     
     print(np.allclose(logcdfs[inval], logcdfs_fast[inval]))
