@@ -1,1 +1,1 @@
-# ideal
+# Ideal points models
