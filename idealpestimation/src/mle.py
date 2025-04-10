@@ -128,9 +128,9 @@ def maximum_likelihood_estimator(
     # Perform maximum likelihood estimation        
     bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=args)  #######################    currently with box constraints
     if niter is not None:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":4000000}) #2000000
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":100000}) #2000000
     else:
-        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":4000000}) #2000000
+        result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxfun":100000}) #2000000
     
     mle = result.x          
 
