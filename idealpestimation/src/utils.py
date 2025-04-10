@@ -243,40 +243,71 @@ def optimisation_dict2paramvectors(optim_vector, param_positions_dict, J, K, d, 
     return params_out
 
 
-def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, min_sigma_e=1e-6, args=None):
+def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, min_sigma_e=1e-6, args=None, target_param=None, target_idx=None):
     
-
     if args is not None:
         DIR_out, data_location, subdataset_name, dataset_index, optimisation_method,\
             parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z,\
                 constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z,\
                     prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
-                            prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
+                            prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize = args
         
         grid_width_std = 5  
         bounds = []
-        for param in parameter_names:
-            if param == "X":
-                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0])]*(K*d)) 
-            elif param == "Z":
-                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0])]*(J*d)) 
-            elif param == "Phi":
-                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0])]*(J*d)) 
-            elif param == "alpha":
-                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha)]*J) 
-            elif param == "beta":
-                bounds.extend([(-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta)]*K) 
-            elif param == "gamma":
+        if target_param is not None:
+            if target_param == "X":
+                if target_idx is None:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0])]*(K*d)) 
+                else:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0])]) 
+            elif target_param == "Z":
+                if target_idx is None:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0])]*(J*d)) 
+                else:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0])])
+            elif target_param == "Phi":
+                if target_idx is None:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0])]*(J*d)) 
+                else:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0])]) 
+            elif target_param == "alpha":
+                if target_idx is None:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha)]*J) 
+                else:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha)]) 
+            elif target_param == "beta":
+                if target_idx is None:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta)]*K) 
+                else:
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta)]) 
+            elif target_param == "gamma":
                 bounds.append((-grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma, grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma)) 
-            elif param == "delta":
+            elif target_param == "delta":
                 bounds.append((-grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta, grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta)) 
+        else:
+            for param in parameter_names:
+                if param == "X":
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0])]*(K*d)) 
+                elif param == "Z":
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0])]*(J*d)) 
+                elif param == "Phi":
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0])]*(J*d)) 
+                elif param == "alpha":
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha, grid_width_std*np.sqrt(prior_scale_alpha)+prior_loc_alpha)]*J) 
+                elif param == "beta":
+                    bounds.extend([(-grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta, grid_width_std*np.sqrt(prior_scale_beta)+prior_loc_beta)]*K) 
+                elif param == "gamma":
+                    bounds.append((-grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma, grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma)) 
+                elif param == "delta":
+                    bounds.append((-grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta, grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta)) 
     else:
         # def sum_zero_constraint(x):
         #     """Constraint: Sum of Z's should be a constant - default 0, i.e. balanced politician set"""
         #     return np.sum(x[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]])
         bounds = [(None, None)]*(n-1)
-    bounds.append((min_sigma_e, None))
+    if target_param is None:
+        bounds.append((min_sigma_e, None))
     
     return bounds, None
 
@@ -521,6 +552,43 @@ def parse_input_arguments():
     
     return parser.parse_args()
 
+def negative_loglik_coordwise(theta_coordval, theta_idx, full_theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False, numbafast=True):
+
+    full_theta[theta_idx] = theta_coordval
+    params_hat = optimisation_dict2params(full_theta, param_positions_dict, J, K, d, parameter_names)    
+    mu_e = 0
+    sigma_e = params_hat["sigma_e"]
+    errscale = sigma_e
+    errloc = mu_e          
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")    
+    _nll = 0
+    if debug:
+        for i in range(K):
+            for j in range(J):
+                pij_arg = p_ij_arg(i, j, full_theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+                philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+    
+    if numbafast:    
+        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
+        gamma = params_hat["gamma"][0]
+        alpha = params_hat["alpha"]
+        beta = params_hat["beta"]
+        pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
+    else:
+        pij_arg = p_ij_arg(None, None, full_theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+    
+    philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+    nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
+
+    if debug:
+        assert(np.allclose(nll, _nll))
+
+    sum_Z_J_vectors = np.sum(Z, axis=1)    
+    return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+
 def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False, numbafast=True):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
@@ -556,6 +624,60 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
 
     sum_Z_J_vectors = np.sum(Z, axis=1)    
     return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+
+def negative_loglik_coordwise_jax(theta_coordval, theta_idx, full_theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
+
+    full_theta[theta_idx] = theta_coordval
+    params_hat = optimisation_dict2params(full_theta, param_positions_dict, J, K, d, parameter_names)
+    X = jnp.asarray(params_hat["X"]).reshape((d, K), order="F")                     
+    Z = jnp.asarray(params_hat["Z"]).reshape((d, J), order="F")   
+    Y = jnp.asarray(Y)    
+    if "Phi" in params_hat.keys():
+        Phi = jnp.asarray(params_hat["Phi"]).reshape((d, J), order="F")     
+        delta = jnp.asarray(params_hat["delta"])
+    else:
+        Phi = jnp.zeros(Z.shape)
+        delta = 0
+    alpha = jnp.asarray(params_hat["alpha"])
+    beta = jnp.asarray(params_hat["beta"])
+    # c = params_hat["c"]
+    gamma = jnp.asarray(params_hat["gamma"])    
+    mu_e = 0
+    sigma_e = jnp.asarray(params_hat["sigma_e"])
+    errscale = sigma_e
+    errloc = mu_e 
+    _nll = 0
+    dst_func = lambda x, y: jnp.sum((x-y)**2)
+
+    pij_argJ = p_ij_arg(None, None, full_theta, J, K, d, parameter_names, dst_func, param_positions_dict, use_jax=True)  
+    philogcdfJ = jax.scipy.stats.norm.logcdf(pij_argJ, loc=errloc, scale=errscale)
+    # log_one_minus_cdfJ = log_complement_from_log_cdf_vec(philogcdfJ, pij_argJ, mean=errloc, variance=errscale, use_jax=True) - probably numerical errors vs iterative
+    log_one_minus_cdfJ = jnp.zeros(philogcdfJ.shape)
+    nlltest = 0
+    for i in range(K):
+        for j in range(J):
+            if debug:
+                pij_arg = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]    
+                philogcdf = jax.scipy.stats.norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+            else:
+                pij_arg = pij_argJ[i, j]
+                philogcdf = philogcdfJ[i, j]
+            
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, 
+                                                            variance=errscale, use_jax=True)
+            if debug:
+                log_one_minus_cdfJ.at[i,j].set(log_one_minus_cdf[0])
+                nlltest += (1-Y[i, j])*log_one_minus_cdfJ[i,j]
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+            else:
+                nlltest += (1-Y[i, j])*log_one_minus_cdf
+                
+    nll = jnp.sum(Y*philogcdfJ) + nlltest
+    if debug:
+        assert(jnp.allclose(nll, _nll))
+        
+    sum_Z_J_vectors = jnp.sum(Z, axis=1)
+    return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
 def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
 
@@ -609,7 +731,6 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
         
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
-
 
 def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict):
     
@@ -691,7 +812,6 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
                             showgrid=False, showlegend=True, 
                             print_png=True, print_html=True, 
                             print_pdf=False)
-
 
 
 def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict):
@@ -1189,11 +1309,11 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
             gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
     except:
         DIR_out, data_location, subdataset_name, dataset_index, optimisation_method,\
-            parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z,\
+            parameter_names, J, K, d, N, dst_func, niter, _, m, penalty_weight_Z,\
                 constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z,\
                     prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
-                            prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng = args
+                            prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
 
     if samples_list is None and parameter_space_dim <= 21201:
         sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
