@@ -253,7 +253,7 @@ def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, 
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize = args
         
-        grid_width_std = 5  
+        grid_width_std = 6 
         bounds = []
         if target_param is not None:
             if target_param == "X":
@@ -285,6 +285,8 @@ def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, 
                 bounds.append((-grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma, grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma)) 
             elif target_param == "delta":
                 bounds.append((-grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta, grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta)) 
+            elif target_param == "sigma_e":
+                bounds.append((min_sigma_e, None))
         else:
             for param in parameter_names:
                 if param == "X":
@@ -301,12 +303,13 @@ def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, 
                     bounds.append((-grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma, grid_width_std*np.sqrt(prior_scale_gamma)+prior_loc_gamma)) 
                 elif param == "delta":
                     bounds.append((-grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta, grid_width_std*np.sqrt(prior_scale_delta)+prior_loc_delta)) 
+                elif param == "sigma_e":
+                    bounds.append((min_sigma_e, None))
     else:
         # def sum_zero_constraint(x):
         #     """Constraint: Sum of Z's should be a constant - default 0, i.e. balanced politician set"""
         #     return np.sum(x[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]])
         bounds = [(None, None)]*(n-1)
-    if target_param is None:
         bounds.append((min_sigma_e, None))
     
     return bounds, None
@@ -413,7 +416,31 @@ def hvp(f, x, v):
 def get_hessian_diag_jax(f, x):
     # f: function w.r.t to parameter vector x
     return hvp(f, x, jnp.ones_like(x))
+
+def rank_and_return_best_theta(estimated_thetas, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args):
     
+    best_theta = None
+    computed_loglik = []
+    for theta_set in estimated_thetas:
+        theta = theta_set[0]
+        loglik = log_full_likelihood(Y, theta.copy(), param_positions_dict, args)
+        computed_loglik.append(loglik[0])
+    # sort in increasing order, i.e. from worst to best solution
+    sorted_idx = np.argsort(np.asarray(computed_loglik))
+    sorted_idx_lst = sorted_idx.tolist() 
+    best_theta = estimated_thetas[sorted_idx_lst[-1]][0]
+    best_theta_var = estimated_thetas[sorted_idx_lst[-1]][1]
+    current_pid = estimated_thetas[sorted_idx_lst[-1]][2]
+    timestamp = estimated_thetas[sorted_idx_lst[-1]][3]
+    eltime = estimated_thetas[sorted_idx_lst[-1]][4]
+    hours = estimated_thetas[sorted_idx_lst[-1]][5]
+    retry = estimated_thetas[sorted_idx_lst[-1]][6]
+    success = estimated_thetas[sorted_idx_lst[-1]][7]
+    varstatus = estimated_thetas[sorted_idx_lst[-1]][8]
+    
+    return best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus
+
+
 def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict, theta_true, param_positions_dict):
 
     params_out = dict()
@@ -732,26 +759,27 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
-def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict):
+def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize):
     
     parameter_space_dim = (K+J)*d + J + K + 2
-    theta_true = np.zeros((parameter_space_dim,))
-    with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_topdir), "r") as f:
-        for result in f.iter(type=dict, skip_invalid=True):
-            for param in parameter_names:
-                theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
-
     params_out_jsonl = dict()
     estimation_error_per_trial_per_batch = dict()
     estimation_error_per_trial = dict()
     for param in parameter_names:
         estimation_error_per_trial[param] = []
+    
     for m in range(M):
+        theta_true = np.zeros((parameter_space_dim,))
+        with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_topdir, m), "r") as f:
+            for result in f.iter(type=dict, skip_invalid=True):
+                for param in parameter_names:
+                    theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
         fig_m_over_databatches = go.Figure()
         estimation_error_per_trial_per_batch[m] = dict()
         for param in parameter_names:            
             estimation_error_per_trial_per_batch[m][param] = []
-        data_location = "{}/{}/".format(data_topdir, m)
+                
+        data_location = "{}/{}/{}/".format(data_topdir, m, batchsize)
         params_out, estimation_error_per_trial_per_batch[m] = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
                                                                 estimation_error_per_trial_per_batch[m], theta_true, param_positions_dict)    
         for param in parameter_names:
@@ -816,13 +844,7 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
 
 def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict):
     
-    parameter_space_dim = (K+J)*d + J + K + 2
-    theta_true = np.zeros((parameter_space_dim,))
-    with jsonlines.open("{}/0/synthetic_gen_parameters.jsonl".format(data_topdir), "r") as f:
-        for result in f.iter(type=dict, skip_invalid=True):
-            for param in parameter_names:
-                theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
-    
+    parameter_space_dim = (K+J)*d + J + K + 2    
     params_out_jsonl = dict()
     estimation_error_per_trial = dict()
     estimation_error_per_trial_per_batch = dict()
@@ -831,6 +853,11 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
     for batchsize in batchsizes:                    
         print(batchsize)
         for m in range(M):   
+            theta_true = np.zeros((parameter_space_dim,))
+            with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_topdir, m), "r") as f:
+                for result in f.iter(type=dict, skip_invalid=True):
+                    for param in parameter_names:
+                        theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
             fig_m_over_databatches = go.Figure()
             estimation_error_per_trial_per_batch[m] = dict()
             estimation_error_per_trial_per_batch[m][batchsize] = dict()
@@ -1232,7 +1259,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
         theta = theta_set[0]
         loglik = log_full_likelihood(Y, theta.copy(), param_positions_dict, args)
         computed_loglik.append(loglik[0])
-    # sort in increasing order, i.e. from best to worst solution
+    # sort in increasing order, i.e. from worst to best solution
     sorted_idx = np.argsort(np.asarray(computed_loglik))
     sorted_idx_lst = sorted_idx.tolist()    
     for i in sorted_idx_lst:
@@ -2393,11 +2420,20 @@ class TruncatedInverseGamma:
 
 def log_full_likelihood(Y, theta_curr, param_positions_dict, args):
 
-    DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
-    parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
-    prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
-    prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
-    gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
+    try:
+        DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
+        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
+        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
+    except:
+        DIR_out, data_location, subdataset_name, dataset_index, optimisation_method,\
+            parameter_names, J, K, d, N, dst_func, niter, _, m, penalty_weight_Z,\
+                constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z,\
+                    prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
+                        prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
+                            prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
+
 
     ll_utility_part = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
     params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)

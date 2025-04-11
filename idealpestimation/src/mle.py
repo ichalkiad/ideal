@@ -22,7 +22,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                                 time, datetime, timedelta, parse_input_arguments, \
                                                                     negative_loglik_coordwise, negative_loglik_coordwise_jax, collect_mle_results, \
                                                                         collect_mle_results_batchsize_analysis, sample_theta_curr_init,\
-                                                                        get_parameter_name_and_vector_coordinate, check_convergence
+                                                                        get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta
 
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
@@ -46,9 +46,9 @@ def optimise_negativeloglik_elementwise(param, idx, vector_index_in_param_matrix
     retry = 0
     t0 = time.time()
     while retry < retries:   
-        print("Retry: {}".format(retry))
+        # print("Retry: {}".format(retry))
         mle, result = maximum_likelihood_estimator(f, initial_guess=np.asarray([theta_test_in[idx]]), 
-                                        variance_method='jacobian', disp=True, 
+                                        variance_method='jacobian', disp=False, 
                                         optimization_method=optimisation_method, 
                                         data=Y, full_hessian=False, diag_hessian_only=False, 
                                         plot_hessian=False, loglikelihood_per_data_point=None, 
@@ -63,10 +63,9 @@ def optimise_negativeloglik_elementwise(param, idx, vector_index_in_param_matrix
                                                                             args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
             retry += 1
         
-    elapsedtime = str(timedelta(seconds=time.time()-t0))   
-    
+    elapsedtime = str(timedelta(seconds=time.time()-t0))       
     theta_test_out = theta_curr.copy()
-    theta_test_out[idx] = param_estimate
+    theta_test_out[idx] = param_estimate[0]
     
     return theta_test_out, elapsedtime, result, retry
 
@@ -152,8 +151,10 @@ def maximum_likelihood_estimator(
         'jac': '3-point'#,
         # 'hess': '2-point'
     }                   
-    # Perform maximum likelihood estimation        
-    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=args, target_param=target_param, target_idx=target_idx)  #######################    currently with box constraints
+    # Perform maximum likelihood estimation
+    mle = None
+    result = None        
+    bounds, _ = create_constraint_functions(len(initial_guess), min_sigma_e, args=args, target_param=target_param, target_idx=target_idx)
     if niter is not None:
         result = minimize(likelihood_function, **optimize_kwargs, bounds=bounds, options={"disp":disp, "maxiter":niter, "maxfun":100000}) #2000000
     else:
@@ -249,46 +250,151 @@ def estimate_mle(args):
             k += 1    
     theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim_theta, base2exponent, param_positions_dict_theta, 
                                                                 args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
-
-    l = 0
-    theta_prev = np.zeros((parameter_space_dim_theta,))
-    variance_local_vec = np.zeros((parameter_space_dim_theta,))
-    converged = False
-    t0 = time.time()
-
-    args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, K, d, N, dst_func, L,
+    args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, N, d, N, dst_func, L,
         parameter_space_dim_theta, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
         prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
         prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,
         prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict_theta, rng, batchsize)
-    ipdb.set_trace()
-
-    while ((L is not None and l < L)) and (not converged):
+    max_full_restarts = 5
+    full_restarts = 0
+    estimated_thetas = []
+    t0 = time.time()
+    while full_restarts < max_full_restarts:
+        l = 0
+        theta_prev = np.zeros((parameter_space_dim_theta,))
+        variance_local_vec = np.zeros((parameter_space_dim_theta,))
         converged = False
-        i = 0 
-        while i < parameter_space_dim_theta:                                            
-            target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict_theta, i=i, d=d)                    
-            theta_test, elapsedtime, result, retry = optimise_negativeloglik_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
-                                                                Y, theta_curr.copy(), param_positions_dict_theta, L, args, debug=False,
-                                                                theta_samples_list=theta_samples_list, idx_all=idx_all, base2exponent=base2exponent)                   
-            theta_curr = theta_test.copy()    
-            variance_local_vec[i] = result["variance_diag"]
-            i += 1  
-            print(i) 
-        converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
-                                                                        parameter_space_dim=parameter_space_dim_theta, testparam=None, 
-                                                                        testidx=None, p=1, tol=tol)    
-        ipdb.set_trace() 
-        theta_prev = theta_curr.copy() 
-        l += 1
-        print("Total full scans of Theta: {}".format(l))
-        print("Convergence: {}".format(converged))    
+        while ((L is not None and l < L)) and (not converged):
+            i = 0 
+            while i < parameter_space_dim_theta:                                            
+                target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict_theta, i=i, d=d)                    
+                theta_test, elapsedtime, result, retry = optimise_negativeloglik_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
+                                                                    Y, theta_curr.copy(), param_positions_dict_theta, L, args, debug=False,
+                                                                    theta_samples_list=theta_samples_list, idx_all=idx_all, base2exponent=base2exponent)                   
+                theta_curr = theta_test.copy()    
+                if target_param in ["alpha", "beta"]:
+                    vector_index = vector_coordinate
+                else:
+                    vector_index = vector_index_in_param_matrix
+                if vector_coordinate is not None:
+                    if target_param in ["X", "Z", "Phi"]:
+                        testidx = vector_index*d + vector_coordinate
+                    else:
+                        testidx = vector_coordinate
+                else:
+                    testidx = vector_index
+                coord_converged, _, _ = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
+                                                        parameter_space_dim=parameter_space_dim_theta, testparam=target_param, 
+                                                        testidx=testidx, p=1, tol=tol)   
+                if (not coord_converged) or (coord_converged and result["variance_diag"] != 1):
+                    # if converged, estimate has not moved, hence Hessian Inv is 1
+                    variance_local_vec[i] = result["variance_diag"]
+                i += 1  
+            converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
+                                                                            parameter_space_dim=parameter_space_dim_theta, testparam=None, 
+                                                                            testidx=vector_coordinate, p=1, tol=tol)     
+            theta_prev = theta_curr.copy() 
+            l += 1
+            print("Total full scans of Theta: {}".format(l))
+            print("Convergence: {}".format(converged)) 
+            print("Random restart: {}".format(random_restart))  
+            
+            
+        if (not converged) or (full_restarts < max_full_restarts):           
+            # print(theta_curr)                                                              
+            # random restart, completely from scratch
+            theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim_theta, base2exponent, param_positions_dict_theta,
+                                                                        args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)                     
+            full_restarts += 1
+
+            mle = theta_curr.copy()
+            if result["variance_status"]:
+                params_hat = optimisation_dict2paramvectors(mle, param_positions_dict_theta, J, N, d, parameter_names)
+                variance_hat = optimisation_dict2paramvectors(variance_local_vec, param_positions_dict_theta, J, N, d, parameter_names) 
+                grid_and_optim_outcome = dict()
+                grid_and_optim_outcome["PID"] = current_pid
+                grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                elapsedtime = timedelta(seconds=time.time()-t0)            
+                total_seconds = int(elapsedtime.total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60            
+                grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
+                grid_and_optim_outcome["elapsedtime_hours"] = hours
+                grid_and_optim_outcome["retry"] = retry
+                grid_and_optim_outcome["parameter names"] = parameter_names
+                grid_and_optim_outcome["local theta"] = [mle.tolist()]
+                grid_and_optim_outcome["X"] = params_hat["X"]
+                grid_and_optim_outcome["Z"] = params_hat["Z"]
+                if "Phi" in params_hat.keys():
+                    grid_and_optim_outcome["Phi"] = params_hat["Phi"] 
+                grid_and_optim_outcome["alpha"] = params_hat["alpha"]
+                grid_and_optim_outcome["beta"] = params_hat["beta"]
+                grid_and_optim_outcome["gamma"] = params_hat["gamma"][0]
+                if "delta" in params_hat.keys():
+                    grid_and_optim_outcome["delta"] = params_hat["delta"][0]        
+                grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"][0]
+                grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
+                if "Phi" in params_hat.keys():
+                    grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
+                grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
+                grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
+                if "delta" in params_hat.keys():
+                    grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]        
+                grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
+                
+                grid_and_optim_outcome["param_positions_dict"] = param_positions_dict_theta
+                grid_and_optim_outcome["mle_estimation_status"] = result.success
+                grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
+                estimated_thetas.append((mle, variance_local_vec, current_pid, grid_and_optim_outcome["timestamp"], 
+                                grid_and_optim_outcome["elapsedtime"], hours, retry, result.success, result["variance_status"]))
+            else:
+                grid_and_optim_outcome = dict()
+                grid_and_optim_outcome["PID"] = current_pid
+                grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                elapsedtime = timedelta(seconds=time.time()-t0)            
+                total_seconds = int(elapsedtime.total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60            
+                grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
+                grid_and_optim_outcome["elapsedtime_hours"] = hours
+                grid_and_optim_outcome["retry"] = retry
+                grid_and_optim_outcome["parameter names"] = parameter_names
+                grid_and_optim_outcome["local theta"] = None
+                grid_and_optim_outcome["X"] = None
+                grid_and_optim_outcome["Z"] = None
+                if "Phi" in parameter_names:
+                    grid_and_optim_outcome["Phi"] = None
+                grid_and_optim_outcome["alpha"] = None
+                grid_and_optim_outcome["beta"] = None
+                grid_and_optim_outcome["gamma"] = None
+                if "delta" in parameter_names:
+                    grid_and_optim_outcome["delta"] = None        
+                grid_and_optim_outcome["sigma_e"] = None
+
+                grid_and_optim_outcome["variance_Z"] = None
+                if "Phi" in parameter_names:
+                    grid_and_optim_outcome["variance_Phi"] = None
+                grid_and_optim_outcome["variance_alpha"] = None
+                grid_and_optim_outcome["variance_gamma"] = None
+                if "delta" in parameter_names:
+                    grid_and_optim_outcome["variance_delta"] = None
+                grid_and_optim_outcome["variance_mu_e"] = None
+                grid_and_optim_outcome["variance_sigma_e"] = None
+                
+                grid_and_optim_outcome["param_positions_dict"] = param_positions_dict_theta
+                grid_and_optim_outcome["mle_estimation_status"] = result.success
+                grid_and_optim_outcome["variance_estimation_status"] = None
+            out_file = "{}/estimationallresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
+            with open(out_file, 'a') as f:         
+                writer = jsonlines.Writer(f)
+                writer.write(grid_and_optim_outcome)
 
     mle = theta_curr.copy()
-    if result.success and result["variance_status"]:
-        params_hat = optimisation_dict2params(mle, param_positions_dict_theta, J, N, d, parameter_names)
-        variance_hat = optimisation_dict2paramvectors(variance_local_vec, param_positions_dict_theta, J, K, d, parameter_names) 
-
+    if result["variance_status"]:
+        params_hat = optimisation_dict2paramvectors(mle, param_positions_dict_theta, J, N, d, parameter_names)
+        variance_hat = optimisation_dict2paramvectors(variance_local_vec, param_positions_dict_theta, J, N, d, parameter_names) 
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -302,16 +408,16 @@ def estimate_mle(args):
         grid_and_optim_outcome["retry"] = retry
         grid_and_optim_outcome["parameter names"] = parameter_names
         grid_and_optim_outcome["local theta"] = [mle.tolist()]
-        grid_and_optim_outcome["X"] = params_hat["X"].reshape((d*N,), order="F").tolist()  
-        grid_and_optim_outcome["Z"] = params_hat["Z"].reshape((d*J,), order="F").tolist()     
+        grid_and_optim_outcome["X"] = params_hat["X"]
+        grid_and_optim_outcome["Z"] = params_hat["Z"]   
         if "Phi" in params_hat.keys():
-            grid_and_optim_outcome["Phi"] = params_hat["Phi"].reshape((d*J,), order="F").tolist() 
-        grid_and_optim_outcome["alpha"] = params_hat["alpha"].tolist() 
-        grid_and_optim_outcome["beta"] = params_hat["beta"].tolist() 
-        grid_and_optim_outcome["gamma"] = params_hat["gamma"].tolist()[0]
+            grid_and_optim_outcome["Phi"] = params_hat["Phi"]
+        grid_and_optim_outcome["alpha"] = params_hat["alpha"]
+        grid_and_optim_outcome["beta"] = params_hat["beta"]
+        grid_and_optim_outcome["gamma"] = params_hat["gamma"][0]
         if "delta" in params_hat.keys():
-            grid_and_optim_outcome["delta"] = params_hat["delta"].tolist()[0]        
-        grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"].tolist()[0]
+            grid_and_optim_outcome["delta"] = params_hat["delta"][0]        
+        grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"][0]
         grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
         if "Phi" in params_hat.keys():
             grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
@@ -324,6 +430,8 @@ def estimate_mle(args):
         grid_and_optim_outcome["param_positions_dict"] = param_positions_dict_theta
         grid_and_optim_outcome["mle_estimation_status"] = result.success
         grid_and_optim_outcome["variance_estimation_status"] = result["variance_status"]
+        estimated_thetas.append((mle, variance_local_vec, current_pid, grid_and_optim_outcome["timestamp"], 
+                                grid_and_optim_outcome["elapsedtime"], hours, retry, result.success, result["variance_status"]))
     else:
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
@@ -364,6 +472,47 @@ def estimate_mle(args):
         grid_and_optim_outcome["variance_estimation_status"] = None
 
 
+    out_file = "{}/estimationallresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
+    with open(out_file, 'a') as f:         
+        writer = jsonlines.Writer(f)
+        writer.write(grid_and_optim_outcome)
+    
+
+    best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus =\
+                         rank_and_return_best_theta(estimated_thetas, Y, J, N, d, parameter_names, dst_func, param_positions_dict_theta, DIR_out, args)
+    params_hat = optimisation_dict2paramvectors(best_theta, param_positions_dict_theta, J, N, d, parameter_names)
+    variance_hat = optimisation_dict2paramvectors(best_theta_var, param_positions_dict_theta, J, N, d, parameter_names) 
+    grid_and_optim_outcome = dict()
+    grid_and_optim_outcome["PID"] = current_pid
+    grid_and_optim_outcome["timestamp"] = timestamp
+    elapsedtime = timedelta(seconds=time.time()-t0)            
+    grid_and_optim_outcome["elapsedtime"] = eltime
+    grid_and_optim_outcome["elapsedtime_hours"] = hours
+    grid_and_optim_outcome["retry"] = retry
+    grid_and_optim_outcome["parameter names"] = parameter_names
+    grid_and_optim_outcome["local theta"] = [best_theta.tolist()]
+    grid_and_optim_outcome["X"] = params_hat["X"]
+    grid_and_optim_outcome["Z"] = params_hat["Z"]   
+    if "Phi" in params_hat.keys():
+        grid_and_optim_outcome["Phi"] = params_hat["Phi"]
+    grid_and_optim_outcome["alpha"] = params_hat["alpha"]
+    grid_and_optim_outcome["beta"] = params_hat["beta"]
+    grid_and_optim_outcome["gamma"] = params_hat["gamma"][0]
+    if "delta" in params_hat.keys():
+        grid_and_optim_outcome["delta"] = params_hat["delta"][0]        
+    grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"][0]
+    grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
+    if "Phi" in params_hat.keys():
+        grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
+    grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
+    grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
+    if "delta" in params_hat.keys():
+        grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]        
+    grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
+    
+    grid_and_optim_outcome["param_positions_dict"] = param_positions_dict_theta
+    grid_and_optim_outcome["mle_estimation_status"] = success
+    grid_and_optim_outcome["variance_estimation_status"] = varstatus
     out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
     with open(out_file, 'a') as f:         
         writer = jsonlines.Writer(f)
@@ -644,13 +793,13 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             while True:
                 for m in range(trialsmin, trialsmax, 1):
 
-                    path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
+                    path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize)) 
 
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
                     for dataset_index in range(len(subdatasets_names)):                    
                         subdataset_name = subdatasets_names[dataset_index]  
 
-                        DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
+                        DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) 
 
                         from_row = int(subdataset_name.split("_")[1])
                         to_row = int(subdataset_name.split("_")[2])
@@ -688,14 +837,11 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     break       
         else:
             for m in range(trialsmin, trialsmax, 1):
-                path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))  #########
-
+                path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))
                 subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                 for dataset_index in range(len(subdatasets_names)):               
-                    subdataset_name = subdatasets_names[dataset_index]            
-
-                    DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name) #########
-
+                    subdataset_name = subdatasets_names[dataset_index]
+                    DIR_out = "{}/{}/{}/{}/estimation/".format(DIR_top, m, batchsize, subdataset_name)
                     from_row = int(subdataset_name.split("_")[1])
                     to_row = int(subdataset_name.split("_")[2])
                     if pathlib.Path(DIR_out).is_dir():
@@ -772,7 +918,7 @@ if __name__ == "__main__":
 
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 10
+    niter = 1000
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 30
@@ -844,21 +990,21 @@ if __name__ == "__main__":
         elif param == "sigma_e":
             param_positions_dict[param] = (k, k + 1)                                
             k += 1    
-    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
-        parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
-        prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
-        prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
-        prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
-        prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
-        prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
-        rng=rng, batchsize=batchsize)
+    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+    #     data_location=data_location, parallel=parallel, 
+    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
+    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+    #     trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
+    #     prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
+    #     prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
+    #     prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+    #     prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
+    #     prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+    #     prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
+    #     rng=rng, batchsize=batchsize)
 
 
-    # data_topdir = data_location
-    # collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)
+    data_topdir = data_location
+    collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize)
     # collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
     
