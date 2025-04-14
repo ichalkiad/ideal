@@ -67,18 +67,19 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
 
 def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
     
-    x = x.reshape((x.shape[0]*x.shape[1],))
-    xx = (x-x.mean())/x.std()
+    x1 = x.reshape((x.shape[0]*x.shape[1],), order="F")
+    print(x1.mean(), x1.std())
+    xx = (x1-x1.mean())/x1.std()
 
     min_logcdf_val = norm.logcdf(-threshold_std_no, loc=0, scale=1)
     max_logcdf_val = norm.logcdf(threshold_std_no, loc=0, scale=1)
 
     if isinstance(x, np.ndarray):
-        res = np.zeros(x.shape)
+        res = np.zeros(xx.shape)
     
     ltval = np.nonzero(xx <= -threshold_std_no)
     gtval = np.nonzero(xx >= threshold_std_no)
-    inval = np.nonzero((xx > -threshold_std_no) & (xx < threshold_std_no)) #(x > loc-threshold_std_no*scale) &
+    inval = np.nonzero((xx > -threshold_std_no) & (xx < threshold_std_no))
 
     if len(ltval) > 0:
         # print([i for i in x[ltval]])
@@ -89,12 +90,11 @@ def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
     if len(inval) > 0:
         res[inval] = norm.logcdf(xx[inval], loc=0, scale=1)
     
-    # ipdb.set_trace()
-    # x = x.reshape((10000*100,))
+    res = res.reshape((x.shape[0], x.shape[1]), order="F")
+    # ipdb.set_trace()    
     # t0 = time.time()
-    # norm.logcdf(x, loc, scale/1000)
-    # print(str(timedelta(seconds=time.time()-t0)))
-    # xx = (x-x.mean())/x.std()
+    # norm.logcdf(x, loc, scale)
+    # print(str(timedelta(seconds=time.time()-t0)))    
     # t0 = time.time()
     # norm.logcdf(xx, loc=0, scale=1)
     # print(str(timedelta(seconds=time.time()-t0)))
@@ -152,22 +152,30 @@ def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
     pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
     
     t0 = time.time()
-    logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e)  
-    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e)
+    logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e) 
+    print(str(timedelta(seconds=time.time()-t0)))
+    print("sdfsd")
+    pijs1 = pijs.reshape((pijs.shape[0]*pijs.shape[1],), order="F")    
+    pijs1 = (pijs1-pijs1.mean())/pijs1.std()
+    pijs1 = pijs1.reshape((pijs.shape[0], pijs.shape[1]), order="F")    
+
+    t0 = time.time()
+    # logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e)  
+    logcdfs = norm.logcdf(pijs1, loc=0, scale=1)
+    # log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e)
     print(str(timedelta(seconds=time.time()-t0)))
     
     t0 = time.time()
-    logcdfs_fast, inval = norm_logcdf_thresholdapprox(pijs, 0, sigma_e, threshold_std_no=3)
-    log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=False, threshold_std_no=3)
+    logcdfs_fast, idxval = norm_logcdf_thresholdapprox(pijs1, 0, sigma_e, threshold_std_no=3)    
+    # log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=False, threshold_std_no=3)
     print(str(timedelta(seconds=time.time()-t0)))
     
-    print(np.allclose(logcdfs[inval], logcdfs_fast[inval]))
-    print(np.allclose(log1mcdfs[inval], log1mcdfs_fast[inval]))
-    print(logcdfs[inval])
-    print(logcdfs_fast[inval])
-    # print((logcdfs-logcdfs_fast))
-    # print((logcdfs-logcdfs_fast)**2)
-    # print(((logcdfs-logcdfs_fast)**2).sum()/(K*J))
+    print(np.allclose(logcdfs.reshape((K*J,), order="F")[idxval], logcdfs_fast.reshape((K*J,), order="F")[idxval]))
+    # print(np.allclose(log1mcdfs[idxval], log1mcdfs_fast[idxval]))
+    print(logcdfs.reshape((K*J,), order="F")[idxval])
+    print(logcdfs_fast.reshape((K*J,), order="F")[idxval])
+    # print(logcdfs_fast[inval])
+    
 
 
 
@@ -476,14 +484,12 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                             end   = int(namesplit[3].replace(".jsonl", ""))
                             if param == "X":
                                 params_out[param][start*d:end*d] = theta
-                            else:
-                                params_out[param][start:end] = theta
-                            if param == "beta":
-                                mse_trial_m_batch_index = np.mean((theta - theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])**2)
-                            else:
                                 X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
                                 X_hat = np.asarray(theta).reshape((d, end-start), order="F")
                                 Rx, tx, mse_trial_m_batch_index, _ = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                            else:
+                                params_out[param][start:end] = theta                            
+                                mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])**2)
                         else:                            
                             weight = result["variance_{}".format(param)]                            
                             theta = result[param]
@@ -494,7 +500,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                                 Z_hat = np.asarray(theta).reshape((d, J), order="F")
                                 Rz, tz, mse_trial_m_batch_index, _ = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                             else:
-                                mse_trial_m_batch_index = np.mean((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2)
+                                mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]))**2)
             
             if error_dict is not None:
                 error_dict[param].append(mse_trial_m_batch_index)
