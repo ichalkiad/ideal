@@ -22,9 +22,10 @@ def serial_worker(args):
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
-        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
+        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true, param_positions_dict_prev = args
     
     DIR_out_icm = "{}/{}/".format(DIR_out, s)
+    print(DIR_out_icm)
     pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)
     
     icm_args = (DIR_out_icm, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
@@ -36,12 +37,14 @@ def serial_worker(args):
     theta = icm_posterior_power_annealing(Y_annealed, param_positions_dict, icm_args,
                                 temperature_rate=temperature_rate, temperature_steps=temperature_steps, 
                                 percentage_parameter_change=percentage_parameter_change, 
-                                fastrun=fastrun, data_annealing=False, annealing_rows=None, 
-                                theta_part_annealing=None)
+                                fastrun=fastrun, data_annealing=True, annealing_prev=param_positions_dict_prev, 
+                                theta_part_annealing=theta_part_annealing)
     elapsedtime = str(timedelta(seconds=time.time()-t0))   
-    # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration - ensure indices of estimated theta segment are stored
+    # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration 
+    # ensure indices of estimated theta segment are stored - not really needed for when batches are non-overlapping, except for Z, alpha, gamma, sigma_e
     theta_part_annealing = rank_and_plot_solutions(theta, elapsedtime, Y_annealed, J, batchrows, d, parameter_names, 
-                                                dst_func, param_positions_dict, DIR_out_icm, icm_args)    
+                                                dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
+                                                row_start=k_prev, row_end=k_prev+batchrows)
 
 
 class ProcessManagerSyntheticDataAnnealing(ProcessManager):
@@ -55,33 +58,7 @@ class ProcessManagerSyntheticDataAnnealing(ProcessManager):
             self.execution_counter.value += 1
             self.shared_dict[current_pid] = self.execution_counter.value
         
-        t0 = time.time()
-        k_prev, s, Y_annealed, temperature_rate, temperature_steps, percentage_parameter_change,\
-            fastrun, _, batchrows, theta_part_annealing, theta, elapsedtime, param_positions_dict,\
-            DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
-            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
-            prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
-            prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
-            gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
-        
-        DIR_out_icm = "{}/{}/".format(DIR_out, s)
-        pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)
-
-        icm_args = (DIR_out_icm, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
-                    parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
-                        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
-                            prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
-                                gridpoints_num, diff_iter, disp, min_sigma_e, theta_true)
-        
-        theta = icm_posterior_power_annealing(Y_annealed, param_positions_dict, icm_args,
-                                    temperature_rate=temperature_rate, temperature_steps=temperature_steps, 
-                                    percentage_parameter_change=percentage_parameter_change, 
-                                    fastrun=fastrun, data_annealing=False, annealing_rows=None, 
-                                    theta_part_annealing=None)
-        elapsedtime = str(timedelta(seconds=time.time()-t0))   
-        # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration - ensure indices of estimated theta segment are stored
-        theta_part_annealing = rank_and_plot_solutions(theta, elapsedtime, Y_annealed, J, batchrows, d, parameter_names, 
-                                                    dst_func, param_positions_dict, DIR_out_icm, icm_args)     
+        serial_worker(args)
         
 
 
@@ -108,7 +85,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                     DIR_out = "{}/{}/estimation_ICM_data_annealing_differentiate_posterior_elementwise/".format(data_location, m)
             else:
                 if evaluate_posterior:
-                    DIR_out = "{}/{}/estimation_ICM_data_annealing_evaluate_posterior_vector_test/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_data_annealing_evaluate_posterior_vector/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_annealing/".format(data_location, m)
@@ -156,8 +133,9 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                         theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]] = result[param] 
         
             N = math.ceil(parameter_space_dim/J)
-            y_rows_prev = None
             theta_part_annealing = None
+            param_positions_dict_prev = None
+            
             if elementwise and not evaluate_posterior:
                 # growing data window + differentiate posterior
                 for s in np.arange(temperature_steps[0], temperature_steps[1] + temperature_rate[0], temperature_rate[0]):
@@ -166,87 +144,88 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                         continue
                     Y_annealed = Y[0:y_rows, :]            
                     t0 = time.time()
-                    param_positions_dict = dict()            
                     k = 0
-                    parameter_space_dim = (y_rows+J)*d + J + y_rows + 2
-                    theta_true_annealing = np.zeros((parameter_space_dim,))
+                    param_positions_dict_theta = dict()            
+                    parameter_space_dim_theta = (y_rows+J)*d + J + y_rows + 2
+                    theta_true_annealing = np.zeros((parameter_space_dim_theta,))
                     for param in parameter_names:
                         if param == "X":
-                            param_positions_dict[param] = (k, k + y_rows*d)
+                            param_positions_dict_theta[param] = (k, k + y_rows*d)
                             theta_true_annealing[k:k + y_rows*d] = theta_true[k:k + y_rows*d]                     
                             k += y_rows*d    
                         elif param in ["Z"]:
-                            param_positions_dict[param] = (k, k + J*d)   
+                            param_positions_dict_theta[param] = (k, k + J*d)   
                             theta_true_annealing[k:k + J*d] = theta_true[K*d:K*d + J*d]                              
                             k += J*d
                         elif param in ["Phi"]:            
-                            param_positions_dict[param] = (k, k + J*d)        
+                            param_positions_dict_theta[param] = (k, k + J*d)        
                             theta_true_annealing[k:k + J*d] = theta_true[K*d + J*d:K*d + 2*J*d]                                                      
                             k += J*d
                         elif param == "alpha":
-                            param_positions_dict[param] = (k, k + J)              
+                            param_positions_dict_theta[param] = (k, k + J)              
                             if "Phi" in parameter_names:
                                 theta_true_annealing[k:k + J] = theta_true[K*d + 2*J*d:K*d + 2*J*d + J] 
                             else:
                                 theta_true_annealing[k:k + J] = theta_true[K*d + J*d:K*d + J*d + J]                         
                             k += J
                         elif param == "beta":
-                            param_positions_dict[param] = (k, k + y_rows)     
+                            param_positions_dict_theta[param] = (k, k + y_rows)     
                             if "Phi" in parameter_names:
                                 theta_true_annealing[k:k + y_rows] = theta_true[K*d + 2*J*d + J:K*d + 2*J*d + J + y_rows]
                             else:
                                 theta_true_annealing[k:k + y_rows] = theta_true[K*d + J*d + J:K*d + J*d + J + y_rows]                              
                             k += y_rows    
                         elif param == "gamma":
-                            param_positions_dict[param] = (k, k + 1)     
+                            param_positions_dict_theta[param] = (k, k + 1)     
                             if "Phi" in parameter_names:
                                 theta_true_annealing[k:k + 1] = theta_true[K*d + 2*J*d + y_rows + J:K*d + 2*J*d + y_rows + J + 1]     
                             else:
                                 theta_true_annealing[k:k + 1] = theta_true[K*d + J*d + y_rows + J:K*d + J*d + y_rows + J + 1]
                             k += 1
                         elif param == "delta":
-                            param_positions_dict[param] = (k, k + 1)    
+                            param_positions_dict_theta[param] = (k, k + 1)    
                             theta_true_annealing[k:k + 1] = theta_true[K*d + 2*J*d + y_rows + J + 1:K*d + 2*J*d + y_rows + J + 2]                     
                             k += 1
                         elif param == "sigma_e":
-                            param_positions_dict[param] = (k, k + 1)  
+                            param_positions_dict_theta[param] = (k, k + 1)  
                             if "Phi" in parameter_names:
                                 theta_true_annealing[k:k + 1] = theta_true[K*d + 2*J*d + y_rows + J + 2:K*d + 2*J*d + y_rows + J + 3]                              
                             else:
                                 theta_true_annealing[k:k + 1] = theta_true[K*d + J*d + y_rows + J + 1:K*d + J*d + y_rows + J + 2]   
                             k += 1
-                    args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, y_rows, d, dst_func, L, tol,                     
-                                parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
+                    icm_args = ("{}/{}/".format(DIR_out, y_rows), total_running_processes, data_location, optimisation_method, parameter_names, J, y_rows, d, dst_func, L, tol,                     
+                                parameter_space_dim_theta, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
                                 prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
                                 prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
                                 gridpoints_num, diff_iter, disp, min_sigma_e, theta_true_annealing)   
-                    theta = icm_posterior_power_annealing(Y_annealed, param_positions_dict, args,
+                    theta = icm_posterior_power_annealing(Y_annealed, param_positions_dict_theta, icm_args,
                                                 temperature_rate=temperature_rate, temperature_steps=temperature_steps, 
                                                 percentage_parameter_change=percentage_parameter_change, 
-                                                fastrun=fastrun, data_annealing=True, annealing_rows=y_rows_prev, 
+                                                fastrun=fastrun, data_annealing=True, annealing_prev=param_positions_dict_prev, 
                                                 theta_part_annealing=theta_part_annealing)
                     elapsedtime = str(timedelta(seconds=time.time()-t0))   
                     # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration
                     theta_part_annealing = rank_and_plot_solutions(theta, elapsedtime, Y_annealed, J, y_rows, d, parameter_names, 
-                                                                dst_func, param_positions_dict, DIR_out, args)
-                    y_rows_prev = y_rows                
+                                                                dst_func, param_positions_dict_theta, DIR_out, icm_args, data_tempering=True,
+                                                                row_start=0, row_end=y_rows)
+                    param_positions_dict_prev = param_positions_dict_theta                
             else:
                 # for parallel data annealing: store partial solution, non-overlapping data batches
                 theta = None
                 elapsedtime = None
                 if parallel:
-                    manager = ProcessManagerSyntheticDataAnnealing(total_running_processes)  
+                    manager = ProcessManagerSyntheticDataAnnealing(total_running_processes)
+                    manager.create_results_dict(optim_target="all")    
                 try:  
-                    if parallel: 
-                        manager.create_results_dict(optim_target="all")  
-                    t0 = time.time()
                     k_prev = 0
                     k_theta_true = 0
                     s = temperature_steps[0]
+                    t0 = time.time()
                     while True:    
                         while s <= temperature_steps[1]:
+                            print(s)
                             y_rows = int(round(s*K))
-                            if y_rows < N:
+                            if y_rows-k_prev < N:
                                 s += temperature_rate[0]  
                                 continue
                             Y_annealed = Y[k_prev:y_rows, :]
@@ -255,52 +234,52 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
                             k = 0
                             batchrows = y_rows - k_prev
-                            parameter_space_dim = (batchrows+J)*d + J + batchrows + 2
-                            theta_true_annealing = np.zeros((parameter_space_dim,))
-                            param_positions_dict = dict()      
+                            parameter_space_dim_theta = (batchrows+J)*d + J + batchrows + 2
+                            theta_true_annealing = np.zeros((parameter_space_dim_theta,))
+                            param_positions_dict_theta = dict()      
                             for param in parameter_names:
                                 if param == "X":
-                                    param_positions_dict[param] = (k, k + batchrows*d)
+                                    param_positions_dict_theta[param] = (k, k + batchrows*d)
                                     theta_true_annealing[k:k+batchrows*d] = theta_true[k_theta_true*d:k_theta_true*d+batchrows*d]            
                                     k += batchrows*d    
                                 elif param in ["Z"]:
-                                    param_positions_dict[param] = (k, k + J*d)   
+                                    param_positions_dict_theta[param] = (k, k + J*d)   
                                     theta_true_annealing[k:k+J*d] = theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]]             
                                     k += J*d
                                 elif param in ["Phi"]:            
-                                    param_positions_dict[param] = (k, k + J*d)        
+                                    param_positions_dict_theta[param] = (k, k + J*d)        
                                     theta_true_annealing[k:k+J*d] = theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]]                                                     
                                     k += J*d
                                 elif param == "alpha":
-                                    param_positions_dict[param] = (k, k + J)       
+                                    param_positions_dict_theta[param] = (k, k + J)       
                                     theta_true_annealing[k:k+J] = theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]]                     
                                     k += J
                                 elif param == "beta":
-                                    param_positions_dict[param] = (k, k + batchrows)     
+                                    param_positions_dict_theta[param] = (k, k + batchrows)     
                                     theta_true_annealing[k:k+batchrows] = theta_true[param_positions_dict_init[param][0]+k_theta_true:param_positions_dict_init[param][0]+k_theta_true+batchrows]                             
                                     k += batchrows    
                                 elif param == "gamma":
-                                    param_positions_dict[param] = (k, k + 1)     
+                                    param_positions_dict_theta[param] = (k, k + 1)     
                                     theta_true_annealing[k:k+1] = theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]] 
                                     k += 1
                                 elif param == "delta":
-                                    param_positions_dict[param] = (k, k + 1)    
+                                    param_positions_dict_theta[param] = (k, k + 1)    
                                     theta_true_annealing[k:k+1] = theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]]                 
                                     k += 1
                                 elif param == "sigma_e":
-                                    param_positions_dict[param] = (k, k + 1)  
+                                    param_positions_dict_theta[param] = (k, k + 1)  
                                     theta_true_annealing[k:k+1] = theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]] 
                                     k += 1
 
                             temperature_steps_local = [0, 1, 2, 5, 10]
                             temperature_rate_local = [1e-3, 1e-2, 1e-1, 1]
                             worker_args = (k_prev, s, Y_annealed, temperature_rate_local, temperature_steps_local, percentage_parameter_change, 
-                                        fastrun, True, batchrows, theta_part_annealing, theta, elapsedtime, param_positions_dict, 
-                                        DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, y_rows-k_prev, d, dst_func, L, tol,                     
-                                        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
+                                        fastrun, True, batchrows, theta_part_annealing, theta, elapsedtime, param_positions_dict_theta, 
+                                        DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, batchrows, d, dst_func, L, tol,                     
+                                        parameter_space_dim_theta, m, penalty_weight_Z, constant_Z, retries, False, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
                                         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
                                         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
-                                        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true_annealing)
+                                        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true_annealing, param_positions_dict_prev)
                             if parallel:
                                 #####  parallelisation with Parallel Manager #####
                                 manager.cleanup_finished_processes()
@@ -317,9 +296,22 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                 ################################################## 
                             else:
                                 serial_worker(worker_args)
+                                try:
+                                    out_file = "{}/{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out, s, k_prev, k_prev+batchrows)
+                                    with jsonlines.open(out_file, 'r') as f:         
+                                        for result in f.iter(type=dict, skip_invalid=True):
+                                            for param in parameter_names:
+                                                if theta_part_annealing is None:
+                                                    theta_part_annealing = np.zeros((parameter_space_dim_theta,))
+                                                theta_part_annealing[param_positions_dict_theta[param][0]:param_positions_dict_theta[param][1]] = result[param]
+                                                print(param, result[param]) 
+                                except:
+                                    pass
                             k_prev = y_rows      
-                            s += temperature_rate[0]   
+                            s += temperature_rate[0]  
+                            print(k_theta_true, k_theta_true+batchrows) 
                             k_theta_true += batchrows  
+                            param_positions_dict_prev = param_positions_dict_theta
                         if parallel:
                             if manager.all_processes_complete.is_set():
                                 break  
@@ -375,14 +367,14 @@ if __name__ == "__main__":
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
     # before halving annealing rate
-    percentage_parameter_change = 0.2
+    percentage_parameter_change = 0.1
 
     if not parallel:
         jax.default_device = jax.devices("cpu")[0]
         jax.config.update("jax_traceback_filtering", "off")
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 50
+    niter = 200 #50
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 20
@@ -394,7 +386,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 15 #30
+    gridpoints_num = 30 #30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -416,7 +408,7 @@ if __name__ == "__main__":
     temperature_steps = [0.1, 1]
     temperature_rate = [0.1]
 
-    fastrun = False
+    fastrun = True
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))

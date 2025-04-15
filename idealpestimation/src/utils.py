@@ -103,7 +103,7 @@ def norm_logcdf_thresholdapprox(x, loc, scale, threshold_std_no=4):
     return res, ltval
 
 
-def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
+def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d, args=None):
 
     parameter_space_dim = (K+J)*d + J + K + 2
     theta_true = np.zeros((parameter_space_dim,))
@@ -141,30 +141,57 @@ def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d):
             for param in parameter_names:
                 theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
     
-    params_hat = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
-    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
-    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
-    gamma = params_hat["gamma"][0]
-    alpha = params_hat["alpha"]
-    beta = params_hat["beta"]
-    sigma_e = params_hat["sigma_e"]
+    rng = np.random.default_rng()
+    theta_samples_list = None 
+    idx_all = None
+    nonscaled = []
+    scaled = []
+    while True:
+        try:
+            # if idx_all is not None:
+            #     ipdb.set_trace()
+            theta_true, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, 2, param_positions_dict, 
+                                                                args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
+            # print(len(idx_all))
+        except:
+            break
     
-    pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
-    
-    t0 = time.time()
-    logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e) 
-    print(str(timedelta(seconds=time.time()-t0)))
-    print("sdfsd")
-    pijs1 = pijs.reshape((pijs.shape[0]*pijs.shape[1],), order="F")    
-    pijs1 = (pijs1-pijs1.mean())/pijs1.std()
-    pijs1 = pijs1.reshape((pijs.shape[0], pijs.shape[1]), order="F")    
+        params_hat = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+        Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
+        gamma = params_hat["gamma"][0]
+        alpha = params_hat["alpha"]
+        beta = params_hat["beta"]
+        sigma_e = params_hat["sigma_e"]
 
-    t0 = time.time()
-    # logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e)  
-    logcdfs = norm.logcdf(pijs1, loc=0, scale=1)
-    # log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e)
-    print(str(timedelta(seconds=time.time()-t0)))
+        pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
     
+        # print("Non-scaled") 
+        t0 = time.time()
+        logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e)
+        t1 = time.time()
+        # print(str(timedelta(seconds=t1-t0)))
+        nonscaled.append(t1-t0)
+        pijs1 = pijs.reshape((pijs.shape[0]*pijs.shape[1],), order="F")    
+        pijs1 = (pijs1-pijs1.mean())/pijs1.std()
+        pijs1 = pijs1.reshape((pijs.shape[0], pijs.shape[1]), order="F")    
+
+        # print("Scaled") 
+        t0 = time.time()
+        # logcdfs = norm.logcdf(pijs, loc=0, scale=sigma_e)  
+        logcdfs = norm.logcdf(pijs1, loc=0, scale=1)
+        # log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e)
+        t1 = time.time()
+        # print(str(timedelta(seconds=t1-t0)))
+        scaled.append(t1-t0)
+        # print("\n\n")
+
+    
+    print(str(timedelta(seconds=np.percentile(nonscaled, q=50, method="lower"))))
+    print(str(timedelta(seconds=np.percentile(scaled, q=50, method="lower"))))
+    import sys
+    sys.exit(0)
+
     t0 = time.time()
     logcdfs_fast, idxval = norm_logcdf_thresholdapprox(pijs1, 0, sigma_e, threshold_std_no=3)    
     # log1mcdfs_fast = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=0, variance=sigma_e, approxfast=False, threshold_std_no=3)
@@ -261,7 +288,7 @@ def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, 
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize = args
         
-        grid_width_std = 6 
+        grid_width_std = 5
         bounds = []
         if target_param is not None:
             if target_param == "X":
@@ -1257,7 +1284,8 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
     return converged, delta_theta, random_restart
 
 
-def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args):
+def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, 
+                            param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None):
 
     best_theta = None
     computed_loglik = []
@@ -1292,10 +1320,16 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
             params_out[param] = theta[param_positions_dict[param][0]:param_positions_dict[param][1]]
             if isinstance(params_out[param], np.ndarray):
                 params_out[param] = params_out[param].tolist()
-        out_file = "{}/params_out_global_theta_hat.jsonl".format(DIR_out)
-        with open(out_file, 'a') as f:         
-            writer = jsonlines.Writer(f)
-            writer.write(params_out)
+        if data_tempering:
+            out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out, row_start, row_end)
+            with open(out_file, 'a') as f:         
+                writer = jsonlines.Writer(f)
+                writer.write(params_out)
+        else:
+            out_file = "{}/params_out_global_theta_hat.jsonl".format(DIR_out)
+            with open(out_file, 'a') as f:         
+                writer = jsonlines.Writer(f)
+                writer.write(params_out)
 
         # plot utilities
         pathlib.Path("{}/solution_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)   
@@ -1336,7 +1370,7 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
 
     try:
         DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
-            parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
+            _, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, \
             prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
             gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
@@ -1350,7 +1384,8 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
 
     if samples_list is None and parameter_space_dim <= 21201:
         sampler = qmc.Sobol(d=parameter_space_dim, scramble=False)   
-        samples_list = list(sampler.random_base2(m=base2exponent))       
+        samples_list = list(sampler.random_base2(m=base2exponent))
+        idx_all = np.arange(0, len(samples_list), 1).tolist()       
     elif samples_list is None and parameter_space_dim > 21201:
         if d > 2:
             raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
@@ -1361,8 +1396,8 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         samplesselect = rng.choice(samplesreshape, 15*parameter_space_dim, replace=False)
         samples = samplesselect.reshape((15, parameter_space_dim))
         samples_list = list(samples)       
+        idx_all = np.arange(0, len(samples_list), 1).tolist()
     
-    idx_all = np.arange(0, len(samples_list), 1).tolist()
     idx = np.random.choice(idx_all, size=1, replace=False)[0]
     theta_curr = np.asarray(samples_list[idx]).reshape((1, parameter_space_dim))
     idx_all.remove(idx)       
@@ -1403,38 +1438,19 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
     return theta_curr, samples_list, idx_all
 
 
-def data_annealing_init_theta_given_theta_prev(theta_curr, theta_prev, K, J, d, param_positions_dict, parameter_names, annealing_rows):
-
+def data_annealing_init_theta_given_theta_prev(theta_curr, theta_prev, K, J, d, param_positions_dict, parameter_names, annealing_prev, diff_elementwise=False):
+ 
     for param in parameter_names:
-        if param == "X":
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + d*annealing_rows] = theta_prev[0:d*annealing_rows].copy()
-        elif param in ["Z"]:
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows:d*annealing_rows+d*J].copy()
-        elif param in ["Phi"]:            
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J:d*annealing_rows+2*d*J].copy()
-        elif param == "alpha":
-            if "Phi" in parameter_names:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J:d*annealing_rows+2*d*J+J].copy()
-            else:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J:d*annealing_rows+d*J+J].copy()
-        elif param == "beta":
-            if "Phi" in parameter_names:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + annealing_rows] = theta_prev[d*annealing_rows+2*d*J+J:d*annealing_rows+2*d*J+annealing_rows].copy()
-            else:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][0] + annealing_rows] = theta_prev[d*annealing_rows+d*J+J:d*annealing_rows+d*J+J+annealing_rows].copy()
-        elif param == "gamma":
-            if "Phi" in parameter_names:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J:d*annealing_rows+2*d*J+annealing_rows+J+1].copy()
-            else:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J+annealing_rows+J:d*annealing_rows+d*J+annealing_rows+J+1].copy()
-        elif param == "delta":
-            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J+1:d*annealing_rows+2*d*J+annealing_rows+J+2].copy()
-        elif param == "sigma_e":
-            if "Phi" in parameter_names:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+2*d*J+annealing_rows+J+2:d*annealing_rows+2*d*J+annealing_rows+J+3].copy()
-            else:
-                theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[d*annealing_rows+d*J+annealing_rows+J+1:d*annealing_rows+d*J+annealing_rows+J+2].copy()
-
+        if (not diff_elementwise) and param in ["X", "beta"]:
+            continue
+        elif diff_elementwise and param in ["X", "beta"]:
+            if param=="X":
+                theta_curr[annealing_prev[param][0]:annealing_prev[param][1]] = theta_prev[annealing_prev[param][0]:annealing_prev[param][1]].copy()
+                print(param, theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], np.allclose(theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], theta_curr[annealing_prev[param][0]:annealing_prev[param][1]]))
+        else:
+            theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[annealing_prev[param][0]:annealing_prev[param][1]].copy()
+            print(param, theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], np.allclose(theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]]))
+        
     return theta_curr
 
 
@@ -1549,8 +1565,8 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
     if plot_online and fastrun is False:        
         # compute min achievable mse for X, Z under rotation and scaling
         params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
-        X_true = np.asarray(params_true["X"]) # .reshape((d, K), order="F")       
-        Z_true = np.asarray(params_true["Z"]) # .reshape((d, J), order="F")                         
+        X_true = np.asarray(params_true["X"]) # d x K       
+        Z_true = np.asarray(params_true["Z"]) # d x J                         
         params_hat = optimisation_dict2params(theta_hat, param_positions_dict, J, K, d, parameter_names)
 
         for param in parameter_names:        
@@ -1590,18 +1606,17 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                             print_pdf=False)
             else:
                 if param == "X":
-                    X_hat = np.asarray(params_hat[param]) #.reshape((d, K), order="F")       
+                    X_hat = np.asarray(params_hat[param]) # d x K       
                     X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
                     X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
                     se = (((X_true_vec - X_hat_vec)/X_true_vec)**2)/(d*K)                
                 elif param == "Z":
-                    Z_hat = np.asarray(params_hat[param]) #.reshape((d, J), order="F")          
+                    Z_hat = np.asarray(params_hat[param]) # d x J          
                     Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
                     Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
                     se = (((Z_true_vec - Z_hat_vec)/Z_true_vec)**2)/(d*J) 
                 else:
-                    se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])
-                
+                    se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])            
                 
                 per_param_heats[param].append(se)   
                 rel_se = float(np.sum(se))            
@@ -1630,7 +1645,7 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                 vcolor = "red"
                             else:
                                 vcolor = "green"
-                            if restarted=="fullrestart":
+                            if restarted == "fullrestart":
                                 fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                             label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                             font=dict(size=16, family="Times New Roman"),),)
