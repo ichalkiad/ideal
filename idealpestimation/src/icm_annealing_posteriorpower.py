@@ -737,9 +737,10 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     estimated_thetas = []
 
     max_restarts = 2
-    max_partial_restarts = 2 #5
+    max_partial_restarts = 5
     max_halving = 2
-    
+    plot_online = True
+
     if K < 100 and plot_online:
         # to plot X before it has moved for the first time
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), 
@@ -747,8 +748,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                                                     param_positions_dict, args, plot_arrows=True, testparam=testparam, 
                                                                                     testidx=testidx, testvec=vector_index) 
     converged = False
-    random_restart = False
-    # plot_online = False
+    random_restart = False    
     while ((L is not None and l < L)) and (not converged):
         converged = False
         random_restart = False
@@ -759,7 +759,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         xbox = []
         if elementwise:
             i = 0   
-            # plot_online = True           
+            plot_online = True           
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)                    
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
@@ -776,7 +776,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 delta_rate_prev = delta_rate                                                                    
                 total_iter += 1   
                 i += 1   
-                # plot_online = True 
+                plot_online = True 
                 if i % 1000 == 0:
                     print(i, l)                               
             
@@ -928,7 +928,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:                    
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_dataannealtest_optim_numba/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_aplhabeta_idxonly/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing/".format(data_location, m)
@@ -1079,7 +1079,7 @@ if __name__ == "__main__":
     # temperature_steps = [0, 1, 2, 5, 10]
     # temperature_rate = [0.1, 0.2, 0.5, 1] 
 
-    fastrun = True
+    fastrun = False
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
@@ -1089,7 +1089,7 @@ if __name__ == "__main__":
     #/home/ioannischalkiadakis/ideal
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30      
 
     # with open("/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K10000_J100_sigmae0001/0/Utilities.pickle", "rb") as f:
@@ -1110,8 +1110,8 @@ if __name__ == "__main__":
             prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
             gridpoints_num, diff_iter, disp, min_sigma_e, None)  
 
-    test_fastapprox_cdf(parameter_names, data_location, 0, K, J, d, args=args)
-    sys.exit(0)
+    # test_fastapprox_cdf(parameter_names, data_location, 0, K, J, d, args=args)
+    # sys.exit(0)
 
 
     # full, with status quo

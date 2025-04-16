@@ -2735,7 +2735,9 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
         gamma = params_hat["gamma"][0]
         alpha_nbfast = params_hat["alpha"]
         beta_nbfast = params_hat["beta"]    
-        pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)  
+        # pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)  
+        pijs = p_ij_arg_numbafast(X, Z[:, idx].reshape((d, 1)), alpha, beta_nbfast, gamma, K).flatten()
+        # assert(np.allclose(pijs[:, idx], p_ij_arg_numbafast(X, Z[:, idx].reshape((d, 1)), alpha, beta_nbfast, gamma, K).flatten()))        
     else:
         pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)      
     
@@ -2745,7 +2747,7 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
         log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)
         assert np.allclose(log1mcdfs, log1mcdfsbase)
 
-    logpalpha_j = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
+    logpalpha_j = np.sum(Y[:, idx]*logcdfs + (1-Y[:, idx])*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
     if debug:
         assert(np.allclose(logpalpha_j, _logpalpha_j))
     
@@ -2775,7 +2777,9 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
         gamma = params_hat["gamma"][0]
         alpha_nbfast = params_hat["alpha"]
         beta_nbfast = params_hat["beta"]
-        pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)     
+        # pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)     
+        pijs = p_i_arg_numbafast(X[:, idx], Z, alpha_nbfast, beta, gamma)
+        # assert(np.allclose(pijs[idx, :], p_i_arg_numbafast(X[:, idx], Z, alpha_nbfast, beta, gamma)))        
     else:
         pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
         
@@ -2785,7 +2789,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
         log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
         assert np.allclose(log1mcdfs, log1mcdfsbase)
 
-    logpbeta_k = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta))
+    logpbeta_k = np.sum(Y[idx, :]*logcdfs + (1-Y[idx, :])*log1mcdfs + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta))
     if debug:
         assert(np.allclose(logpbeta_k, _logpbeta_k))
     
