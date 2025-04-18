@@ -1554,43 +1554,97 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
         per_param_heats["theta"].append(rel_se)
     # total relative error
     mse_theta_full.append(float(np.sum(rel_se)))
-    if plot_online and fastrun is False:        
-        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
-        savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
-        pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                print_pdf=False)        
+        
+    fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
+    savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
+    pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+    fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                            showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                            print_pdf=False)        
+  
+    # compute min achievable mse for X, Z under rotation and scaling
+    params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+    X_true = np.asarray(params_true["X"]) # d x K       
+    Z_true = np.asarray(params_true["Z"]) # d x J                         
+    params_hat = optimisation_dict2params(theta_hat, param_positions_dict, J, K, d, parameter_names)
 
-    if plot_online and fastrun is False:        
-        # compute min achievable mse for X, Z under rotation and scaling
-        params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
-        X_true = np.asarray(params_true["X"]) # d x K       
-        Z_true = np.asarray(params_true["Z"]) # d x J                         
-        params_hat = optimisation_dict2params(theta_hat, param_positions_dict, J, K, d, parameter_names)
-
-        for param in parameter_names:        
-            if param in ["gamma", "delta", "sigma_e"]:
-                rel_se = np.sum((((params_true[param] - params_hat[param])/params_true[param])**2))/len(params_true[param])
-                # time series plots
-                per_param_ers[param].append(float(rel_se))
-                if plot_online:
-                    fig = make_subplots(specs=[[{"secondary_y": True}]])   
+    for param in parameter_names:        
+        if param in ["gamma", "delta", "sigma_e"]:
+            rel_se = np.sum((((params_true[param] - params_hat[param])/params_true[param])**2))/len(params_true[param])
+            # time series plots
+            per_param_ers[param].append(float(rel_se))
+            if plot_online:
+                fig = make_subplots(specs=[[{"secondary_y": True}]])   
+                fig.add_trace(go.Scatter(
+                                        y=per_param_ers[param], showlegend=False,
+                                        x=np.arange(iteration)                                    
+                                    ), secondary_y=False)
+                fig.add_trace(go.Scatter(
+                                        y=mse_theta_full, showlegend=True,
+                                        x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                                    ), secondary_y=True)
+                for itm in plot_restarts:
+                    scanrep, totaliterations, halvedgammas, restarted = itm
+                    if halvedgammas:
+                        vcolor = "red"
+                    else:
+                        vcolor = "green"
+                    if restarted=="fullrestart":
+                        fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
+                    else:
+                        # partial restart
+                        fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
+                savename = "{}/timeseries_plots/{}_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                        print_pdf=False)
+        else:
+            if param == "X":
+                X_hat = np.asarray(params_hat[param]) # d x K       
+                X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
+                X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
+                se = (((X_true_vec - X_hat_vec)/X_true_vec)**2)/(d*K)                
+            elif param == "Z":
+                Z_hat = np.asarray(params_hat[param]) # d x J          
+                Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
+                Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
+                se = (((Z_true_vec - Z_hat_vec)/Z_true_vec)**2)/(d*J) 
+            else:
+                se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])            
+            
+            per_param_heats[param].append(se)   
+            rel_se = float(np.sum(se))            
+            if plot_online:  
+                fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
+                savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                        print_pdf=False)            
+                parray = np.stack(per_param_heats[param])
+                # timeseries plots
+                for pidx in range(parray.shape[1]):
+                    fig = make_subplots(specs=[[{"secondary_y": True}]]) 
                     fig.add_trace(go.Scatter(
-                                            y=per_param_ers[param], showlegend=False,
-                                            x=np.arange(iteration)                                    
-                                        ), secondary_y=False)
+                                    y=parray[:, pidx], showlegend=False,
+                                    x=np.arange(iteration)                                    
+                                ), secondary_y=False)
                     fig.add_trace(go.Scatter(
-                                            y=mse_theta_full, showlegend=True,
-                                            x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                        ), secondary_y=True)
+                                    y=mse_theta_full, showlegend=True,
+                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                                ), secondary_y=True)
                     for itm in plot_restarts:
                         scanrep, totaliterations, halvedgammas, restarted = itm
                         if halvedgammas:
                             vcolor = "red"
                         else:
                             vcolor = "green"
-                        if restarted=="fullrestart":
+                        if restarted == "fullrestart":
                             fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                         label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                         font=dict(size=16, family="Times New Roman"),),)
@@ -1599,164 +1653,109 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                             fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                         label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                         font=dict(size=16, family="Times New Roman"),),)
-                    savename = "{}/timeseries_plots/{}_squarederror.html".format(DIR_out, param)
+                    savename = "{}/timeseries_plots/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
                     pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                    fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
+                    fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
                                             showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                            print_pdf=False)
-            else:
-                if param == "X":
-                    X_hat = np.asarray(params_hat[param]) # d x K       
-                    X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
-                    X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
-                    se = (((X_true_vec - X_hat_vec)/X_true_vec)**2)/(d*K)                
-                elif param == "Z":
-                    Z_hat = np.asarray(params_hat[param]) # d x J          
-                    Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
-                    Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
-                    se = (((Z_true_vec - Z_hat_vec)/Z_true_vec)**2)/(d*J) 
-                else:
-                    se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])            
-                
-                per_param_heats[param].append(se)   
-                rel_se = float(np.sum(se))            
-                if plot_online:  
-                    fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
-                    savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
-                    pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                    fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                                            showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                            print_pdf=False)            
-                    parray = np.stack(per_param_heats[param])
-                    # timeseries plots
-                    for pidx in range(parray.shape[1]):
-                        fig = make_subplots(specs=[[{"secondary_y": True}]]) 
-                        fig.add_trace(go.Scatter(
-                                        y=parray[:, pidx], showlegend=False,
-                                        x=np.arange(iteration)                                    
-                                    ), secondary_y=False)
-                        fig.add_trace(go.Scatter(
-                                        y=mse_theta_full, showlegend=True,
-                                        x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                    ), secondary_y=True)
-                        for itm in plot_restarts:
-                            scanrep, totaliterations, halvedgammas, restarted = itm
-                            if halvedgammas:
-                                vcolor = "red"
-                            else:
-                                vcolor = "green"
-                            if restarted == "fullrestart":
-                                fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                            font=dict(size=16, family="Times New Roman"),),)
-                            else:
-                                # partial restart
-                                fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                            font=dict(size=16, family="Times New Roman"),),)
-                        savename = "{}/timeseries_plots/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
-                        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                        fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
-                                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                                print_pdf=False)     
+                                            print_pdf=False)     
 
-        if fig_xz is None:
-            fig_xz = go.Figure()  
-        # mean error over all elements of the matrices  
-        Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
-        mse_x_list.append(mse_x)
-        mse_x_nonRT_list.append(mse_x_nonRT)
-        Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
-        mse_z_list.append(mse_z)   
-        mse_z_nonRT_list.append(mse_z_nonRT)
-        # following does not reset when a new full scan starts
-        per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
-        per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
-        per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
-        per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)
-        xbox.append(fullscan)
-        if plot_online:
-            fig_xz.add_trace(go.Box(
-                                y=np.asarray(mse_x_list).tolist(), 
-                                x=xbox,
-                                name="X - total iter. {}".format(iteration),
-                                boxpoints='outliers', line=dict(color="blue")
-                                ))
-            fig_xz.add_trace(go.Box(
-                                y=np.asarray(mse_x_nonRT_list).tolist(), 
-                                x=xbox, opacity=0.5,
-                                name="X (nonRT) - total iter. {}".format(iteration),
-                                boxpoints='outliers', line=dict(color="blue")
-                                ))
-            fig_xz.add_trace(go.Box(
-                                y=np.asarray(mse_z_list).tolist(), 
-                                x=xbox,
-                                name="Z - total iter. {}".format(iteration),
-                                boxpoints='outliers', line=dict(color="green")
-                                ))
-            fig_xz.add_trace(go.Box(
-                                y=np.asarray(mse_z_nonRT_list).tolist(), 
-                                x=xbox, opacity=0.5,
-                                name="Z (nonRT) - total iter. {}".format(iteration),
-                                boxpoints='outliers', line=dict(color="green")
-                                ))
-            fig_xz.update_layout(boxmode="group")
-            savename = "{}/xz_boxplots/relative_mse.html".format(DIR_out)
-            pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-            fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
-                                print_png=True, print_html=True, print_pdf=False)
-            figX = make_subplots(specs=[[{"secondary_y": True}]]) 
-            figX.add_trace(go.Scatter(
-                                    y=per_param_ers["X_rot_translated_mseOverMatrix"], 
-                                    x=np.arange(iteration),
-                                    name="X - min MSE<br>(under rot/transl)"
-                                ), secondary_y=False)
-            figX.add_trace(go.Scatter(
-                                    y=mse_theta_full, 
-                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                ), secondary_y=True)
-            
-            figZ = make_subplots(specs=[[{"secondary_y": True}]]) 
-            figZ.add_trace(go.Scatter(
-                                    y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
-                                    x=np.arange(iteration),
-                                    name="Z - min MSE<br>(under rot/trl)"
-                                ), secondary_y=False)
-            figZ.add_trace(go.Scatter(
-                                    y=mse_theta_full, 
-                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                ), secondary_y=True)
-            for itm in plot_restarts:
-                scanrep, totaliterations, halvedgammas, restarted = itm
-                if halvedgammas:
-                    vcolor = "red"
-                else:
-                    vcolor = "green"
-                if restarted=="fullrestart":
-                    figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                font=dict(size=16, family="Times New Roman"),),)
-                    figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                font=dict(size=16, family="Times New Roman"),),)
-                else:
-                    # partial restart
-                    figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                font=dict(size=16, family="Times New Roman"),),)
-                    figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                font=dict(size=16, family="Times New Roman"),),)
-            savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
-            pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-            fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 
-                                    showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                    print_pdf=False)
-            savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_mse.html".format(DIR_out)
-            pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-            fix_plot_layout_and_save(figZ, savenameZ, xaxis_title="", yaxis_title="MSE", title="", 
-                                    showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                    print_pdf=False)
+    if fig_xz is None:
+        fig_xz = go.Figure()  
+    # mean error over all elements of the matrices  
+    Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+    mse_x_list.append(mse_x)
+    mse_x_nonRT_list.append(mse_x_nonRT)
+    Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+    mse_z_list.append(mse_z)   
+    mse_z_nonRT_list.append(mse_z_nonRT)
+    # following does not reset when a new full scan starts
+    per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
+    per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
+    per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
+    per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)
+    xbox.append(fullscan)
+    if plot_online:
+        fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_x_list).tolist(), 
+                            x=xbox,
+                            name="X - total iter. {}".format(iteration),
+                            boxpoints='outliers', line=dict(color="blue")
+                            ))
+        fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_x_nonRT_list).tolist(), 
+                            x=xbox, opacity=0.5,
+                            name="X (nonRT) - total iter. {}".format(iteration),
+                            boxpoints='outliers', line=dict(color="blue")
+                            ))
+        fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_z_list).tolist(), 
+                            x=xbox,
+                            name="Z - total iter. {}".format(iteration),
+                            boxpoints='outliers', line=dict(color="green")
+                            ))
+        fig_xz.add_trace(go.Box(
+                            y=np.asarray(mse_z_nonRT_list).tolist(), 
+                            x=xbox, opacity=0.5,
+                            name="Z (nonRT) - total iter. {}".format(iteration),
+                            boxpoints='outliers', line=dict(color="green")
+                            ))
+        fig_xz.update_layout(boxmode="group")
+        savename = "{}/xz_boxplots/relative_mse.html".format(DIR_out)
+        pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
+                            print_png=True, print_html=True, print_pdf=False)
+        figX = make_subplots(specs=[[{"secondary_y": True}]]) 
+        figX.add_trace(go.Scatter(
+                                y=per_param_ers["X_rot_translated_mseOverMatrix"], 
+                                x=np.arange(iteration),
+                                name="X - min MSE<br>(under rot/transl)"
+                            ), secondary_y=False)
+        figX.add_trace(go.Scatter(
+                                y=mse_theta_full, 
+                                x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                            ), secondary_y=True)
+        
+        figZ = make_subplots(specs=[[{"secondary_y": True}]]) 
+        figZ.add_trace(go.Scatter(
+                                y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
+                                x=np.arange(iteration),
+                                name="Z - min MSE<br>(under rot/trl)"
+                            ), secondary_y=False)
+        figZ.add_trace(go.Scatter(
+                                y=mse_theta_full, 
+                                x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                            ), secondary_y=True)
+        for itm in plot_restarts:
+            scanrep, totaliterations, halvedgammas, restarted = itm
+            if halvedgammas:
+                vcolor = "red"
+            else:
+                vcolor = "green"
+            if restarted=="fullrestart":
+                figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+                figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+            else:
+                # partial restart
+                figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+                figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+        savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
+        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                print_pdf=False)
+        savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_mse.html".format(DIR_out)
+        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(figZ, savenameZ, xaxis_title="", yaxis_title="MSE", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                print_pdf=False)
 
     return mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox
 
