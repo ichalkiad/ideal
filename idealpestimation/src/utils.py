@@ -1677,27 +1677,27 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
     if plot_online:
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_list).tolist(), 
-                            x=xbox,
+                            x=xbox, show_legend=False,
                             name="X - total iter. {}".format(iteration),
-                            boxpoints='outliers', line=dict(color="blue")
+                            boxpoints=False, line=dict(color="blue")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_nonRT_list).tolist(), 
-                            x=xbox, opacity=0.5,
+                            x=xbox, opacity=0.5, show_legend=False,
                             name="X (nonRT) - total iter. {}".format(iteration),
-                            boxpoints='outliers', line=dict(color="blue")
+                            boxpoints=False, line=dict(color="blue")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_z_list).tolist(), 
-                            x=xbox,
+                            x=xbox, show_legend=False,
                             name="Z - total iter. {}".format(iteration),
-                            boxpoints='outliers', line=dict(color="green")
+                            boxpoints=False, line=dict(color="green")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_z_nonRT_list).tolist(), 
-                            x=xbox, opacity=0.5,
+                            x=xbox, opacity=0.5, show_legend=False,
                             name="Z (nonRT) - total iter. {}".format(iteration),
-                            boxpoints='outliers', line=dict(color="green")
+                            boxpoints=False, line=dict(color="green")
                             ))
         fig_xz.update_layout(boxmode="group")
         savename = "{}/xz_boxplots/relative_mse.html".format(DIR_out)
