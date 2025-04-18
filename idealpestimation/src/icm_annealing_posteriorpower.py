@@ -737,7 +737,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     max_halving = 2
     plot_online = True
 
-    if K < 100 and plot_online:
+    if plot_online and not fastrun:
         # to plot X before it has moved for the first time
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), 
                                                                                     total_iter, fig_posteriors, fig_posteriors_annealed, gamma, 
@@ -763,9 +763,10 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)                
                 # if rng.binomial(1, print_probab_per_coord_iter, 1) == 1:
                 if plot_online:
+                    # only compute errors for latter plotting
                     mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
-                                    param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
+                                    param_positions_dict=param_positions_dict, plot_online=False, mse_theta_full=mse_theta_full, 
                                     fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
                                     mse_z_nonRT_list=mse_z_nonRT_list, per_param_ers=per_param_ers, 
                                     per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, fastrun=fastrun)      
@@ -812,9 +813,10 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                                     temperature_steps, all_gammas)
                     # if rng.binomial(1, print_probab_per_coord_iter, 1) == 1:
                     if plot_online:
+                        # only compute errors for latter plotting
                         mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
                                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
-                                    plot_online=plot_online, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                                    plot_online=False, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                                     mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, 
                                     per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
                                     xbox=xbox, plot_restarts=plot_restarts, fastrun=fastrun)                       

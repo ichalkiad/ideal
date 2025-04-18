@@ -1554,13 +1554,14 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
         per_param_heats["theta"].append(rel_se)
     # total relative error
     mse_theta_full.append(float(np.sum(rel_se)))
-        
-    fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
-    savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
-    pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-    fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                            showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                            print_pdf=False)        
+
+    if plot_online:  
+        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
+        savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
+        pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                print_pdf=False)        
   
     # compute min achievable mse for X, Z under rotation and scaling
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
@@ -1677,25 +1678,25 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
     if plot_online:
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_list).tolist(), 
-                            x=xbox, show_legend=False,
+                            x=xbox, showlegend=False,
                             name="X - total iter. {}".format(iteration),
                             boxpoints=False, line=dict(color="blue")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_nonRT_list).tolist(), 
-                            x=xbox, opacity=0.5, show_legend=False,
+                            x=xbox, opacity=0.5, showlegend=False,
                             name="X (nonRT) - total iter. {}".format(iteration),
                             boxpoints=False, line=dict(color="blue")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_z_list).tolist(), 
-                            x=xbox, show_legend=False,
+                            x=xbox, showlegend=False,
                             name="Z - total iter. {}".format(iteration),
                             boxpoints=False, line=dict(color="green")
                             ))
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_z_nonRT_list).tolist(), 
-                            x=xbox, opacity=0.5, show_legend=False,
+                            x=xbox, opacity=0.5, showlegend=False,
                             name="Z (nonRT) - total iter. {}".format(iteration),
                             boxpoints=False, line=dict(color="green")
                             ))
