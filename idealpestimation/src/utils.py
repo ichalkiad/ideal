@@ -458,7 +458,7 @@ def rank_and_return_best_theta(estimated_thetas, Y, J, K, d, parameter_names, ds
     computed_loglik = []
     for theta_set in estimated_thetas:
         theta = theta_set[0]
-        loglik = log_full_likelihood(Y, theta.copy(), param_positions_dict, args)
+        loglik, _ = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
         computed_loglik.append(loglik[0])
     # sort in increasing order, i.e. from worst to best solution
     sorted_idx = np.argsort(np.asarray(computed_loglik))
@@ -1288,24 +1288,30 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
                             param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None):
 
     best_theta = None
-    computed_loglik = []
+    computed_logfullposterior = []
     for theta_set in estimated_thetas:
         theta = theta_set[0]
-        loglik = log_full_likelihood(Y, theta.copy(), param_positions_dict, args)
-        computed_loglik.append(loglik[0])
+        _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
+        computed_logfullposterior.append(posterior[0])
     # sort in increasing order, i.e. from worst to best solution
-    sorted_idx = np.argsort(np.asarray(computed_loglik))
-    sorted_idx_lst = sorted_idx.tolist()    
-    for i in sorted_idx_lst:
+    sorted_idx = np.argsort(np.asarray(computed_logfullposterior))
+    sorted_idx_lst = sorted_idx.tolist()  
+    # save in the order of best to worst solution
+    best2worst = list(reversed(sorted_idx_lst))    
+    theta_list = []
+    posterior_list = []
+    for i in best2worst:
         theta = estimated_thetas[i][0]
+        theta_list.append(theta)
         best_theta = theta.copy()
         mse_x_RT = estimated_thetas[i][1]
         mse_z_RT = estimated_thetas[i][2]
         mse_x_nonRT = estimated_thetas[i][3]
         mse_z_nonRT = estimated_thetas[i][4]
-        loglik = computed_loglik[i]
+        logposterior = computed_logfullposterior[i]
+        posterior_list.append(logposterior)
         params_out = dict()
-        params_out["loglik"] = loglik
+        params_out["logfullposterior"] = logposterior
         params_out["mse_x_RT"] = mse_x_RT
         params_out["mse_z_RT"] = mse_z_RT
         params_out["mse_x_nonRT"] = mse_x_nonRT
@@ -1347,20 +1353,27 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
                                 showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
     
     # 2D projection of solutions
-    raw_symbols = SymbolValidator().values
-    theta_matrix = np.array([th[0] for th in estimated_thetas])
-    computed_loglik = np.array(computed_loglik)[sorted_idx]
+    # raw_symbols = SymbolValidator().values    
+    theta_matrix = np.asarray(theta_list)
+    computed_logfullposterior = np.array(posterior_list)    
     if theta_matrix.shape[0] > 1:
-        theta_matrix = theta_matrix[sorted_idx, :]
+        # theta_matrix = theta_matrix[sorted_idx, :]
         pca = PCA(n_components=2)
         components = pca.fit_transform(theta_matrix)
         fig = go.Figure()
         for i in range(components.shape[0]):
-            fig.add_trace(go.Scatter(x=[components[i, 0]], y=[components[i, 1]], marker_symbol=raw_symbols[i], text=computed_loglik[i]))
+            opacity = (components.shape[0]-i)/(components.shape[0])
+            fig.add_trace(go.Scatter(x=[components[i, 0]], y=[components[i, 1]], marker_color="green",
+                                    marker_symbol="circle", name="Rank {}".format(i+1), marker_opacity=opacity,
+                                    text="pc2/(pc1+pc2) = {:.2f}/({:.2f}+{:.2f}) = {:.2f}"                                                      
+                                    "<br>full posterior = {:.3f}".format(components[i, 1], components[i, 0], components[i, 1],
+                                                                components[i, 1]/(components[i, 0] + components[i, 1]),
+                                                                computed_logfullposterior[i])))
         fig.update(layout_yaxis_range = [np.min(components[:,1])-1,np.max(components[:,1])+1])
-        fix_plot_layout_and_save(fig, "{}/solution_plots/project_solutions_2D.html".format(DIR_out, sorted_idx_lst.index(i)), 
-                                    xaxis_title="PC1", yaxis_title="PC2", title="", 
-                                    showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
+        fix_plot_layout_and_save(fig, "{}/solution_plots/project_solutions_2D.html".format(DIR_out, 
+                                sorted_idx_lst.index(i)), xaxis_title="PC1", yaxis_title="PC2", 
+                                title="s1 = {:.3f}, s2 = {:.3f}".format(pca.singular_values_[0], pca.singular_values_[1]), 
+                                showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
         # fig.show()
     
     return best_theta
@@ -1555,13 +1568,13 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
     # total relative error
     mse_theta_full.append(float(np.sum(rel_se)))
 
-    if plot_online:  
-        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
-        savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
-        pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                print_pdf=False)        
+    # if plot_online:  
+    #     fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
+    #     savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
+    #     pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+    #     fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+    #                             showgrid=False, showlegend=True, print_png=True, print_html=False, 
+    #                             print_pdf=False)        
   
     # compute min achievable mse for X, Z under rotation and scaling
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
@@ -1621,15 +1634,19 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
             per_param_heats[param].append(se)   
             rel_se = float(np.sum(se))            
             if plot_online:  
-                fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
-                savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
-                pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                        print_pdf=False)            
+                # fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
+                # savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
+                # pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                # fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                #                         showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                #                         print_pdf=False)            
                 parray = np.stack(per_param_heats[param])
                 # timeseries plots
                 for pidx in range(parray.shape[1]):
+
+                    if pidx not in [10, 75, 82, 115]:  #################################################
+                        continue
+
                     fig = make_subplots(specs=[[{"secondary_y": True}]]) 
                     fig.add_trace(go.Scatter(
                                     y=parray[:, pidx], showlegend=False,
@@ -1659,23 +1676,23 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                     fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
                                             showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                             print_pdf=False)     
-
-    if fig_xz is None:
-        fig_xz = go.Figure()  
-    # mean error over all elements of the matrices  
-    Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
-    mse_x_list.append(mse_x)
-    mse_x_nonRT_list.append(mse_x_nonRT)
-    Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
-    mse_z_list.append(mse_z)   
-    mse_z_nonRT_list.append(mse_z_nonRT)
-    # following does not reset when a new full scan starts
-    per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
-    per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
-    per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
-    per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)
-    xbox.append(fullscan)
     if plot_online:
+        if fig_xz is None:
+            fig_xz = go.Figure()  
+        # mean error over all elements of the matrices  
+        Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+        mse_x_list.append(mse_x)
+        mse_x_nonRT_list.append(mse_x_nonRT)
+        Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+        mse_z_list.append(mse_z)   
+        mse_z_nonRT_list.append(mse_z_nonRT)
+        # following does not reset when a new full scan starts
+        per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
+        per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
+        per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
+        per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)
+        xbox.append(fullscan)
+    
         fig_xz.add_trace(go.Box(
                             y=np.asarray(mse_x_list).tolist(), 
                             x=xbox, showlegend=False,
@@ -2126,10 +2143,13 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
     
-    data_loglik = log_full_likelihood(Y, theta_curr.copy(), param_positions_dict, args)
+    data_loglik, data_fullposterior = log_full_posterior(Y, theta_curr.copy(), param_positions_dict, args)
 
     # non-annealed posterior
     for theta_i in range(parameter_space_dim):       
+
+        if theta_i not in [10, 75, 82, 115, 120, 121]: ####################################################
+            continue
         
         if testparam is not None and elementwise and testidx is not None and param_positions_dict[testparam][0] + testidx != theta_i:
             continue
@@ -2144,10 +2164,10 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
 
         if target_param in ["gamma", "delta", "sigma_e"]:
             if len(plotting_thetas[target_param]) == 0:                
-                plotting_thetas[target_param].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                plotting_thetas[target_param].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
             elif len(plotting_thetas[target_param]) >= 1 and plotting_thetas[target_param][-1][2] != theta_curr[theta_i]:
                 # plot if parameter value has moved
-                plotting_thetas[target_param].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                plotting_thetas[target_param].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
         else:            
             if isinstance(plotting_thetas[target_param], list) and len(plotting_thetas[target_param]) == 0:                
                 plotting_thetas[target_param] = dict()
@@ -2168,24 +2188,24 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
                         else:
                             plotting_thetas[target_param][jj] = []                                  
                 if target_param in ["X", "Z", "Phi"]:
-                    plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                    plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
                 else:
-                    plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                    plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
             else:
                 if target_param in ["X", "Z", "Phi"]:                    
                     if len(plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate]) == 0:                        
-                        plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                        plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
                     elif len(plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate]) >= 1 and \
                         plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate][-1][2] != theta_curr[theta_i]:
                         # plot if parameter value has moved
-                        plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                        plotting_thetas[target_param][vector_index_in_param_matrix][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
                 else:
                     if len(plotting_thetas[target_param][vector_coordinate]) == 0:                        
-                        plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                        plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
                     elif len(plotting_thetas[target_param][vector_coordinate]) >= 1 and \
                         plotting_thetas[target_param][vector_coordinate][-1][2] != theta_curr[theta_i]:
                         # plot if parameter value has moved
-                        plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_loglik))
+                        plotting_thetas[target_param][vector_coordinate].append((vect_iter, iteration, theta_curr[theta_i], data_fullposterior))
 
         if elementwise or (not elementwise and target_param in ["alpha", "beta", "gamma", "delta", "sigma_e"]):                                         
             fig_posteriors[target_param] = plot_posterior_elementwise(outdir="{}/estimation_posteriors/".format(DIR_out), param=target_param, 
@@ -2221,6 +2241,12 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
     if gamma != 1:
         # annealed posterior
         for theta_i in range(parameter_space_dim):     
+
+
+            if theta_i not in [10, 75, 82, 115, 120, 121]: ####################################################
+                continue
+
+
             if testidx is not None and testparam is not None and param_positions_dict[testparam][0] + testidx != theta_i:
                 continue  
             target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=theta_i, d=d)     
@@ -2439,7 +2465,7 @@ class TruncatedInverseGamma:
         
         return logpdf
 
-def log_full_likelihood(Y, theta_curr, param_positions_dict, args):
+def log_full_posterior(Y, theta_curr, param_positions_dict, args):
 
     try:
         DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
@@ -2456,31 +2482,32 @@ def log_full_likelihood(Y, theta_curr, param_positions_dict, args):
                             prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
 
 
-    ll_utility_part = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
+    loglik = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
     params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)
 
-    loglik = ll_utility_part
+    full_posterior = 0.0
+    full_posterior += loglik
     X = np.asarray(params_hat["X"]).reshape((d, K), order="F")
-    loglik += multivariate_normal.logpdf(X.T, mean=prior_loc_x, cov=prior_scale_x).sum()
+    full_posterior += multivariate_normal.logpdf(X.T, mean=prior_loc_x, cov=prior_scale_x).sum()
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F") 
-    loglik += multivariate_normal.logpdf(Z.T, mean=prior_loc_z, cov=prior_scale_z).sum()
+    full_posterior += multivariate_normal.logpdf(Z.T, mean=prior_loc_z, cov=prior_scale_z).sum()
     if "Phi" in parameter_names:
         Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F") 
-        loglik += multivariate_normal.logpdf(Phi.T, mean=prior_loc_phi, cov=prior_scale_phi).sum()
+        full_posterior += multivariate_normal.logpdf(Phi.T, mean=prior_loc_phi, cov=prior_scale_phi).sum()
     alpha = params_hat["alpha"]
-    loglik += norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha).sum()
+    full_posterior += norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha).sum()
     beta = params_hat["beta"]
-    loglik += norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta).sum()
+    full_posterior += norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta).sum()
     gamma = params_hat["gamma"]
-    loglik += norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma)
+    full_posterior += norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma)
     if "delta" in parameter_names:
         delta = params_hat["delta"]
-        loglik += norm.logpdf(delta, loc=prior_loc_delta, scale=prior_scale_delta)
+        full_posterior += norm.logpdf(delta, loc=prior_loc_delta, scale=prior_scale_delta)
     sigma_e = params_hat["sigma_e"]
     tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=min_sigma_e, upper=10*np.sqrt(prior_scale_sigmae)+prior_scale_sigmae) 
-    loglik += tig.logpdf(sigma_e)
+    full_posterior += tig.logpdf(sigma_e)
 
-    return loglik
+    return loglik, full_posterior
 
 def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, dst_func, 
                                 param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, debug=False, numbafast=True):
