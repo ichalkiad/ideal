@@ -22,6 +22,7 @@ from plotly.subplots import make_subplots
 from itertools import product
 import numba
 from numba import prange
+from joblib import Parallel, delayed
 
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
@@ -459,7 +460,7 @@ def rank_and_return_best_theta(estimated_thetas, Y, J, K, d, parameter_names, ds
     for theta_set in estimated_thetas:
         theta = theta_set[0]
         loglik, _ = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
-        computed_loglik.append(loglik[0])
+        computed_loglik.append(loglik)
     # sort in increasing order, i.e. from worst to best solution
     sorted_idx = np.argsort(np.asarray(computed_loglik))
     sorted_idx_lst = sorted_idx.tolist() 
@@ -612,7 +613,8 @@ def parse_input_arguments():
     
     return parser.parse_args()
 
-def negative_loglik_coordwise(theta_coordval, theta_idx, full_theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False, numbafast=True):
+def negative_loglik_coordwise(theta_coordval, theta_idx, full_theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, 
+                              penalty_weight_Z, constant_Z, debug=False, numbafast=True):
 
     full_theta[theta_idx] = theta_coordval
     params_hat = optimisation_dict2params(full_theta, param_positions_dict, J, K, d, parameter_names)    
@@ -646,8 +648,112 @@ def negative_loglik_coordwise(theta_coordval, theta_idx, full_theta, Y, J, K, d,
     if debug:
         assert(np.allclose(nll, _nll))
 
-    sum_Z_J_vectors = np.sum(Z, axis=1)    
-    return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+    # sum_Z_J_vectors = np.sum(Z, axis=1)    
+    return -nll #+ penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+
+def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, row_blocks, col_blocks, block_size_rows, block_size_cols, njobs=30):
+    
+    nll = 0.0
+    blocks = []
+    for i in range(row_blocks):
+        for j in range(col_blocks):
+            row_start = i * block_size_rows
+            row_end = min(row_start + block_size_rows, K)
+            col_start = j * block_size_cols
+            col_end = min(col_start + block_size_cols, J)
+            
+            blocks.append((row_start, row_end, col_start, col_end))
+
+            # nll += process_single_block(Y[row_start:row_end, col_start:col_end], 
+            #                             X[:, row_start:row_end] , Z[:, col_start:col_end], 
+            #                             alpha[col_start:col_end], beta[row_start:row_end], gamma, errloc, errscale, row_end-row_start)
+    
+    results = Parallel(n_jobs=njobs)(
+        delayed(process_single_block)(Y[row_start:row_end, col_start:col_end], 
+                                        X[:, row_start:row_end] , Z[:, col_start:col_end], 
+                                        alpha[col_start:col_end], beta[row_start:row_end], gamma, errloc, errscale, row_end-row_start) 
+                                        for row_start, row_end, col_start, col_end in blocks
+    )
+
+    nll = np.sum(results)
+
+    return nll
+
+def process_single_block(Y, X, Z, alpha, beta, gamma, errloc, errscale, block_size_rows):
+    
+    pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, block_size_rows)        
+    philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+    nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)    
+    
+    return nll
+
+def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y, J, K, d, 
+                                    parameter_names, dst_func, param_positions_dict, 
+                                    penalty_weight_Z, constant_Z, debug=False, numbafast=True,
+                                    block_size_rows=5000, block_size_cols=100):
+
+    full_theta[theta_idx] = theta_coordval
+    params_hat = optimisation_dict2params(full_theta, param_positions_dict, J, K, d, parameter_names)    
+    mu_e = 0
+    sigma_e = params_hat["sigma_e"]
+    errscale = sigma_e
+    errloc = mu_e          
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")    
+    _nll = 0
+    if debug:
+        for i in range(K):
+            for j in range(J):
+                pij_arg = p_ij_arg(i, j, full_theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+                philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+
+    if numbafast:    
+        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
+        gamma = params_hat["gamma"][0]
+        alpha = params_hat["alpha"]
+        beta = params_hat["beta"]
+        t0 = time.time()
+        pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)        
+        philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+        log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+        nll_nonparallel = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
+        elapsedtime = timedelta(seconds=time.time()-t0)            
+        total_seconds = int(elapsedtime.total_seconds())
+        milliseconds = (time.time()-t0)*1000 
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write({"K":K, "J":J, "block_size_rows": block_size_rows, 
+                          "block_size_cols":block_size_cols, "parallel": 0, 
+                          "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
+    
+    row_blocks = (K + block_size_rows - 1) // block_size_rows
+    col_blocks = (J + block_size_cols - 1) // block_size_cols
+    t0 = time.time()
+    nll = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, 
+                                row_blocks, col_blocks, block_size_rows, block_size_cols)
+    elapsedtime = timedelta(seconds=time.time()-t0)    
+    milliseconds = (time.time()-t0)*1000         
+    total_seconds = int(elapsedtime.total_seconds())
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
+    with open(out_file, 'a') as f:         
+        writer = jsonlines.Writer(f)
+        writer.write({"K":K, "J":J, "block_size_rows":block_size_rows, 
+                    "block_size_cols":block_size_cols, "parallel":1, 
+                    "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
+    assert(np.allclose(nll_nonparallel, nll))
+
+    if debug:
+        assert(np.allclose(nll, _nll))
+  
+    return -nll
+
 
 def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False, numbafast=True):
 
@@ -736,8 +842,8 @@ def negative_loglik_coordwise_jax(theta_coordval, theta_idx, full_theta, Y, J, K
     if debug:
         assert(jnp.allclose(nll, _nll))
         
-    sum_Z_J_vectors = jnp.sum(Z, axis=1)
-    return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
+    # sum_Z_J_vectors = jnp.sum(Z, axis=1)
+    return -nll[0] #+ jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
 def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
 
@@ -1597,21 +1703,21 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                         y=mse_theta_full, showlegend=True,
                                         x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                                     ), secondary_y=True)
-                for itm in plot_restarts:
-                    scanrep, totaliterations, halvedgammas, restarted = itm
-                    if halvedgammas:
-                        vcolor = "red"
-                    else:
-                        vcolor = "green"
-                    if restarted=="fullrestart":
-                        fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                    font=dict(size=16, family="Times New Roman"),),)
-                    else:
-                        # partial restart
-                        fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                    font=dict(size=16, family="Times New Roman"),),)
+                # for itm in plot_restarts:
+                #     scanrep, totaliterations, halvedgammas, restarted = itm
+                #     if halvedgammas:
+                #         vcolor = "red"
+                #     else:
+                #         vcolor = "green"
+                #     if restarted=="fullrestart":
+                #         fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                #                     font=dict(size=16, family="Times New Roman"),),)
+                #     else:
+                #         # partial restart
+                #         fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                #                     font=dict(size=16, family="Times New Roman"),),)
                 savename = "{}/timeseries_plots/{}_squarederror.html".format(DIR_out, param)
                 pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                 fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
@@ -1656,21 +1762,21 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                     y=mse_theta_full, showlegend=True,
                                     x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                                 ), secondary_y=True)
-                    for itm in plot_restarts:
-                        scanrep, totaliterations, halvedgammas, restarted = itm
-                        if halvedgammas:
-                            vcolor = "red"
-                        else:
-                            vcolor = "green"
-                        if restarted == "fullrestart":
-                            fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                        font=dict(size=16, family="Times New Roman"),),)
-                        else:
-                            # partial restart
-                            fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                        font=dict(size=16, family="Times New Roman"),),)
+                    # for itm in plot_restarts:
+                    #     scanrep, totaliterations, halvedgammas, restarted = itm
+                    #     if halvedgammas:
+                    #         vcolor = "red"
+                    #     else:
+                    #         vcolor = "green"
+                    #     if restarted == "fullrestart":
+                    #         fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                    #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                    #                     font=dict(size=16, family="Times New Roman"),),)
+                    #     else:
+                    #         # partial restart
+                    #         fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                    #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                    #                     font=dict(size=16, family="Times New Roman"),),)
                     savename = "{}/timeseries_plots/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
                     pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                     fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
@@ -1743,27 +1849,27 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                 y=mse_theta_full, 
                                 x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                             ), secondary_y=True)
-        for itm in plot_restarts:
-            scanrep, totaliterations, halvedgammas, restarted = itm
-            if halvedgammas:
-                vcolor = "red"
-            else:
-                vcolor = "green"
-            if restarted=="fullrestart":
-                figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
-                figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
-            else:
-                # partial restart
-                figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
-                figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
+        # for itm in plot_restarts:
+        #     scanrep, totaliterations, halvedgammas, restarted = itm
+        #     if halvedgammas:
+        #         vcolor = "red"
+        #     else:
+        #         vcolor = "green"
+        #     if restarted=="fullrestart":
+        #         figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+        #                     font=dict(size=16, family="Times New Roman"),),)
+        #         figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+        #                     font=dict(size=16, family="Times New Roman"),),)
+        #     else:
+        #         # partial restart
+        #         figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+        #                     font=dict(size=16, family="Times New Roman"),),)
+        #         figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+        #                     font=dict(size=16, family="Times New Roman"),),)
         savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
         pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 

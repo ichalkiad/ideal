@@ -22,7 +22,9 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                                 time, datetime, timedelta, parse_input_arguments, \
                                                                     negative_loglik_coordwise, negative_loglik_coordwise_jax, collect_mle_results, \
                                                                         collect_mle_results_batchsize_analysis, sample_theta_curr_init,\
-                                                                        get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta
+                                                                        get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta,\
+                                                                        negative_loglik_coordwise_parallel
+
 
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
@@ -37,7 +39,8 @@ def optimise_negativeloglik_elementwise(param, idx, vector_index_in_param_matrix
     
     niter_minimize = None
     theta_test_in = theta_curr.copy()
-    f = lambda x: negative_loglik_coordwise(x, idx, theta_test_in, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
+    f = lambda x: negative_loglik_coordwise(x, idx, theta_test_in, Y, J, N, d, 
+                                            parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
     if parallel:
         f_jax = None
     else:    
@@ -253,11 +256,11 @@ def estimate_mle(args):
                                                                     args, samples_list=theta_samples_list, 
                                                                     idx_all=idx_all, rng=rng)
     args_theta = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, N, d, N, dst_func, L,
-            parameter_space_dim_theta, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
-            prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
-            prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,
-            prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
-            param_positions_dict_theta, rng, batchsize)   
+                parameter_space_dim_theta, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
+                prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
+                prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,
+                prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
+                param_positions_dict_theta, rng, batchsize)   
 
     max_full_restarts = 3
     full_restarts = 0
@@ -485,7 +488,6 @@ def estimate_mle(args):
         writer = jsonlines.Writer(f)
         writer.write(grid_and_optim_outcome)
     
-    ipdb.set_trace()
     # keep best estimate for weighted combining
     best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus =\
                                             rank_and_return_best_theta(estimated_thetas, Y, J, N, d, parameter_names, 
@@ -928,11 +930,11 @@ if __name__ == "__main__":
 
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 1000
+    niter = 3
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 30
-    batchsize = 34
+    batchsize = 64
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]
@@ -956,7 +958,7 @@ if __name__ == "__main__":
     prior_scale_delta= 1        
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
