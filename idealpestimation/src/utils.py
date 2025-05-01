@@ -205,7 +205,96 @@ def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d, args=None):
     # print(logcdfs_fast[inval])
     
 
+def plot_loglik_runtimes(filerec, outdir="/tmp/"):
 
+    rows_100k_nonparallel = {"block_rows_500": [], "block_rows_1000": []}
+    rows_1M_nonparallel = {"block_rows_3000": [], "block_rows_5000": []}
+    rows_100k_parallel = {"block_rows_500": [], "block_rows_1000": []}
+    rows_1M_parallel = {"block_rows_3000": [], "block_rows_5000": []}
+    with jsonlines.open(filerec, mode="r") as f:              
+        for result in f.iter(type=dict, skip_invalid=True):
+
+            if result["parallel"] == 1:
+                if result["K"] == 3004:
+                    if result["block_size_rows"] == 500:
+                        rows_100k_parallel["block_rows_500"].append(result["milliseconds"])
+                    else:
+                        rows_100k_parallel["block_rows_1000"].append(result["milliseconds"])
+                else:
+                    if result["block_size_rows"] == 3000:
+                        rows_1M_parallel["block_rows_3000"].append(result["milliseconds"])
+                    else:
+                        rows_1M_parallel["block_rows_5000"].append(result["milliseconds"])
+            else:
+                if result["K"] == 3004:
+                    if result["block_size_rows"] == 500:
+                        rows_100k_nonparallel["block_rows_500"].append(result["milliseconds"])
+                    else:
+                        rows_100k_nonparallel["block_rows_1000"].append(result["milliseconds"])
+                else:
+                    if result["block_size_rows"] == 3000:
+                        rows_1M_nonparallel["block_rows_3000"].append(result["milliseconds"])
+                    else:
+                        rows_1M_nonparallel["block_rows_5000"].append(result["milliseconds"])
+    fig = go.Figure()
+    fig.add_trace(go.Box(
+                    y=rows_100k_nonparallel["block_rows_500"], 
+                    showlegend=True, opacity=0.5, marker_color="red",
+                    # x=x, 
+                    boxpoints=False, name="500x100"
+                ))
+    fig.add_trace(go.Box(
+                    y=rows_100k_nonparallel["block_rows_1000"], 
+                    showlegend=True, opacity=0.5, marker_color="red",
+                    # x=x, 
+                    boxpoints=False, name="1000x100"
+                ))
+    fig.add_trace(go.Box(
+                    y=rows_100k_parallel["block_rows_500"], 
+                    showlegend=True, opacity=0.5, marker_color="green",
+                    # x=x,
+                    boxpoints=False, name="500x100"
+                ))
+    fig.add_trace(go.Box(
+                    y=rows_100k_parallel["block_rows_1000"], 
+                    showlegend=True, opacity=0.5, marker_color="green",
+                    # x=x,
+                    boxpoints=False, name="1000x100"
+                ))
+    
+
+    fig.add_trace(go.Box(
+                    y=rows_1M_nonparallel["block_rows_3000"], 
+                    showlegend=True, opacity=1, marker_color="red",
+                    # x=x, 
+                    boxpoints=False, name="3000x100"
+                ))
+    fig.add_trace(go.Box(
+                    y=rows_1M_nonparallel["block_rows_5000"], 
+                    showlegend=True, opacity=1, marker_color="red",
+                    # x=x, 
+                    boxpoints=False, name="5000x100"
+                ))
+    fig.add_trace(go.Box(
+                    y=rows_1M_parallel["block_rows_3000"], 
+                    showlegend=True, opacity=1, marker_color="green",
+                    # x=x,
+                    boxpoints=False, name="3000x100"
+                ))
+    fig.add_trace(go.Box(
+                    y=rows_1M_parallel["block_rows_5000"], 
+                    showlegend=True, opacity=1, marker_color="green",
+                    # x=x,
+                    boxpoints=False, name="5000x100"
+                ))
+    fig.update_layout(
+        boxmode='group'
+    )
+    savename = "{}/likelihood_timings_parallel.html".format(outdir)
+    pathlib.Path("{}/".format(outdir)).mkdir(parents=True, exist_ok=True)     
+    fix_plot_layout_and_save(fig, savename, xaxis_title="Block sizes", yaxis_title="milliseconds", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, print_pdf=False)
 
 ####################### MLE #############################
 
@@ -476,8 +565,7 @@ def rank_and_return_best_theta(estimated_thetas, Y, J, K, d, parameter_names, ds
     
     return best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus
 
-
-def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict, theta_true, param_positions_dict):
+def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict, error_nonrotated_dict, theta_true, param_positions_dict):
 
     params_out = dict()
     params_out["X"] = np.zeros((d*K,))
@@ -499,7 +587,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                 raise AttributeError("Should have 1 output estimation file.")
             for estim in estimates_names:
                 with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
-                    for result in f.iter(type=dict, skip_invalid=True):      
+                    for result in f.iter(type=dict, skip_invalid=True):
                         if result["mle_estimation_status"] is False or \
                             result["variance_estimation_status"] is None or\
                                 result["variance_estimation_status"] is False or result["local theta"] is None:
@@ -514,7 +602,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                                 params_out[param][start*d:end*d] = theta
                                 X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
                                 X_hat = np.asarray(theta).reshape((d, end-start), order="F")
-                                Rx, tx, mse_trial_m_batch_index, _ = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                                Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                             else:
                                 params_out[param][start:end] = theta                            
                                 mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])**2)
@@ -526,16 +614,18 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                             if param == "Z":
                                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")  
                                 Z_hat = np.asarray(theta).reshape((d, J), order="F")
-                                Rz, tz, mse_trial_m_batch_index, _ = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                                Rz, tz, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                             else:
                                 mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]))**2)
             
             if error_dict is not None:
                 error_dict[param].append(mse_trial_m_batch_index)
+            if error_nonrotated_dict is not None and param in ["X", "Z", "Phi"]:
+                error_nonrotated_dict[param].append(mse_nonrotated_trial_m_batch_index)
 
         if param in ["X", "beta"]:
             params_out[param] = params_out[param]        
-        else:                
+        else:             
             all_weights = np.stack(all_weights)
             if param not in ["Z", "Phi", "alpha"]:
                 all_weights = all_weights.flatten()
@@ -548,7 +638,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
             weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
             params_out[param] = weighted_estimate
     
-    return params_out, error_dict
+    return params_out, error_dict, error_nonrotated_dict
 
 def parse_input_arguments():
 
@@ -651,7 +741,8 @@ def negative_loglik_coordwise(theta_coordval, theta_idx, full_theta, Y, J, K, d,
     # sum_Z_J_vectors = np.sum(Z, axis=1)    
     return -nll #+ penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
 
-def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, row_blocks, col_blocks, block_size_rows, block_size_cols, njobs=30):
+def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, row_blocks, col_blocks,
+                            block_size_rows, block_size_cols, njobs=5, prior=None):
     
     nll = 0.0
     blocks = []
@@ -671,7 +762,7 @@ def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale,
     results = Parallel(n_jobs=njobs)(
         delayed(process_single_block)(Y[row_start:row_end, col_start:col_end], 
                                         X[:, row_start:row_end] , Z[:, col_start:col_end], 
-                                        alpha[col_start:col_end], beta[row_start:row_end], gamma, errloc, errscale, row_end-row_start) 
+                                        alpha[col_start:col_end], beta[row_start:row_end], gamma, errloc, errscale, row_end-row_start, prior) 
                                         for row_start, row_end, col_start, col_end in blocks
     )
 
@@ -679,12 +770,17 @@ def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale,
 
     return nll
 
-def process_single_block(Y, X, Z, alpha, beta, gamma, errloc, errscale, block_size_rows):
+def process_single_block(Y, X, Z, alpha, beta, gamma, errloc, errscale, block_size_rows, prior=None):
     
     pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, block_size_rows)        
     philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
-    nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)    
+    log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)    
+
+    if prior is not None:
+        nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf + prior)    
+    else:
+        nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)    
+        
     
     return nll
 
@@ -709,7 +805,7 @@ def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y,
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
                 _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
 
-    if numbafast:    
+    if numbafast and debug:    
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
         gamma = params_hat["gamma"][0]
         alpha = params_hat["alpha"]
@@ -736,24 +832,70 @@ def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y,
     t0 = time.time()
     nll = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, 
                                 row_blocks, col_blocks, block_size_rows, block_size_cols)
-    elapsedtime = timedelta(seconds=time.time()-t0)    
-    milliseconds = (time.time()-t0)*1000         
-    total_seconds = int(elapsedtime.total_seconds())
-    hours = total_seconds // 3600
-    minutes = (total_seconds % 3600) // 60
-    out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
-    with open(out_file, 'a') as f:         
-        writer = jsonlines.Writer(f)
-        writer.write({"K":K, "J":J, "block_size_rows":block_size_rows, 
-                    "block_size_cols":block_size_cols, "parallel":1, 
-                    "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
-    assert(np.allclose(nll_nonparallel, nll))
+    if debug:
+        elapsedtime = timedelta(seconds=time.time()-t0)    
+        milliseconds = (time.time()-t0)*1000         
+        total_seconds = int(elapsedtime.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write({"K":K, "J":J, "block_size_rows":block_size_rows, 
+                        "block_size_cols":block_size_cols, "parallel":1, 
+                        "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
 
     if debug:
         assert(np.allclose(nll, _nll))
+        assert(np.allclose(nll_nonparallel, nll))
   
     return -nll
 
+
+def negative_loglik_parallel(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, 
+                            constant_Z, debug=False, numbafast=True, block_size_rows=500, block_size_cols=100):
+
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
+    mu_e = 0
+    sigma_e = params_hat["sigma_e"]
+    errscale = sigma_e
+    errloc = mu_e          
+    Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")    
+    _nll = 0
+    if debug:
+        for i in range(K):
+            for j in range(J):
+                pij_arg = p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+                philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
+                _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
+    
+    if numbafast:    
+        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
+        gamma = params_hat["gamma"][0]
+        alpha = params_hat["alpha"]
+        beta = params_hat["beta"]
+        pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
+        philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+        log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+        nllnumba = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
+    else:
+        pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
+        philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
+        log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
+        nllnumba = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
+       
+
+    row_blocks = (K + block_size_rows - 1) // block_size_rows
+    col_blocks = (J + block_size_cols - 1) // block_size_cols    
+    nll = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, 
+                                row_blocks, col_blocks, block_size_rows, block_size_cols)
+
+    if debug:
+        assert(np.allclose(nll, _nll))
+        assert(np.allclose(nll, nllnumba))
+
+    return -nll
 
 def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False, numbafast=True):
 
@@ -788,8 +930,8 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
     if debug:
         assert(np.allclose(nll, _nll))
 
-    sum_Z_J_vectors = np.sum(Z, axis=1)    
-    return -nll + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+    # sum_Z_J_vectors = np.sum(Z, axis=1)    
+    return -nll #+ penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
 
 def negative_loglik_coordwise_jax(theta_coordval, theta_idx, full_theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False):
 
@@ -986,9 +1128,12 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
     parameter_space_dim = (K+J)*d + J + K + 2    
     params_out_jsonl = dict()
     estimation_error_per_trial = dict()
+    estimation_error_per_trial_nonrotated = dict()
     estimation_error_per_trial_per_batch = dict()
+    estimation_error_per_trial_per_batch_nonrotated = dict()
     for param in parameter_names:
         estimation_error_per_trial[param] = dict()
+        estimation_error_per_trial_nonrotated[param] = dict()
     for batchsize in batchsizes:                    
         print(batchsize)
         for m in range(M):   
@@ -1000,33 +1145,43 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
             fig_m_over_databatches = go.Figure()
             estimation_error_per_trial_per_batch[m] = dict()
             estimation_error_per_trial_per_batch[m][batchsize] = dict()
+            estimation_error_per_trial_per_batch_nonrotated[m] = dict()
+            estimation_error_per_trial_per_batch_nonrotated[m][batchsize] = dict()
             for param in parameter_names:            
-                estimation_error_per_trial_per_batch[m][batchsize][param] = []                     
+                estimation_error_per_trial_per_batch[m][batchsize][param] = []       
+                estimation_error_per_trial_per_batch_nonrotated[m][batchsize][param] = []                     
             data_location = "{}/{}/{}/".format(data_topdir, m, batchsize)
-            params_out, estimation_error_per_trial_per_batch[m][batchsize] = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
-                                                            estimation_error_per_trial_per_batch[m][batchsize], theta_true, param_positions_dict)    
+            params_out, estimation_error_per_trial_per_batch[m][batchsize], estimation_error_per_trial_per_batch_nonrotated[m][batchsize] = \
+                                    combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
+                                                                estimation_error_per_trial_per_batch[m][batchsize], 
+                                                                estimation_error_per_trial_per_batch_nonrotated[m][batchsize], 
+                                                                theta_true, param_positions_dict)    
             for param in parameter_names:
                 print(param)
                 if batchsize not in estimation_error_per_trial[param].keys():
                     estimation_error_per_trial[param][batchsize] = []
+                    estimation_error_per_trial_nonrotated[param][batchsize] = []
                 if param == "X":                
                     params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                     X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                     X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
                     Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                     estimation_error_per_trial[param][batchsize].append(float(mse_x))
+                    estimation_error_per_trial_nonrotated[param][batchsize].append(float(mse_x_nonRT))
                 elif param == "Z":
                     params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                     Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                     Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
                     Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
-                    estimation_error_per_trial[param][batchsize].append(float(mse_z))              
+                    estimation_error_per_trial[param][batchsize].append(float(mse_z))  
+                    estimation_error_per_trial_nonrotated[param][batchsize].append(float(mse_z_nonRT))            
                 elif param == "Phi":            
                     params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                     Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                     Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
                     Rphi, tphi, mse_phi, mse_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
                     estimation_error_per_trial[param][batchsize].append(float(mse_phi))
+                    estimation_error_per_trial[param][batchsize].append(float(mse_phi_nonRT))
                 elif param in ["beta", "alpha"]:
                     params_out_jsonl[param] = params_out[param].tolist()     
                     mse = np.sum(((theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2)/len(params_out_jsonl[param])
@@ -1060,6 +1215,11 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
             fig.add_trace(go.Box(
                             y=np.asarray(estimation_error_per_trial[param][batchsize]).tolist(), showlegend=True, name=param,
                             x=[batchsize]*len(estimation_error_per_trial[param][batchsize]), boxpoints='outliers'                                
+                        ))
+            if param in ["X", "Z", "Phi"]:
+                fig.add_trace(go.Box(
+                            y=np.asarray(estimation_error_per_trial_nonrotated[param][batchsize]).tolist(), showlegend=True, name="{} - nonRT".format(param),
+                            x=[batchsize]*len(estimation_error_per_trial_nonrotated[param][batchsize]), boxpoints='outliers'                                
                         ))
         savename = "{}/mle_estimation_plots/mse_overAllTrials_{}_weighted_boxplot.html".format(data_topdir, param)
         pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)     
@@ -1390,6 +1550,27 @@ def check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict,
     return converged, delta_theta, random_restart
 
 
+def parse_timedelta_string(time_str):
+
+    if "day" in time_str:
+        day_part, time_part = time_str.split(", ")
+        days = int(day_part.split()[0])
+    else:
+        days = 0
+        time_part = time_str
+
+    hours, minutes, seconds = time_part.split(":")
+    seconds, microseconds = (seconds.split(".") + ['0'])[:2]
+    tdelta = timedelta(
+        days=days,
+        hours=int(hours),
+        minutes=int(minutes),
+        seconds=int(seconds),
+        microseconds=int(microseconds)
+    )
+
+    return tdelta
+
 def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, 
                             param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None):
 
@@ -1424,7 +1605,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
         params_out["mse_z_nonRT"] = mse_z_nonRT
         params_out["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")        
         params_out["elapsedtime"] = elapsedtime        
-        time_obj = datetime.strptime(params_out["elapsedtime"], '%H:%M:%S.%f')
+        time_obj = parse_timedelta_string(params_out["elapsedtime"]) #datetime.strptime(params_out["elapsedtime"], '%H:%M:%S.%f')
         hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
         params_out["elapsedtime_hours"] = hours
         params_out["param_positions_dict"] = param_positions_dict
@@ -2587,8 +2768,8 @@ def log_full_posterior(Y, theta_curr, param_positions_dict, args):
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
 
-
-    loglik = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
+    ############################################################################
+    loglik = -negative_loglik_parallel(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=True)
     params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)
 
     full_posterior = 0.0
@@ -2655,7 +2836,8 @@ def log_conditional_posterior_x_vec(xi, i, Y, theta, J, K, d, parameter_names, d
     return logpx_i*gamma
 
 def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, 
-                                param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, debug=False, numbafast=True):
+                                param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, 
+                                debug=False, numbafast=True):
     # l denotes the coordinate of vector x_i
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -2796,7 +2978,7 @@ def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, d
 
 
 def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
-                                   prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, debug=False, numbafast=True):
+                                   prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, debug=True, numbafast=True, block_size_rows=10):
     # l denotes the coordinate of vector z_i
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -2833,6 +3015,16 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
     if debug:
         assert(np.allclose(logpz_il, _logpz_il))
 
+    # row_blocks = (K + block_size_rows - 1) // block_size_rows
+    # block_size_cols = J
+    # col_blocks = 1
+    # logpz_il_par = process_blocks_parallel(Y, X, Z, alpha, betai, gamma, K, J, mu_e, sigma_e, 
+    #                             row_blocks, col_blocks, block_size_rows, block_size_cols, 
+    #                             prior=multivariate_normal.logpdf(z_il, mean=prior_loc_z, cov=prior_scale_z))
+    # if debug:
+    #     assert(np.allclose(logpz_il, logpz_il_par))
+
+
     if abs(penalty_weight_Z) > 1e-10:
         sum_Z_J_vectors = np.sum(Z, axis=1)    
         obj = logpz_il + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
@@ -2843,7 +3035,9 @@ def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_name
 
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, 
-                                    param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1, debug=False, numbafast=True):
+                                    param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1, 
+                                    debug=True, numbafast=True, block_size_rows=10):    
+    
     # Assuming independent, Gaussian alphas.
     # Hence, even when evaluating with vector parameters, we use the uni-dimensional posterior for alpha.
 
@@ -2866,7 +3060,7 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma = params_hat["gamma"][0]
-        alpha_nbfast = params_hat["alpha"]
+        # alpha_nbfast = params_hat["alpha"]
         beta_nbfast = params_hat["beta"]    
         # pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)  
         pijs = p_ij_arg_numbafast(X, Z[:, idx].reshape((d, 1)), alpha, beta_nbfast, gamma, K).flatten()
@@ -2883,6 +3077,15 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
     logpalpha_j = np.sum(Y[:, idx]*logcdfs + (1-Y[:, idx])*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
     if debug:
         assert(np.allclose(logpalpha_j, _logpalpha_j))
+
+    row_blocks = (K + block_size_rows - 1) // block_size_rows
+    block_size_cols = J
+    col_blocks = 1
+    logpalpha_j_par = process_blocks_parallel(Y, X, Z, alpha, params_hat["beta"], gamma, K, J, mu_e, sigma_e, 
+                                row_blocks, col_blocks, block_size_rows, block_size_cols, 
+                                prior=norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
+    if debug:
+        assert(np.allclose(logpalpha_j, logpalpha_j_par))
     
     return logpalpha_j*gamma
 
@@ -2909,7 +3112,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma = params_hat["gamma"][0]
         alpha_nbfast = params_hat["alpha"]
-        beta_nbfast = params_hat["beta"]
+        # beta_nbfast = params_hat["beta"]
         # pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)     
         pijs = p_i_arg_numbafast(X[:, idx], Z, alpha_nbfast, beta, gamma)
         # assert(np.allclose(pijs[idx, :], p_i_arg_numbafast(X[:, idx], Z, alpha_nbfast, beta, gamma)))        
@@ -2929,7 +3132,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     return logpbeta_k*gamma
 
 def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1, prior_loc_gamma=0, 
-                                    prior_scale_gamma=1, debug=False, numbafast=True):    
+                                    prior_scale_gamma=1, debug=True, numbafast=True, block_size_rows=10, block_size_cols=10):    
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
@@ -2965,7 +3168,15 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
     logpgamma = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma))
     if debug:
         assert(np.allclose(logpgamma, _logpgamma))
-                    
+                        
+    row_blocks = (K + block_size_rows - 1) // block_size_rows
+    col_blocks = (J + block_size_cols - 1) // block_size_cols    
+    logpgamma_par = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, mu_e, sigma_e, 
+                                row_blocks, col_blocks, block_size_rows, block_size_cols, 
+                                prior=norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma))
+    if debug:
+        assert(np.allclose(logpgamma, logpgamma_par))
+
     return logpgamma*gamma_annealing
 
 def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, prior_loc_delta=0, prior_scale_delta=1, debug=False):    
@@ -2994,7 +3205,8 @@ def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, d
     return logpdelta**gamma
 
 def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, 
-                                    prior_loc_sigmae=0, prior_scale_sigmae=1, min_sigma_e=0.0001, debug=False, numbafast=True):    
+                                    prior_loc_sigmae=0, prior_scale_sigmae=1, min_sigma_e=0.0001, 
+                                    debug=True, numbafast=True, block_size_rows=10, block_size_cols=10):    
     
     tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=min_sigma_e, upper=10*np.sqrt(prior_scale_sigmae)+prior_scale_sigmae)    
     mu_e = 0
@@ -3029,6 +3241,14 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
     logpsigma_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + tig.logpdf(sigma_e))   
     if debug:
         assert(np.allclose(logpsigma_e, _logpsigma_e)) 
+
+    row_blocks = (K + block_size_rows - 1) // block_size_rows
+    col_blocks = (J + block_size_cols - 1) // block_size_cols    
+    logpsigma_e_par = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, mu_e, sigma_e, 
+                                row_blocks, col_blocks, block_size_rows, block_size_cols, 
+                                prior=tig.logpdf(sigma_e))
+    if debug:
+        assert(np.allclose(logpsigma_e, logpsigma_e_par))
         
     return logpsigma_e*gamma
 
