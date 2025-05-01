@@ -735,7 +735,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     max_restarts = 2
     max_partial_restarts = 5
     max_halving = 2
-    plot_online = True
+    plot_online = False
 
     if plot_online: # and not fastrun: #################################
         # to plot X before it has moved for the first time
@@ -927,7 +927,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:                    
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_aplhabeta_idxonly_fastrun_someplots/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_testparallelposterior/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing/".format(data_location, m)
@@ -1051,7 +1051,7 @@ if __name__ == "__main__":
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]
     # no status quo
-    parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
+    parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2  
     gridpoints_num = 30 #10, 15, 30
     prior_loc_x = np.zeros((d,))
@@ -1088,7 +1088,7 @@ if __name__ == "__main__":
     #/home/ioannischalkiadakis/ideal
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30      
 
     # with open("/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K10000_J100_sigmae0001/0/Utilities.pickle", "rb") as f:
