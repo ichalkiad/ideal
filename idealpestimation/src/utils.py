@@ -23,7 +23,7 @@ from itertools import product
 import numba
 from numba import prange
 from joblib import Parallel, delayed
-
+import pandas as pd
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=True):
@@ -213,8 +213,9 @@ def plot_loglik_runtimes(filerec, outdir="/tmp/"):
     rows_1M_parallel = {"block_rows_3000": [], "block_rows_5000": []}
     with jsonlines.open(filerec, mode="r") as f:              
         for result in f.iter(type=dict, skip_invalid=True):
-
-            if result["parallel"] == 1:
+            if np.isnan(result["milliseconds"]) or not isinstance(result["milliseconds"], float):
+                continue
+            if result["parallel"] == 1:                
                 if result["K"] == 3004:
                     if result["block_size_rows"] == 500:
                         rows_100k_parallel["block_rows_500"].append(result["milliseconds"])
@@ -236,63 +237,85 @@ def plot_loglik_runtimes(filerec, outdir="/tmp/"):
                         rows_1M_nonparallel["block_rows_3000"].append(result["milliseconds"])
                     else:
                         rows_1M_nonparallel["block_rows_5000"].append(result["milliseconds"])
+   
     fig = go.Figure()
-    fig.add_trace(go.Box(
-                    y=rows_100k_nonparallel["block_rows_500"], 
-                    showlegend=True, opacity=0.5, marker_color="red",
-                    # x=x, 
-                    boxpoints=False, name="500x100"
-                ))
-    fig.add_trace(go.Box(
-                    y=rows_100k_nonparallel["block_rows_1000"], 
-                    showlegend=True, opacity=0.5, marker_color="red",
-                    # x=x, 
-                    boxpoints=False, name="1000x100"
-                ))
-    fig.add_trace(go.Box(
-                    y=rows_100k_parallel["block_rows_500"], 
-                    showlegend=True, opacity=0.5, marker_color="green",
-                    # x=x,
-                    boxpoints=False, name="500x100"
-                ))
-    fig.add_trace(go.Box(
-                    y=rows_100k_parallel["block_rows_1000"], 
-                    showlegend=True, opacity=0.5, marker_color="green",
-                    # x=x,
-                    boxpoints=False, name="1000x100"
-                ))
-    
+    fig100k = go.Figure()
+    fig1M = go.Figure()
+    for par in [0, 1]:
+        for Ksize in ["100k", "1M"]:
+            if par == 0:
+                market_color = "red"
+                if Ksize == "100k":
+                    opacity = 0.5
+                    loaddict = rows_100k_nonparallel
+                else:
+                    opacity = 1
+                    loaddict = rows_1M_nonparallel
+            else:
+                market_color = "green"
+                if Ksize == "100k":
+                    opacity = 0.5
+                    loaddict = rows_100k_parallel
+                else:
+                    opacity = 1
+                    loaddict = rows_1M_parallel
+            for keys in loaddict.keys():                
+                df = pd.DataFrame.from_dict({"vals":loaddict[keys]})
+                lower_bound = df.vals.quantile(0.05)
+                upper_bound = df.vals.quantile(0.95)
+                df_filtered = df.vals[(df.vals >= lower_bound) & (df.vals <= upper_bound)].dropna()
+                if "500" in keys and "5000" not in keys:
+                    name = "500x100"
+                elif "1000" in keys:
+                    name = "1000x100"
+                elif "3000" in keys:
+                    name = "3000x100"
+                elif "5000" in keys:
+                    name = "5000x100"                
+                fig.add_trace(go.Box(
+                                y=df_filtered.values.flatten().tolist(), 
+                                showlegend=True, opacity=opacity, marker_color=market_color,
+                                # x=x, 
+                                boxpoints="outliers", name=name
+                            ))
+                if Ksize == "100k":
+                    fig100k.add_trace(go.Box(
+                                y=df_filtered.values.flatten().tolist(), 
+                                showlegend=True, opacity=1, marker_color=market_color,
+                                # x=x, 
+                                boxpoints="outliers", name=name
+                            ))
+                else:
+                    fig1M.add_trace(go.Box(
+                                y=df_filtered.values.flatten().tolist(), 
+                                showlegend=True, opacity=1, marker_color=market_color,
+                                # x=x, 
+                                boxpoints="outliers", name=name
+                            ))
 
-    fig.add_trace(go.Box(
-                    y=rows_1M_nonparallel["block_rows_3000"], 
-                    showlegend=True, opacity=1, marker_color="red",
-                    # x=x, 
-                    boxpoints=False, name="3000x100"
-                ))
-    fig.add_trace(go.Box(
-                    y=rows_1M_nonparallel["block_rows_5000"], 
-                    showlegend=True, opacity=1, marker_color="red",
-                    # x=x, 
-                    boxpoints=False, name="5000x100"
-                ))
-    fig.add_trace(go.Box(
-                    y=rows_1M_parallel["block_rows_3000"], 
-                    showlegend=True, opacity=1, marker_color="green",
-                    # x=x,
-                    boxpoints=False, name="3000x100"
-                ))
-    fig.add_trace(go.Box(
-                    y=rows_1M_parallel["block_rows_5000"], 
-                    showlegend=True, opacity=1, marker_color="green",
-                    # x=x,
-                    boxpoints=False, name="5000x100"
-                ))
     fig.update_layout(
         boxmode='group'
     )
     savename = "{}/likelihood_timings_parallel.html".format(outdir)
     pathlib.Path("{}/".format(outdir)).mkdir(parents=True, exist_ok=True)     
     fix_plot_layout_and_save(fig, savename, xaxis_title="Block sizes", yaxis_title="milliseconds", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, print_pdf=False)
+
+    fig100k.update_layout(
+        boxmode='group'
+    )
+    savename = "{}/likelihood_timings_parallel_100k.html".format(outdir)
+    pathlib.Path("{}/".format(outdir)).mkdir(parents=True, exist_ok=True)     
+    fix_plot_layout_and_save(fig100k, savename, xaxis_title="Block sizes", yaxis_title="milliseconds", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, print_pdf=False)
+    fig1M.update_layout(
+        boxmode='group'
+    )
+    savename = "{}/likelihood_timings_parallel_1M.html".format(outdir)
+    pathlib.Path("{}/".format(outdir)).mkdir(parents=True, exist_ok=True)     
+    fix_plot_layout_and_save(fig1M, savename, xaxis_title="Block sizes", yaxis_title="milliseconds", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=True, print_html=True, print_pdf=False)
 
@@ -742,30 +765,33 @@ def negative_loglik_coordwise(theta_coordval, theta_idx, full_theta, Y, J, K, d,
     return -nll #+ penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
 
 def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, row_blocks, col_blocks,
-                            block_size_rows, block_size_cols, njobs=5, prior=None):
+                            block_size_rows, block_size_cols, njobs=20, prior=None):
     
     nll = 0.0
     blocks = []
-    for i in range(row_blocks):
-        for j in range(col_blocks):
+    if col_blocks == -1:
+        # index of vector j
+        col_start = block_size_cols
+        col_end = col_start + 1
+        for i in range(row_blocks):
             row_start = i * block_size_rows
             row_end = min(row_start + block_size_rows, K)
-            col_start = j * block_size_cols
-            col_end = min(col_start + block_size_cols, J)
-            
             blocks.append((row_start, row_end, col_start, col_end))
-
-            # nll += process_single_block(Y[row_start:row_end, col_start:col_end], 
-            #                             X[:, row_start:row_end] , Z[:, col_start:col_end], 
-            #                             alpha[col_start:col_end], beta[row_start:row_end], gamma, errloc, errscale, row_end-row_start)
-    
+    else:
+        for i in range(row_blocks):       
+            for j in range(col_blocks):
+                row_start = i * block_size_rows
+                row_end = min(row_start + block_size_rows, K)
+                col_start = j * block_size_cols
+                col_end = min(col_start + block_size_cols, J)                       
+                blocks.append((row_start, row_end, col_start, col_end))
     results = Parallel(n_jobs=njobs)(
         delayed(process_single_block)(Y[row_start:row_end, col_start:col_end], 
                                         X[:, row_start:row_end] , Z[:, col_start:col_end], 
-                                        alpha[col_start:col_end], beta[row_start:row_end], gamma, errloc, errscale, row_end-row_start, prior) 
-                                        for row_start, row_end, col_start, col_end in blocks
+                                        alpha[col_start:col_end], beta[row_start:row_end], 
+                                        gamma, errloc, errscale, row_end-row_start, prior) 
+                                    for row_start, row_end, col_start, col_end in blocks
     )
-
     nll = np.sum(results)
 
     return nll
@@ -780,8 +806,7 @@ def process_single_block(Y, X, Z, alpha, beta, gamma, errloc, errscale, block_si
         nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf + prior)    
     else:
         nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)    
-        
-    
+            
     return nll
 
 def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y, J, K, d, 
@@ -853,7 +878,7 @@ def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y,
 
 
 def negative_loglik_parallel(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, 
-                            constant_Z, debug=False, numbafast=True, block_size_rows=500, block_size_cols=100):
+                            constant_Z, debug=False, numbafast=True, block_size_rows=2000, block_size_cols=100):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
     mu_e = 0
@@ -869,31 +894,17 @@ def negative_loglik_parallel(theta, Y, J, K, d, parameter_names, dst_func, param
                 philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij_arg, mean=errloc, variance=errscale)
                 _nll += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf
-    
-    if numbafast:    
-        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
-        gamma = params_hat["gamma"][0]
-        alpha = params_hat["alpha"]
-        beta = params_hat["beta"]
-        pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
-        philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-        log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
-        nllnumba = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
-    else:
-        pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
-        philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
-        log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
-        nllnumba = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
-       
-
+   
+    X = np.asarray(params_hat["X"]).reshape((d, K), order="F")         
+    gamma = params_hat["gamma"][0]
+    alpha = params_hat["alpha"]
+    beta = params_hat["beta"]    
     row_blocks = (K + block_size_rows - 1) // block_size_rows
     col_blocks = (J + block_size_cols - 1) // block_size_cols    
     nll = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, 
                                 row_blocks, col_blocks, block_size_rows, block_size_cols)
-
     if debug:
-        assert(np.allclose(nll, _nll))
-        assert(np.allclose(nll, nllnumba))
+        assert(np.allclose(nll, _nll))            
 
     return -nll
 
@@ -1410,6 +1421,16 @@ def p_i_arg_numbafast(xi, Z, alpha, betai, gamma):
     
     return phi
 
+@numba.jit(nopython=True, cache=True)
+def p_j_arg_numbafast(X, zj, alphaj, beta, gamma):
+    
+    z_broadcast = zj[:, np.newaxis]    
+    diff_xz = z_broadcast - X
+    dst_xz = np.sum(diff_xz * diff_xz, axis=0)             
+    phi = gamma*dst_xz + alphaj + beta                   
+    
+    return phi
+
 
 def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_dict, use_jax=False):
 
@@ -1425,7 +1446,6 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
             delta = 0
         alpha = jnp.asarray(params_hat["alpha"])
         beta = jnp.asarray(params_hat["beta"])
-        # c = params_hat["c"]
         gamma = jnp.asarray(params_hat["gamma"])        
         if isinstance(i, int) and isinstance(j, int):            
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]            
@@ -1442,8 +1462,29 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
                     dst_xphi = 0
                 phi = gamma*dst_xz - delta*dst_xphi + alpha + betai     
                 return phi
+            def pairwise_dst_fast_j(zj_alphaj):                                
+                if "Phi" in params_hat.keys():
+                    zj, phi_j, alphaj = zj_alphaj  
+                else:
+                    zj, alphaj = zj_alphaj                            
+                z_broadcast = zj[:, jnp.newaxis]
+                diff_xz = z_broadcast - X
+                dst_xz = jnp.sum(diff_xz * diff_xz, axis=0)
+                if "Phi" in params_hat.keys():
+                    phi_broadcast = phi_j[:, jnp.newaxis]
+                    diff_xphi = phi_broadcast - X
+                    dst_xphi = jnp.sum(diff_xphi * diff_xphi, axis=1)
+                else:
+                    dst_xphi = 0                
+                phi = gamma*dst_xz - delta*dst_xphi + alphaj + beta
+                return phi
             if isinstance(i, int) and j is None:        
-                phi = pairwise_dst_fast((X[:, i], beta[i]))            
+                phi = pairwise_dst_fast((X[:, i], beta[i]))       
+            elif i is None and isinstance(j, int):      
+                if "Phi" in params_hat.keys():       
+                    phi = pairwise_dst_fast_j((Z[:, j], Phi[:, j], alpha[j]))                
+                else:
+                    phi = pairwise_dst_fast_j((Z[:, j], alpha[j]))             
             elif i is None and j is None:                          
                 arr_list = list(map(pairwise_dst_fast, zip(X.transpose(), beta)))
                 phi = jnp.vstack(arr_list)
@@ -1458,9 +1499,7 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
             delta = 0
         alpha = params_hat["alpha"]
         beta = params_hat["beta"]
-        # c = params_hat["c"]
-        gamma = params_hat["gamma"]       
-
+        gamma = params_hat["gamma"]  
         if isinstance(i, int) and isinstance(j, int):
             phi = gamma*dst_func(X[:, i], Z[:, j]) - delta*dst_func(X[:, i], Phi[:, j]) + alpha[j] + beta[i]
         else:
@@ -1476,8 +1515,29 @@ def p_ij_arg(i, j, theta, J, K, d, parameter_names, dst_func, param_positions_di
                     dst_xphi = 0
                 phi = gamma*dst_xz - delta*dst_xphi + alpha + betai     
                 return phi
+            def pairwise_dst_fast_j(zj_alphaj):                                
+                if "Phi" in params_hat.keys():
+                    zj, phi_j, alphaj = zj_alphaj  
+                else:
+                    zj, alphaj = zj_alphaj                            
+                z_broadcast = zj[:, np.newaxis]
+                diff_xz = z_broadcast - X
+                dst_xz = np.sum(diff_xz * diff_xz, axis=0)
+                if "Phi" in params_hat.keys():
+                    phi_broadcast = phi_j[:, np.newaxis]
+                    diff_xphi = phi_broadcast - X
+                    dst_xphi = np.sum(diff_xphi * diff_xphi, axis=1)
+                else:
+                    dst_xphi = 0                
+                phi = gamma*dst_xz - delta*dst_xphi + alphaj + beta
+                return phi
             if isinstance(i, int) and j is None:        
                 phi = pairwise_dst_fast((X[:, i], beta[i]))            
+            elif i is None and isinstance(j, int):      
+                if "Phi" in params_hat.keys():       
+                    phi = pairwise_dst_fast_j((Z[:, j], Phi[:, j], alpha[j]))                
+                else:
+                    phi = pairwise_dst_fast_j((Z[:, j], alpha[j]))                
             elif i is None and j is None:                          
                 arr_list = list(map(pairwise_dst_fast, zip(X.transpose(), beta)))
                 phi = np.vstack(arr_list)
@@ -1569,7 +1629,7 @@ def parse_timedelta_string(time_str):
         microseconds=int(microseconds)
     )
 
-    return tdelta
+    return tdelta, int(hours), int(minutes), int(seconds), int(microseconds)
 
 def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, 
                             param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None):
@@ -1605,8 +1665,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
         params_out["mse_z_nonRT"] = mse_z_nonRT
         params_out["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")        
         params_out["elapsedtime"] = elapsedtime        
-        time_obj = parse_timedelta_string(params_out["elapsedtime"]) #datetime.strptime(params_out["elapsedtime"], '%H:%M:%S.%f')
-        hours = (time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600 + time_obj.microsecond / 3600000000)
+        time_obj, hours, mins, sec, microsec = parse_timedelta_string(params_out["elapsedtime"])
         params_out["elapsedtime_hours"] = hours
         params_out["param_positions_dict"] = param_positions_dict
         for param in parameter_names:
@@ -1854,15 +1913,18 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
         per_param_heats["theta"].append(rel_se)
     # total relative error
     mse_theta_full.append(float(np.sum(rel_se)))
+    
+    ###############################
+    if plot_online:  
+        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
+        savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
+        pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                print_pdf=False)        
+    ###############################
 
-    # if plot_online:  
-    #     fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
-    #     savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
-    #     pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-    #     fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-    #                             showgrid=False, showlegend=True, print_png=True, print_html=False, 
-    #                             print_pdf=False)        
-  
+
     # compute min achievable mse for X, Z under rotation and scaling
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
     X_true = np.asarray(params_true["X"]) # d x K       
@@ -1884,21 +1946,23 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                         y=mse_theta_full, showlegend=True,
                                         x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                                     ), secondary_y=True)
-                # for itm in plot_restarts:
-                #     scanrep, totaliterations, halvedgammas, restarted = itm
-                #     if halvedgammas:
-                #         vcolor = "red"
-                #     else:
-                #         vcolor = "green"
-                #     if restarted=="fullrestart":
-                #         fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                #                     font=dict(size=16, family="Times New Roman"),),)
-                #     else:
-                #         # partial restart
-                #         fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                #                     font=dict(size=16, family="Times New Roman"),),)
+                ###############################
+                for itm in plot_restarts:
+                    scanrep, totaliterations, halvedgammas, restarted = itm
+                    if halvedgammas:
+                        vcolor = "red"
+                    else:
+                        vcolor = "green"
+                    if restarted=="fullrestart":
+                        fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
+                    else:
+                        # partial restart
+                        fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
+                ###############################
                 savename = "{}/timeseries_plots/{}_squarederror.html".format(DIR_out, param)
                 pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                 fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
@@ -1921,18 +1985,20 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
             per_param_heats[param].append(se)   
             rel_se = float(np.sum(se))            
             if plot_online:  
-                # fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
-                # savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
-                # pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                # fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                #                         showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                #                         print_pdf=False)            
+                ###############################
+                fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
+                savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                        print_pdf=False)            
+                ###############################
                 parray = np.stack(per_param_heats[param])
                 # timeseries plots
                 for pidx in range(parray.shape[1]):
 
-                    if pidx not in [10, 75, 82, 115]:  #################################################
-                        continue
+                    # if pidx not in [10, 75, 82, 115]:  #################################################
+                    #     continue
 
                     fig = make_subplots(specs=[[{"secondary_y": True}]]) 
                     fig.add_trace(go.Scatter(
@@ -1943,21 +2009,23 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                     y=mse_theta_full, showlegend=True,
                                     x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                                 ), secondary_y=True)
-                    # for itm in plot_restarts:
-                    #     scanrep, totaliterations, halvedgammas, restarted = itm
-                    #     if halvedgammas:
-                    #         vcolor = "red"
-                    #     else:
-                    #         vcolor = "green"
-                    #     if restarted == "fullrestart":
-                    #         fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                    #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                    #                     font=dict(size=16, family="Times New Roman"),),)
-                    #     else:
-                    #         # partial restart
-                    #         fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                    #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                    #                     font=dict(size=16, family="Times New Roman"),),)
+                    ###############################
+                    for itm in plot_restarts:
+                        scanrep, totaliterations, halvedgammas, restarted = itm
+                        if halvedgammas:
+                            vcolor = "red"
+                        else:
+                            vcolor = "green"
+                        if restarted == "fullrestart":
+                            fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                        font=dict(size=16, family="Times New Roman"),),)
+                        else:
+                            # partial restart
+                            fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                        font=dict(size=16, family="Times New Roman"),),)
+                    ###############################
                     savename = "{}/timeseries_plots/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
                     pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
                     fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
@@ -2030,27 +2098,29 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                 y=mse_theta_full, 
                                 x=np.arange(iteration), line_color="red", name="Θ MSE"                                
                             ), secondary_y=True)
-        # for itm in plot_restarts:
-        #     scanrep, totaliterations, halvedgammas, restarted = itm
-        #     if halvedgammas:
-        #         vcolor = "red"
-        #     else:
-        #         vcolor = "green"
-        #     if restarted=="fullrestart":
-        #         figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-        #                     font=dict(size=16, family="Times New Roman"),),)
-        #         figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-        #                     font=dict(size=16, family="Times New Roman"),),)
-        #     else:
-        #         # partial restart
-        #         figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-        #                     font=dict(size=16, family="Times New Roman"),),)
-        #         figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-        #                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-        #                     font=dict(size=16, family="Times New Roman"),),)
+        ###############################
+        for itm in plot_restarts:
+            scanrep, totaliterations, halvedgammas, restarted = itm
+            if halvedgammas:
+                vcolor = "red"
+            else:
+                vcolor = "green"
+            if restarted=="fullrestart":
+                figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+                figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+            else:
+                # partial restart
+                figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+                figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                            font=dict(size=16, family="Times New Roman"),),)
+        ###############################
         savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
         pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 
@@ -2435,8 +2505,8 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
     # non-annealed posterior
     for theta_i in range(parameter_space_dim):       
 
-        if theta_i not in [10, 75, 82, 115, 120, 121]: ####################################################
-            continue
+        # if theta_i not in [10, 75, 82, 115, 120, 121]: ####################################################
+        #     continue
         
         if testparam is not None and elementwise and testidx is not None and param_positions_dict[testparam][0] + testidx != theta_i:
             continue
@@ -2530,8 +2600,8 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
         for theta_i in range(parameter_space_dim):     
 
 
-            if theta_i not in [10, 75, 82, 115, 120, 121]: ####################################################
-                continue
+            # if theta_i not in [10, 75, 82, 115, 120, 121]: ####################################################
+            #     continue
 
 
             if testidx is not None and testparam is not None and param_positions_dict[testparam][0] + testidx != theta_i:
@@ -2768,8 +2838,12 @@ def log_full_posterior(Y, theta_curr, param_positions_dict, args):
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
 
-    ############################################################################
-    loglik = -negative_loglik_parallel(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=True)
+    # if False:
+    if K*J <= 10e4:
+        loglik = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
+    else:
+        loglik = -negative_loglik_parallel(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
+            
     params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)
 
     full_posterior = 0.0
@@ -2876,221 +2950,240 @@ def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_name
              
     return logpx_il*gamma
 
-
-def log_conditional_posterior_phi_vec(phii, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1, debug=False):
+def log_conditional_posterior_phi_vec(phi_j, j, Y, theta, J, K, d, parameter_names, dst_func, 
+                                      param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, 
+                                      gamma=1, debug=False, numbafast=True, block_size_rows=10):
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")                         
-    Phi[:, i] = phii
+    Phi[:, j] = phi_j
     theta_test = theta.copy()
     theta_test[param_positions_dict["Phi"][0]:param_positions_dict["Phi"][1]] = Phi.reshape((d*J,), order="F")
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
     if debug:
-        _logpphi_i = 0
-        for j in range(J):
+        _logpphi_j = 0
+        for i in range(K):
             pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
             philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            _logpphi_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi)
+            _logpphi_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(phi_j, mean=prior_loc_phi, cov=prior_scale_phi)
 
-    pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
+    pijs = p_ij_arg(None, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
     log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
-    logpphi_i = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(phii, mean=prior_loc_phi, cov=prior_scale_phi))
+    logpphi_j = np.sum(Y[:, j]*logcdfs + (1-Y[:, j])*log1mcdfs + multivariate_normal.logpdf(phi_j, mean=prior_loc_phi, cov=prior_scale_phi))
     if debug:
-        assert(np.allclose(logpphi_i, _logpphi_i))
+        assert(np.allclose(logpphi_j, _logpphi_j))
              
-    return logpphi_i*gamma
+    return logpphi_j*gamma
 
-
-def log_conditional_posterior_phi_jl(phi_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1, debug=False):
-    # l denotes the coordinate of vector phi_i
+def log_conditional_posterior_phi_jl(phi_jl, l, j, Y, theta, J, K, d, parameter_names, dst_func, 
+                                    param_positions_dict, prior_loc_phi=0, prior_scale_phi=1, gamma=1, 
+                                    debug=False, numbafast=True, block_size_rows=10):
+    # l denotes the coordinate of vector phi_j
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Phi = np.asarray(params_hat["Phi"]).reshape((d, J), order="F")                         
-    Phi[l, i] = phi_il
+    Phi[l, j] = phi_jl
     theta_test = theta.copy()
     theta_test[param_positions_dict["Phi"][0]:param_positions_dict["Phi"][1]] = Phi.reshape((d*J,), order="F")
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
     if debug:
-        _logpphi_il = 0
-        for j in range(J):
+        _logpphi_jl = 0
+        for i in range(K):
             pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
             philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            _logpphi_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(phi_il, loc=prior_loc_phi, scale=prior_scale_phi)
+            _logpphi_jl += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(phi_jl, loc=prior_loc_phi, scale=prior_scale_phi)
     
-    pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
+    pijs = p_ij_arg(None, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
     log1mcdfs = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
-    logpphi_il = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(phi_il, mean=prior_loc_phi, cov=prior_scale_phi))
+    logpphi_jl = np.sum(Y[:, j]*logcdfs + (1-Y[:, j])*log1mcdfs + multivariate_normal.logpdf(phi_jl, mean=prior_loc_phi, cov=prior_scale_phi))
     if debug:
-        assert(np.allclose(logpphi_il, _logpphi_il))
+        assert(np.allclose(logpphi_jl, _logpphi_jl))
 
-    return logpphi_il*gamma
+    return logpphi_jl*gamma
 
-def log_conditional_posterior_z_vec(zi, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
-                                    prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, debug=False, numbafast=True):
+def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
+                                    prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, 
+                                    debug=False, numbafast=True, block_size_rows=5000):
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
-    Z[:, i] = zi
+    Z[:, j] = zj
     theta_test = theta.copy()
     theta_test[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]] = Z.reshape((d*J,), order="F")
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
     if debug:
-        _logpz_i = 0
-        for j in range(J):
+        _logpz_j = 0
+        for i in range(K):
             pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
             philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            _logpz_i += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z)
+            _logpz_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(zj, mean=prior_loc_z, cov=prior_scale_z)
     
-    if numbafast:
-        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
-        gamma = params_hat["gamma"][0]
-        alpha = params_hat["alpha"]
-        betai = params_hat["beta"][i]
-        pijs = p_i_arg_numbafast(X[:, i], Z, alpha, betai, gamma)
+    # if False:
+    if K*J <= 10e4:
+        if numbafast:
+            X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+            gamma = params_hat["gamma"][0]
+            alphaj = params_hat["alpha"][j]
+            beta = params_hat["beta"]
+            pijs = p_j_arg_numbafast(X, Z[:, j], alphaj, beta, gamma)
+        else:
+            pijs = p_ij_arg(None, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)              
+        logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+        log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+        logpz_j = np.sum(Y[:, j]*logcdfs + (1-Y[:, j])*log1mcdfs + multivariate_normal.logpdf(zj, mean=prior_loc_z, cov=prior_scale_z))
+        if debug:
+            log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+            assert np.allclose(log1mcdfs, log1mcdfsbase)
+            assert(np.allclose(logpz_j, _logpz_j))
     else:
-        pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)  
-    
-    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
-    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
-    if debug:
-        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
-        assert np.allclose(log1mcdfs, log1mcdfsbase)
+        row_blocks = (K + block_size_rows - 1) // block_size_rows
+        block_size_cols = j
+        col_blocks = -1
+        logpz_j = process_blocks_parallel(Y, X, Z, params_hat["alpha"], 
+                                            beta, gamma, K, J, mu_e, sigma_e, 
+                                            row_blocks, col_blocks, block_size_rows, block_size_cols, 
+                                            prior=multivariate_normal.logpdf(zj, mean=prior_loc_z, cov=prior_scale_z))
+        if debug:
+            assert(np.allclose(logpz_j, _logpz_j))
 
-    logpz_i = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(zi, mean=prior_loc_z, cov=prior_scale_z))
-    if debug:
-        assert(np.allclose(logpz_i, _logpz_i))
+    # if abs(penalty_weight_Z) > 1e-10:
+    #     sum_Z_J_vectors = np.sum(Z, axis=1)    
+    #     obj = logpz_j + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+    # else:
+    #     obj = logpz_j
     
-    if abs(penalty_weight_Z) > 1e-10:
-        sum_Z_J_vectors = np.sum(Z, axis=1)    
-        obj = logpz_i + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
-    else:
-        obj = logpz_i
-    
-    return obj*gamma
+    return logpz_j*gamma
 
-
-def log_conditional_posterior_z_jl(z_il, l, i, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
-                                   prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, debug=True, numbafast=True, block_size_rows=10):
-    # l denotes the coordinate of vector z_i
+def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
+                                   prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, 
+                                   debug=False, numbafast=True, block_size_rows=5000):
+    # l denotes the coordinate of vector z_j
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
-    Z[l, i] = z_il
+    Z[l, j] = z_jl
     theta_test = theta.copy()
     theta_test[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]] = Z.reshape((d*J,), order="F")
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
     if debug:
-        _logpz_il = 0
-        for j in range(J):
+        _logpz_jl = 0
+        for i in range(K):
             pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
             philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-            _logpz_il += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(z_il, loc=prior_loc_z, scale=prior_scale_z)
+            _logpz_jl += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(z_jl, loc=prior_loc_z, scale=prior_scale_z)
 
-    if numbafast:
+    # if False:
+    if K*J <= 10e4:
+        if numbafast:
+            X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+            gamma = params_hat["gamma"][0]
+            alphaj = params_hat["alpha"][j]
+            beta = params_hat["beta"]
+            pijs = p_j_arg_numbafast(X, Z[:, j], alphaj, beta, gamma)
+        else:
+            pijs = p_ij_arg(None, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
+        logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
+        log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)   
+        logpz_jl = np.sum(Y[:, j]*logcdfs + (1-Y[:, j])*log1mcdfs + multivariate_normal.logpdf(z_jl, mean=prior_loc_z, cov=prior_scale_z))
+        if debug:
+            log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+            assert np.allclose(log1mcdfs, log1mcdfsbase)       
+            assert(np.allclose(logpz_jl, _logpz_jl))
+    else:
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         gamma = params_hat["gamma"][0]
-        alpha = params_hat["alpha"]
-        betai = params_hat["beta"][i]
-        pijs = p_i_arg_numbafast(X[:, i], Z, alpha, betai, gamma)
-    else:
-        pijs = p_ij_arg(i, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)     
-    
-    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
-    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)   
-    if debug:
-        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
-        assert np.allclose(log1mcdfs, log1mcdfsbase)       
-    
-    logpz_il = np.sum(Y[i, :]*logcdfs + (1-Y[i, :])*log1mcdfs + multivariate_normal.logpdf(z_il, mean=prior_loc_z, cov=prior_scale_z))
-    if debug:
-        assert(np.allclose(logpz_il, _logpz_il))
+        beta = params_hat["beta"]
+        row_blocks = (K + block_size_rows - 1) // block_size_rows
+        block_size_cols = j
+        col_blocks = -1
+        logpz_jl = process_blocks_parallel(Y, X, Z, params_hat["alpha"], 
+                                            beta, gamma, K, J, mu_e, sigma_e, row_blocks, col_blocks, 
+                                            block_size_rows, block_size_cols, 
+                                            prior=multivariate_normal.logpdf(z_jl, mean=prior_loc_z, cov=prior_scale_z))
+        if debug:
+            assert(np.allclose(logpz_jl, _logpz_jl))
 
-    # row_blocks = (K + block_size_rows - 1) // block_size_rows
-    # block_size_cols = J
-    # col_blocks = 1
-    # logpz_il_par = process_blocks_parallel(Y, X, Z, alpha, betai, gamma, K, J, mu_e, sigma_e, 
-    #                             row_blocks, col_blocks, block_size_rows, block_size_cols, 
-    #                             prior=multivariate_normal.logpdf(z_il, mean=prior_loc_z, cov=prior_scale_z))
-    # if debug:
-    #     assert(np.allclose(logpz_il, logpz_il_par))
+    # if abs(penalty_weight_Z) > 1e-10:
+    #     sum_Z_J_vectors = np.sum(Z, axis=1)    
+    #     obj = logpz_jl + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
+    # else:
+    #     obj = logpz_jl
 
-
-    if abs(penalty_weight_Z) > 1e-10:
-        sum_Z_J_vectors = np.sum(Z, axis=1)    
-        obj = logpz_il + penalty_weight_Z * np.sum((sum_Z_J_vectors-np.asarray([constant_Z]*d))**2)
-    else:
-        obj = logpz_il
-
-    return obj*gamma
-
+    return logpz_jl*gamma
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, 
                                     param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1, 
-                                    debug=True, numbafast=True, block_size_rows=10):    
+                                    debug=False, numbafast=True, block_size_rows=5000):    
     
     # Assuming independent, Gaussian alphas.
     # Hence, even when evaluating with vector parameters, we use the uni-dimensional posterior for alpha.
+    # Only computes the part of the posterior that impacts optimisation.
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
     theta_test = theta.copy()    
     theta_test[param_positions_dict["alpha"][0] + idx] = alpha     
-    if debug:
+    if debug:        
         _logpalpha_j = 0
-        for j in range(J):        
-            for i in range(K):
-                pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)            
-                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-                _logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
+        # for j in range(J):        
+        j = idx
+        for i in range(K):
+            pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)            
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+            _logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
 
-    if numbafast:
-        params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
+    # if False:
+    if K*J <= 10e4:
+        if numbafast:
+            params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
+            X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+            Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
+            gamma = params_hat["gamma"][0]        
+            beta_nbfast = params_hat["beta"]            
+            pijs = p_j_arg_numbafast(X, Z[:, idx], alpha, beta_nbfast, gamma)
+            # alpha_nbfast = params_hat["alpha"]
+            # pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)  
+            # assert(np.allclose(pijs[:, idx], p_ij_arg_numbafast(X, Z[:, idx].reshape((d, 1)), alpha, beta_nbfast, gamma, K).flatten()))        
+        else:
+            pijs = p_ij_arg(None, idx, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)      
+        logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)   
+        log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e) 
+        logpalpha_j = np.sum(Y[:, idx]*logcdfs + (1-Y[:, idx])*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
+        if debug:     
+            log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)
+            assert np.allclose(log1mcdfs, log1mcdfsbase)
+            assert np.allclose(logpalpha_j, _logpalpha_j)
+    else:
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
-        gamma = params_hat["gamma"][0]
-        # alpha_nbfast = params_hat["alpha"]
-        beta_nbfast = params_hat["beta"]    
-        # pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)  
-        pijs = p_ij_arg_numbafast(X, Z[:, idx].reshape((d, 1)), alpha, beta_nbfast, gamma, K).flatten()
-        # assert(np.allclose(pijs[:, idx], p_ij_arg_numbafast(X, Z[:, idx].reshape((d, 1)), alpha, beta_nbfast, gamma, K).flatten()))        
-    else:
-        pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)      
-    
-    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)   
-    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e) 
-    if debug:     
-        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)
-        assert np.allclose(log1mcdfs, log1mcdfsbase)
-
-    logpalpha_j = np.sum(Y[:, idx]*logcdfs + (1-Y[:, idx])*log1mcdfs + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
-    if debug:
-        assert(np.allclose(logpalpha_j, _logpalpha_j))
-
-    row_blocks = (K + block_size_rows - 1) // block_size_rows
-    block_size_cols = J
-    col_blocks = 1
-    logpalpha_j_par = process_blocks_parallel(Y, X, Z, alpha, params_hat["beta"], gamma, K, J, mu_e, sigma_e, 
-                                row_blocks, col_blocks, block_size_rows, block_size_cols, 
-                                prior=norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
-    if debug:
-        assert(np.allclose(logpalpha_j, logpalpha_j_par))
+        gamma = params_hat["gamma"][0]        
+        row_blocks = (K + block_size_rows - 1) // block_size_rows
+        block_size_cols = idx
+        col_blocks = -1    
+        logpalpha_j = process_blocks_parallel(Y, X, Z, theta_test[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]].copy(), 
+                                                params_hat["beta"], gamma, K, J, mu_e, sigma_e, 
+                                                row_blocks, col_blocks, block_size_rows, block_size_cols, 
+                                                prior=norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha))
+        if debug:
+            assert(np.allclose(logpalpha_j, _logpalpha_j))
     
     return logpalpha_j*gamma
 
 def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_names, dst_func, 
-                            param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1, debug=False, numbafast=True):
+                            param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1, 
+                            debug=False, numbafast=True):
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
@@ -3099,25 +3192,26 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     theta_test[param_positions_dict["beta"][0] + idx] = beta
     if debug:
         _logpbeta_k = 0
-        for j in range(J):
-            for i in range(K):
-                pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
-                philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
-                log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
-                _logpbeta_k += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta)
+        i = idx
+        for j in range(J):            
+            # for i in range(K):
+            pij = p_ij_arg(i, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
+            philogcdf = norm.logcdf(pij, loc=mu_e, scale=sigma_e)
+            log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
+            _logpbeta_k += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta)
 
     if numbafast:
         params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma = params_hat["gamma"][0]
-        alpha_nbfast = params_hat["alpha"]
+        alpha_nbfast = params_hat["alpha"]        
+        pijs = p_i_arg_numbafast(X[:, idx], Z, alpha_nbfast, beta, gamma)
         # beta_nbfast = params_hat["beta"]
         # pijs = p_ij_arg_numbafast(X, Z, alpha_nbfast, beta_nbfast, gamma, K)     
-        pijs = p_i_arg_numbafast(X[:, idx], Z, alpha_nbfast, beta, gamma)
         # assert(np.allclose(pijs[idx, :], p_i_arg_numbafast(X[:, idx], Z, alpha_nbfast, beta, gamma)))        
     else:
-        pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
+        pijs = p_ij_arg(idx, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
         
     logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
     log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)   
@@ -3132,7 +3226,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     return logpbeta_k*gamma
 
 def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1, prior_loc_gamma=0, 
-                                    prior_scale_gamma=1, debug=True, numbafast=True, block_size_rows=10, block_size_cols=10):    
+                                    prior_scale_gamma=1, debug=False, numbafast=True, block_size_rows=5000, block_size_cols=100):    
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
@@ -3148,38 +3242,43 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpgamma += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma)
 
-    if numbafast:
-        params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
+    # if False:
+    if K*J <= 10e4:
+        if numbafast:
+            params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
+            X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+            Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
+            gamma_nbfast = params_hat["gamma"][0]
+            alpha = params_hat["alpha"]
+            beta = params_hat["beta"]
+            pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma_nbfast, K)     
+        else:
+            pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
+        logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+        log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
+        logpgamma = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma))
+        if debug:
+            log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+            assert np.allclose(log1mcdfs, log1mcdfsbase)
+            assert(np.allclose(logpgamma, _logpgamma))
+    else:
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma_nbfast = params_hat["gamma"][0]
         alpha = params_hat["alpha"]
         beta = params_hat["beta"]
-        pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma_nbfast, K)     
-    else:
-        pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)
-        
-    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
-    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
-    if debug:
-        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
-        assert np.allclose(log1mcdfs, log1mcdfsbase)
-
-    logpgamma = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma))
-    if debug:
-        assert(np.allclose(logpgamma, _logpgamma))
-                        
-    row_blocks = (K + block_size_rows - 1) // block_size_rows
-    col_blocks = (J + block_size_cols - 1) // block_size_cols    
-    logpgamma_par = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, mu_e, sigma_e, 
-                                row_blocks, col_blocks, block_size_rows, block_size_cols, 
-                                prior=norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma))
-    if debug:
-        assert(np.allclose(logpgamma, logpgamma_par))
+        row_blocks = (K + block_size_rows - 1) // block_size_rows
+        col_blocks = (J + block_size_cols - 1) // block_size_cols    
+        logpgamma = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, mu_e, sigma_e, 
+                                    row_blocks, col_blocks, block_size_rows, block_size_cols, 
+                                    prior=norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma))
+        if debug:
+            assert(np.allclose(logpgamma, _logpgamma))
 
     return logpgamma*gamma_annealing
 
-def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, prior_loc_delta=0, prior_scale_delta=1, debug=False):    
+def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, 
+                                    prior_loc_delta=0, prior_scale_delta=1, debug=False):    
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
@@ -3206,7 +3305,7 @@ def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, d
 
 def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, 
                                     prior_loc_sigmae=0, prior_scale_sigmae=1, min_sigma_e=0.0001, 
-                                    debug=True, numbafast=True, block_size_rows=10, block_size_cols=10):    
+                                    debug=False, numbafast=True, block_size_rows=5000, block_size_cols=100):    
     
     tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=min_sigma_e, upper=10*np.sqrt(prior_scale_sigmae)+prior_scale_sigmae)    
     mu_e = 0
@@ -3221,34 +3320,40 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf + tig.logpdf(sigma_e)
     
-    if numbafast:
+    # if False:
+    if K*J <= 10e4:
+        if numbafast:
+            params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+            X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+            Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
+            gamma = params_hat["gamma"][0]
+            alpha = params_hat["alpha"]
+            beta = params_hat["beta"]
+            pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
+        else:
+            pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)    
+        
+        logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
+        log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)
+        logpsigma_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + tig.logpdf(sigma_e))   
+        if debug:
+            log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
+            assert np.allclose(log1mcdfs, log1mcdfsbase)
+            assert(np.allclose(logpsigma_e, _logpsigma_e)) 
+    else:
         params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma = params_hat["gamma"][0]
         alpha = params_hat["alpha"]
         beta = params_hat["beta"]
-        pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
-    else:
-        pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)    
-    
-    logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
-    log1mcdfs = log_complement_from_log_cdf_vec_fast(logcdfs, pijs, mean=mu_e, variance=sigma_e)
-    if debug:
-        log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)    
-        assert np.allclose(log1mcdfs, log1mcdfsbase)
-
-    logpsigma_e = np.sum(Y*logcdfs + (1-Y)*log1mcdfs + tig.logpdf(sigma_e))   
-    if debug:
-        assert(np.allclose(logpsigma_e, _logpsigma_e)) 
-
-    row_blocks = (K + block_size_rows - 1) // block_size_rows
-    col_blocks = (J + block_size_cols - 1) // block_size_cols    
-    logpsigma_e_par = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, mu_e, sigma_e, 
-                                row_blocks, col_blocks, block_size_rows, block_size_cols, 
-                                prior=tig.logpdf(sigma_e))
-    if debug:
-        assert(np.allclose(logpsigma_e, logpsigma_e_par))
+        row_blocks = (K + block_size_rows - 1) // block_size_rows
+        col_blocks = (J + block_size_cols - 1) // block_size_cols    
+        logpsigma_e = process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, mu_e, sigma_e, 
+                                                row_blocks, col_blocks, block_size_rows, 
+                                                block_size_cols, prior=tig.logpdf(sigma_e))
+        if debug:
+            assert(np.allclose(logpsigma_e, _logpsigma_e))
         
     return logpsigma_e*gamma
 

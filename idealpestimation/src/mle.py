@@ -23,7 +23,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                                     negative_loglik_coordwise, negative_loglik_coordwise_jax, collect_mle_results, \
                                                                         collect_mle_results_batchsize_analysis, sample_theta_curr_init,\
                                                                         get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta,\
-                                                                        negative_loglik_coordwise_parallel, plot_loglik_runtimes
+                                                                        negative_loglik_coordwise_parallel, plot_loglik_runtimes, parse_timedelta_string
 
 
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
@@ -40,7 +40,8 @@ def optimise_negativeloglik_elementwise(param, idx, vector_index_in_param_matrix
     niter_minimize = None
     theta_test_in = theta_curr.copy()
     f = lambda x: negative_loglik_coordwise(x, idx, theta_test_in, Y, J, N, d, 
-                                            parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
+                                            parameter_names, dst_func, param_positions_dict, 
+                                            penalty_weight_Z, constant_Z)
     if parallel:
         f_jax = None
     else:    
@@ -324,12 +325,13 @@ def estimate_mle(args):
                 variance_hat = optimisation_dict2paramvectors(variance_local_vec, param_positions_dict_theta, J, N, d, parameter_names) 
                 grid_and_optim_outcome = dict()
                 grid_and_optim_outcome["PID"] = current_pid
-                grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")                
                 elapsedtime = timedelta(seconds=time.time()-t0)            
-                total_seconds = int(elapsedtime.total_seconds())
-                hours = total_seconds // 3600
-                minutes = (total_seconds % 3600) // 60
-                seconds = total_seconds % 60            
+                time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
+                # total_seconds = int(elapsedtime.total_seconds())
+                # hours = total_seconds // 3600
+                # minutes = (total_seconds % 3600) // 60
+                # seconds = total_seconds % 60            
                 grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
                 grid_and_optim_outcome["elapsedtime_hours"] = hours
                 grid_and_optim_outcome["retry"] = retry
@@ -364,10 +366,11 @@ def estimate_mle(args):
                 grid_and_optim_outcome["PID"] = current_pid
                 grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 elapsedtime = timedelta(seconds=time.time()-t0)            
-                total_seconds = int(elapsedtime.total_seconds())
-                hours = total_seconds // 3600
-                minutes = (total_seconds % 3600) // 60
-                seconds = total_seconds % 60            
+                time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
+                # total_seconds = int(elapsedtime.total_seconds())
+                # hours = total_seconds // 3600
+                # minutes = (total_seconds % 3600) // 60
+                # seconds = total_seconds % 60                 
                 grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
                 grid_and_optim_outcome["elapsedtime_hours"] = hours
                 grid_and_optim_outcome["retry"] = retry
@@ -410,10 +413,11 @@ def estimate_mle(args):
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
         elapsedtime = timedelta(seconds=time.time()-t0)            
-        total_seconds = int(elapsedtime.total_seconds())
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60            
+        time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
+        # total_seconds = int(elapsedtime.total_seconds())
+        # hours = total_seconds // 3600
+        # minutes = (total_seconds % 3600) // 60
+        # seconds = total_seconds % 60               
         grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
@@ -448,10 +452,11 @@ def estimate_mle(args):
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
         elapsedtime = timedelta(seconds=time.time()-t0)            
-        total_seconds = int(elapsedtime.total_seconds())
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60            
+        time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
+        # total_seconds = int(elapsedtime.total_seconds())
+        # hours = total_seconds // 3600
+        # minutes = (total_seconds % 3600) // 60
+        # seconds = total_seconds % 60                   
         grid_and_optim_outcome["elapsedtime"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
         grid_and_optim_outcome["elapsedtime_hours"] = hours
         grid_and_optim_outcome["retry"] = retry
@@ -497,9 +502,15 @@ def estimate_mle(args):
     grid_and_optim_outcome = dict()
     grid_and_optim_outcome["PID"] = current_pid
     grid_and_optim_outcome["timestamp"] = timestamp
-    elapsedtime = timedelta(seconds=time.time()-t0)            
-    grid_and_optim_outcome["elapsedtime"] = eltime
-    grid_and_optim_outcome["elapsedtime_hours"] = hours
+    elapsedtime = timedelta(seconds=time.time()-t0)
+    time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
+    # total_seconds = int(elapsedtime.total_seconds())
+    # hours = total_seconds // 3600
+    # minutes = (total_seconds % 3600) // 60
+    # seconds = total_seconds % 60                      
+    grid_and_optim_outcome["elapsedtime_besttheta"] = eltime
+    grid_and_optim_outcome["elapsedtime_full"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
+    grid_and_optim_outcome["elapsedtime_full_hours"] = hours
     grid_and_optim_outcome["retry"] = retry
     grid_and_optim_outcome["parameter names"] = parameter_names
     grid_and_optim_outcome["local theta"] = [best_theta.tolist()]
@@ -683,13 +694,13 @@ if __name__ == "__main__":
         sigma_e_true = args.sigmae
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes)
-    if not parallel:
-        try:
-            jax.default_device = jax.devices("gpu")[0]
-        except:
-            print("Using cpu")
-            jax.default_device = jax.devices("cpu")[0]
-        jax.config.update("jax_traceback_filtering", "off")
+    # if not parallel:
+    #     try:
+    #         jax.default_device = jax.devices("gpu")[0]
+    #     except:
+    #         print("Using cpu")
+    #         jax.default_device = jax.devices("cpu")[0]
+    #     jax.config.update("jax_traceback_filtering", "off")
 
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
@@ -697,7 +708,7 @@ if __name__ == "__main__":
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 30
-    batchsize = 320
+    batchsize = 13
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]
@@ -721,7 +732,7 @@ if __name__ == "__main__":
     prior_scale_delta= 1        
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
