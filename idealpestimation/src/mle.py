@@ -326,7 +326,7 @@ def estimate_mle(args):
                 grid_and_optim_outcome = dict()
                 grid_and_optim_outcome["PID"] = current_pid
                 grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")                
-                elapsedtime = timedelta(seconds=time.time()-t0)            
+                elapsedtime = str(timedelta(seconds=time.time()-t0))
                 time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
                 # total_seconds = int(elapsedtime.total_seconds())
                 # hours = total_seconds // 3600
@@ -365,7 +365,7 @@ def estimate_mle(args):
                 grid_and_optim_outcome = dict()
                 grid_and_optim_outcome["PID"] = current_pid
                 grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                elapsedtime = timedelta(seconds=time.time()-t0)            
+                elapsedtime = str(timedelta(seconds=time.time()-t0))            
                 time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
                 # total_seconds = int(elapsedtime.total_seconds())
                 # hours = total_seconds // 3600
@@ -412,7 +412,7 @@ def estimate_mle(args):
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        elapsedtime = timedelta(seconds=time.time()-t0)            
+        elapsedtime = str(timedelta(seconds=time.time()-t0))            
         time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
         # total_seconds = int(elapsedtime.total_seconds())
         # hours = total_seconds // 3600
@@ -451,7 +451,7 @@ def estimate_mle(args):
         grid_and_optim_outcome = dict()
         grid_and_optim_outcome["PID"] = current_pid
         grid_and_optim_outcome["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        elapsedtime = timedelta(seconds=time.time()-t0)            
+        elapsedtime = str(timedelta(seconds=time.time()-t0))            
         time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
         # total_seconds = int(elapsedtime.total_seconds())
         # hours = total_seconds // 3600
@@ -502,7 +502,7 @@ def estimate_mle(args):
     grid_and_optim_outcome = dict()
     grid_and_optim_outcome["PID"] = current_pid
     grid_and_optim_outcome["timestamp"] = timestamp
-    elapsedtime = timedelta(seconds=time.time()-t0)
+    elapsedtime = str(timedelta(seconds=time.time()-t0))
     time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
     # total_seconds = int(elapsedtime.total_seconds())
     # hours = total_seconds // 3600
@@ -708,7 +708,7 @@ if __name__ == "__main__":
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 30
-    batchsize = 13
+    batchsize = 256
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]
@@ -732,7 +732,7 @@ if __name__ == "__main__":
     prior_scale_delta= 1        
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
