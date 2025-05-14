@@ -776,21 +776,21 @@ if __name__ == "__main__":
         elif param == "sigma_e":
             param_positions_dict[param] = (k, k + 1)                                
             k += 1    
-    main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
-        parameter_names=parameter_names, optimisation_method=optimisation_method, 
-        dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-        trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
-        prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
-        prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
-        prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-        prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
-        prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
-        prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
-        rng=rng, batchsize=batchsize)
+    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+    #     data_location=data_location, parallel=parallel, 
+    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
+    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+    #     trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
+    #     prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
+    #     prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
+    #     prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+    #     prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
+    #     prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+    #     prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
+    #     rng=rng, batchsize=batchsize)
 
 
     data_topdir = data_location
     # collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize)
-    # collect_mle_results_batchsize_analysis(data_topdir, [64], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
+    collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
     

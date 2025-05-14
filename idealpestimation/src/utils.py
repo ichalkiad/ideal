@@ -205,6 +205,33 @@ def test_fastapprox_cdf(parameter_names, data_location, m, K, J, d, args=None):
     # print(logcdfs_fast[inval])
     
 
+def plot_posterior_vec_runtimes(files, names, outdir="/tmp/"):
+
+    fig = go.Figure()
+    for i in range(len(files)):
+        data = {"data": []}  
+        filein = files[i]
+        name = names[i]      
+        with jsonlines.open(filein, mode="r") as f:              
+            for result in f.iter(type=dict, skip_invalid=True):
+                if np.isnan(result["milliseconds"]) or not isinstance(result["milliseconds"], float):
+                    continue
+                data["data"].append(result["milliseconds"])
+            df = pd.DataFrame.from_dict(data)
+            lower_bound = df.data.quantile(0.05)
+            upper_bound = df.data.quantile(0.95)
+            df_filtered = df.data[(df.data >= lower_bound) & (df.data <= upper_bound)].dropna()
+            fig.add_trace(go.Box(
+                            y=df_filtered.values.flatten().tolist(), 
+                            showlegend=True, opacity=1.0,                            
+                            boxpoints="outliers", name=name
+                        ))
+    savename = "{}/posterior_timings_parallelblock_vs_numbaonlycomputation.html".format(outdir)
+    pathlib.Path("{}/".format(outdir)).mkdir(parents=True, exist_ok=True)     
+    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="milliseconds", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, print_pdf=False)
+
 def plot_loglik_runtimes(filerec, outdir="/tmp/"):
 
     rows_100k_nonparallel = {"block_rows_500": [], "block_rows_1000": []}
@@ -777,6 +804,13 @@ def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale,
             row_start = i * block_size_rows
             row_end = min(row_start + block_size_rows, K)
             blocks.append((row_start, row_end, col_start, col_end))
+        results = Parallel(n_jobs=njobs)(
+            delayed(process_single_block)(Y[row_start:row_end, col_start:col_end], 
+                                            X[:, row_start:row_end] , Z[:, col_start], 
+                                            alpha[col_start], beta[row_start:row_end], 
+                                            gamma, errloc, errscale, row_end-row_start, prior) 
+                                        for row_start, row_end, col_start, col_end in blocks
+        )
     else:
         for i in range(row_blocks):       
             for j in range(col_blocks):
@@ -785,20 +819,24 @@ def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale,
                 col_start = j * block_size_cols
                 col_end = min(col_start + block_size_cols, J)                       
                 blocks.append((row_start, row_end, col_start, col_end))
-    results = Parallel(n_jobs=njobs)(
-        delayed(process_single_block)(Y[row_start:row_end, col_start:col_end], 
-                                        X[:, row_start:row_end] , Z[:, col_start:col_end], 
-                                        alpha[col_start:col_end], beta[row_start:row_end], 
-                                        gamma, errloc, errscale, row_end-row_start, prior) 
-                                    for row_start, row_end, col_start, col_end in blocks
-    )
+    
+        results = Parallel(n_jobs=njobs)(
+            delayed(process_single_block)(Y[row_start:row_end, col_start:col_end], 
+                                            X[:, row_start:row_end] , Z[:, col_start:col_end], 
+                                            alpha[col_start:col_end], beta[row_start:row_end], 
+                                            gamma, errloc, errscale, row_end-row_start, prior) 
+                                        for row_start, row_end, col_start, col_end in blocks
+        )
     nll = np.sum(results)
 
     return nll
 
 def process_single_block(Y, X, Z, alpha, beta, gamma, errloc, errscale, block_size_rows, prior=None):
     
-    pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, block_size_rows)        
+    if len(Z.shape) == 1:
+        pij_arg = p_j_arg_numbafast(X, Z, alpha, beta, gamma)          
+    else:
+        pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, block_size_rows) 
     philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
     log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)    
 
@@ -1123,6 +1161,10 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
     # box plot - mse relativised per parameter over trials
     fig = go.Figure()
     for param in parameter_names:
+        # df = pd.DataFrame.from_dict({"vals":estimation_error_per_trial[param]})
+        # lower_bound = df.vals.quantile(0.05)
+        # upper_bound = df.vals.quantile(0.95)
+        # df_filtered = df.vals[(df.vals >= lower_bound) & (df.vals <= upper_bound)].dropna()
         fig.add_trace(go.Box(
                         y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True, name=param,
                         x=[param]*len(estimation_error_per_trial[param]), boxpoints='outliers'                                
@@ -1167,6 +1209,8 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
                                                                 estimation_error_per_trial_per_batch[m][batchsize], 
                                                                 estimation_error_per_trial_per_batch_nonrotated[m][batchsize], 
                                                                 theta_true, param_positions_dict)    
+            all_lows = []
+            all_highs = []
             for param in parameter_names:
                 print(param)
                 if batchsize not in estimation_error_per_trial[param].keys():
@@ -1201,14 +1245,28 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
                     params_out_jsonl[param] = params_out[param]
                     mse = ((theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]])**2
                     estimation_error_per_trial[param][batchsize].append(float(mse[0])) 
-        
-               
+                
+                df = pd.DataFrame.from_dict({"vals": estimation_error_per_trial_per_batch[m][batchsize][param]})
+                lower_bound = df.vals.quantile(0.05)
+                upper_bound = df.vals.quantile(0.95)
+                df_filtered = df.vals[(df.vals >= lower_bound) & (df.vals <= upper_bound)].dropna()
+                q1 = df.vals.quantile(0.25)
+                q3 = df.vals.quantile(0.75)
+                iqr = q3-q1
+                _lower_whisker = q1 - iqr
+                _upper_whisker = q3 + iqr
+                lower_whisker = min([x for x in estimation_error_per_trial_per_batch[m][batchsize][param] if x >= _lower_whisker])
+                upper_whisker = max([x for x in estimation_error_per_trial_per_batch[m][batchsize][param] if x <= _upper_whisker])
                 fig_m_over_databatches.add_trace(go.Box(
-                    y=estimation_error_per_trial_per_batch[m][batchsize][param], 
-                    x=[param]*len(estimation_error_per_trial_per_batch[m][batchsize][param]),
+                    y=df_filtered, 
+                    name=param,
+                    # x=[param]*len(estimation_error_per_trial_per_batch[m][batchsize][param]),
                     showlegend=False,  
                     boxpoints='outliers'
                     ))
+                all_lows.append(lower_whisker)
+                all_highs.append(upper_whisker)
+            fig_m_over_databatches.update_layout(yaxis_range=[min(all_lows), max(all_highs)])
             savename = "{}/mle_estimation_plots/mse_trial{}_perparam_unweighted_boxplot_batchsize{}.html".format(data_topdir, m, batchsize)
             pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)     
             fix_plot_layout_and_save(fig_m_over_databatches, savename, xaxis_title="Parameter", yaxis_title="MSE Θ", title="", 
@@ -1222,16 +1280,50 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
     # box plot - mse relativised per parameter over trials    
     for param in parameter_names:
         fig = go.Figure()
+        all_lows = []
+        all_highs = []
+        all_lows_nonrot = []
+        all_highs_nonrot = []
         for batchsize in batchsizes:
+            df = pd.DataFrame.from_dict({"vals":estimation_error_per_trial[param][batchsize]})
+            lower_bound = df.vals.quantile(0.05)
+            upper_bound = df.vals.quantile(0.95)
+            df_filtered = df.vals[(df.vals >= lower_bound) & (df.vals <= upper_bound)].dropna()
+            q1 = df.vals.quantile(0.25)
+            q3 = df.vals.quantile(0.75)
+            iqr = q3-q1
+            _lower_whisker = q1 - iqr
+            _upper_whisker = q3 + iqr
+            lower_whisker = min([x for x in estimation_error_per_trial[param][batchsize] if x >= _lower_whisker])
+            upper_whisker = max([x for x in estimation_error_per_trial[param][batchsize] if x <= _upper_whisker])
+            all_lows.append(lower_whisker)
+            all_highs.append(upper_whisker)
             fig.add_trace(go.Box(
-                            y=np.asarray(estimation_error_per_trial[param][batchsize]).tolist(), showlegend=True, name=param,
-                            x=[batchsize]*len(estimation_error_per_trial[param][batchsize]), boxpoints='outliers'                                
+                            y=df_filtered, showlegend=False, name=param,
+                            boxpoints='outliers', x=[batchsize]*len(estimation_error_per_trial[param][batchsize])                                
                         ))
             if param in ["X", "Z", "Phi"]:
+                df = pd.DataFrame.from_dict({"vals":estimation_error_per_trial_nonrotated[param][batchsize]})
+                lower_bound = df.vals.quantile(0.05)
+                upper_bound = df.vals.quantile(0.95)
+                df_filtered = df.vals[(df.vals >= lower_bound) & (df.vals <= upper_bound)].dropna()
+                q1 = df.vals.quantile(0.25)
+                q3 = df.vals.quantile(0.75)
+                iqr = q3-q1
+                _lower_whisker = q1 - iqr
+                _upper_whisker = q3 + iqr
+                lower_whisker = min([x for x in estimation_error_per_trial_nonrotated[param][batchsize] if x >= _lower_whisker])
+                upper_whisker = max([x for x in estimation_error_per_trial_nonrotated[param][batchsize] if x <= _upper_whisker])
+                all_lows_nonrot.append(lower_whisker)
+                all_highs_nonrot.append(upper_whisker)
                 fig.add_trace(go.Box(
                             y=np.asarray(estimation_error_per_trial_nonrotated[param][batchsize]).tolist(), showlegend=True, name="{} - nonRT".format(param),
-                            x=[batchsize]*len(estimation_error_per_trial_nonrotated[param][batchsize]), boxpoints='outliers'                                
+                            boxpoints='outliers', x=[batchsize]*len(estimation_error_per_trial_nonrotated[param][batchsize])                                
                         ))
+        fig.update_layout(boxmode="group")
+        all_lows.extend(all_lows_nonrot)
+        all_highs.extend(all_highs_nonrot)
+        fig.update_layout(yaxis_range=[min(all_lows), max(all_highs)])
         savename = "{}/mle_estimation_plots/mse_overAllTrials_{}_weighted_boxplot.html".format(data_topdir, param)
         pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE Θ", title="", 
@@ -1284,59 +1376,71 @@ def log_complement_from_log_cdf_vec(log_cdfx, x, mean, variance, use_jax=False):
      Computes log(1-CDF(x)) given log(CDF(x)) in a numerically stable way.
      """    
      if use_jax:
-         if len(log_cdfx.shape)==0 or (isinstance(log_cdfx, jnp.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
-             if log_cdfx < -0.693:  #log(0.5)
-                 # CDF(x) < 0.5, direct computation is stable  
-                 ret = jnp.log1p(-jnp.exp(log_cdfx))
-             else: 
-                 # CDF(x) >= 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
-                 ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)       
-         else:
-             ret = jnp.zeros(log_cdfx.shape)    
-             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                 idx_case1 = jnp.argwhere(log_cdfx < -0.693)
-                 if idx_case1.size > 0:
-                     ret.at[log_cdfx < -0.693].set(jnp.log1p(-jnp.exp(log_cdfx[log_cdfx < -0.693])))                  
-             else:
-                 idx_case1 = jnp.argwhere(log_cdfx < -0.693).flatten()       
-                 if idx_case1.size > 0:
-                     ret.at[idx_case1].set(jnp.log1p(-np.exp(log_cdfx[idx_case1])))          
- 
-             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                 idx_case2 = jnp.argwhere(log_cdfx >= -0.693)
-                 if idx_case2.size > 0:
-                     ret.at[log_cdfx >= -0.693].set(jax.scipy.stats.norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance))
-             else:
-                 idx_case2 = jnp.argwhere(log_cdfx >= -0.693).flatten()    
-                 if idx_case2.size > 0:                
-                     ret.at[idx_case2].set(jax.scipy.stats.norm.logcdf(-x[idx_case2], loc=mean, scale=variance))       
+        if len(log_cdfx.shape)==0 or (isinstance(log_cdfx, jnp.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
+            if log_cdfx < -0.693:  #log(0.5)
+                # CDF(x) < 0.5, direct computation is stable  
+                xinput = -jnp.exp(log_cdfx)
+                clipped_xinput = jnp.clip(xinput, a_min=-0.9999999999, a_max=None)
+                ret = jnp.log1p(clipped_xinput)
+            else: 
+                # CDF(x) >= 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+                ret = jax.scipy.stats.norm.logcdf(-x, loc=mean, scale=variance)       
+        else:
+            ret = jnp.zeros(log_cdfx.shape)    
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case1 = jnp.argwhere(log_cdfx < -0.693)
+                if idx_case1.size > 0:
+                    xinput = -jnp.exp(log_cdfx[log_cdfx < -0.693])
+                    clipped_xinput = jnp.clip(xinput, a_min=-0.9999999999, a_max=None)
+                    ret.at[log_cdfx < -0.693].set(jnp.log1p(clipped_xinput))                  
+            else:
+                idx_case1 = jnp.argwhere(log_cdfx < -0.693).flatten()       
+                if idx_case1.size > 0:
+                    xinput = -np.exp(log_cdfx[idx_case1])
+                    clipped_xinput = jnp.clip(xinput, a_min=-0.9999999999, a_max=None)
+                    ret.at[idx_case1].set(jnp.log1p(clipped_xinput))          
+
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case2 = jnp.argwhere(log_cdfx >= -0.693)
+                if idx_case2.size > 0:
+                    ret.at[log_cdfx >= -0.693].set(jax.scipy.stats.norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance))
+            else:
+                idx_case2 = jnp.argwhere(log_cdfx >= -0.693).flatten()    
+                if idx_case2.size > 0:                
+                    ret.at[idx_case2].set(jax.scipy.stats.norm.logcdf(-x[idx_case2], loc=mean, scale=variance))       
      else:
-         if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
-             if log_cdfx < -0.693:  #log(0.5)
-                 # If CDF(x) < 0.5, direct computation is stable  
-                 ret = np.log1p(-np.exp(log_cdfx))
-             else: 
-                 # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
-                 ret = norm.logcdf(-x, loc=mean, scale=variance)       
-         else:                          
-             ret = np.zeros(log_cdfx.shape)                
-             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                 idx_case1 = np.argwhere(log_cdfx < -0.693)
-                 if idx_case1.size > 0:
-                     ret[log_cdfx < -0.693] = np.log1p(-np.exp(log_cdfx[log_cdfx < -0.693]))                     
-             else:
-                 idx_case1 = np.argwhere(log_cdfx < -0.693).flatten()       
-                 if idx_case1.size > 0:
-                     ret[idx_case1] = np.log1p(-np.exp(log_cdfx[idx_case1]))             
+        if isinstance(log_cdfx, float) or (isinstance(log_cdfx, np.ndarray) and len(log_cdfx.shape)==1 and log_cdfx.shape[0]==1): 
+            if log_cdfx < -0.693:  #log(0.5)
+                # If CDF(x) < 0.5, direct computation is stable  
+                xinput = -np.exp(log_cdfx)
+                clipped_xinput = np.clip(xinput, a_min=-0.9999999999, a_max=None)
+                ret = np.log1p(clipped_xinput)
+            else: 
+                # If CDF(x) ≥ 0.5, use the fact that 1-CDF(x) = CDF(-x), hence log(1-CDF(x)) = log(CDF(-x))   
+                ret = norm.logcdf(-x, loc=mean, scale=variance)       
+        else:                          
+            ret = np.zeros(log_cdfx.shape)                
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case1 = np.argwhere(log_cdfx < -0.693)
+                if idx_case1.size > 0:
+                    xinput = -np.exp(log_cdfx[log_cdfx < -0.693])
+                    clipped_xinput = np.clip(xinput, a_min=-0.9999999999, a_max=None)
+                    ret[log_cdfx < -0.693] = np.log1p(clipped_xinput)                     
+            else:
+                idx_case1 = np.argwhere(log_cdfx < -0.693).flatten()       
+                if idx_case1.size > 0:
+                    xinput = -np.exp(log_cdfx[idx_case1])
+                    clipped_xinput = np.clip(xinput, a_min=-0.9999999999, a_max=None)
+                    ret[idx_case1] = np.log1p(clipped_xinput)             
  
-             if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
-                 idx_case2 = np.argwhere(log_cdfx >= -0.693)
-                 if idx_case2.size > 0:
-                     ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
-             else:
-                 idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
-                 if idx_case2.size > 0:                
-                     ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)   
+            if ret.shape[0] > 1 and len(ret.shape)==2 and ret.shape[1] > 1:
+                idx_case2 = np.argwhere(log_cdfx >= -0.693)
+                if idx_case2.size > 0:
+                    ret[log_cdfx >= -0.693] = norm.logcdf(-x[log_cdfx >= -0.693], loc=mean, scale=variance)
+            else:
+                idx_case2 = np.argwhere(log_cdfx >= -0.693).flatten()    
+                if idx_case2.size > 0:                
+                    ret[idx_case2] = norm.logcdf(-x[idx_case2], loc=mean, scale=variance)   
  
      return ret
 
@@ -1404,7 +1508,7 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
 @numba.jit(nopython=True, parallel=True, cache=True)
 def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
     
-    phi = np.zeros((K, Z.shape[1]), dtype=np.float64)
+    phi = np.zeros((K, Z.shape[1]), dtype=np.float64)    
     for i in prange(K):
         xi = X[:, i]
         phi[i, :] = p_i_arg_numbafast(xi, Z, alpha, beta[i], gamma)
@@ -1896,9 +2000,9 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
 
 
 def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param_positions_dict,
-                        plot_online=True, mse_theta_full=[], fig_xz=None, mse_x_list=[], mse_z_list=[],
+                        plot_online=True, mse_theta_full=[], fig_x=None, fig_z=None,mse_x_list=[], mse_z_list=[],
                         mse_x_nonRT_list=[], mse_z_nonRT_list=[], per_param_ers=dict(), 
-                        per_param_heats=dict(), xbox=[], plot_restarts=[], fastrun=False):
+                        per_param_heats=dict(), xbox=[], plot_restarts=[], fastrun=False, target_param=None):
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -1919,11 +2023,10 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
         fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
         savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
         pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                print_pdf=False)        
+        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", 
+                                title="", showgrid=False, showlegend=True, print_png=True, 
+                                print_html=False, print_pdf=False)        
     ###############################
-
 
     # compute min achievable mse for X, Z under rotation and scaling
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
@@ -1982,9 +2085,11 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
             else:
                 se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])            
             
-            per_param_heats[param].append(se)   
-            rel_se = float(np.sum(se))            
-            if plot_online:  
+            if fastrun is False:
+                per_param_heats[param].append(se)   
+            rel_se = float(np.sum(se)) 
+            per_param_ers[param].append(float(rel_se))           
+            if plot_online and fastrun is False:
                 ###############################
                 fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
                 savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
@@ -2031,108 +2136,156 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                     fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
                                             showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                             print_pdf=False)     
-    if plot_online:
-        if fig_xz is None:
-            fig_xz = go.Figure()  
-        # mean error over all elements of the matrices  
-        Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
-        mse_x_list.append(mse_x)
-        mse_x_nonRT_list.append(mse_x_nonRT)
-        Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
-        mse_z_list.append(mse_z)   
-        mse_z_nonRT_list.append(mse_z_nonRT)
-        # following does not reset when a new full scan starts
-        per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)
-        per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)
-        per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
-        per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)
-        xbox.append(fullscan)
-    
-        fig_xz.add_trace(go.Box(
-                            y=np.asarray(mse_x_list).tolist(), 
-                            x=xbox, showlegend=False,
+    if fastrun is False:
+        if fig_x is None:
+            fig_x = go.Figure()  
+        if fig_z is None:
+            fig_z = go.Figure()  
+        if fullscan not in xbox:
+            xbox.extend([fullscan]*2)
+        if target_param == "X" or target_param is None:
+            # mean error over all elements of the matrices  
+            Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+            mse_x_list.append(mse_x)
+            mse_x_nonRT_list.append(mse_x_nonRT)
+            per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)                         
+            per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
+        else:
+            if len(mse_x_list) > 0:
+                mse_x_list.append(mse_x_list[-1])
+                mse_x_nonRT_list.append(mse_x_nonRT_list[-1])
+                per_param_ers["X_rot_translated_mseOverMatrix"].append(per_param_ers["X_rot_translated_mseOverMatrix"][-1])                         
+                per_param_ers["X_mseOverMatrix"].append(per_param_ers["X_mseOverMatrix"][-1])
+            else:
+                mse_x_list.append(None)
+                mse_x_nonRT_list.append(None)
+                per_param_ers["X_rot_translated_mseOverMatrix"].append(None)
+                per_param_ers["X_mseOverMatrix"].append(None)     
+        if plot_online:       
+            fig_x.add_trace(go.Box(
+                            y=np.asarray([xxx for xxx in mse_x_list if xxx is not None]).flatten().tolist(), 
+                            showlegend=False, x=xbox, 
                             name="X - total iter. {}".format(iteration),
-                            boxpoints=False, line=dict(color="blue")
+                            boxpoints="outliers", line=dict(color="blue")
                             ))
-        fig_xz.add_trace(go.Box(
-                            y=np.asarray(mse_x_nonRT_list).tolist(), 
-                            x=xbox, opacity=0.5, showlegend=False,
+            fig_x.add_trace(go.Box(
+                            y=np.asarray([xxx for xxx in mse_x_nonRT_list if xxx is not None]).flatten().tolist(), 
+                            opacity=0.5, showlegend=False, x=xbox, 
                             name="X (nonRT) - total iter. {}".format(iteration),
-                            boxpoints=False, line=dict(color="blue")
+                            boxpoints="outliers", line=dict(color="green")
                             ))
-        fig_xz.add_trace(go.Box(
-                            y=np.asarray(mse_z_list).tolist(), 
-                            x=xbox, showlegend=False,
-                            name="Z - total iter. {}".format(iteration),
-                            boxpoints=False, line=dict(color="green")
-                            ))
-        fig_xz.add_trace(go.Box(
-                            y=np.asarray(mse_z_nonRT_list).tolist(), 
-                            x=xbox, opacity=0.5, showlegend=False,
-                            name="Z (nonRT) - total iter. {}".format(iteration),
-                            boxpoints=False, line=dict(color="green")
-                            ))
-        fig_xz.update_layout(boxmode="group")
-        savename = "{}/xz_boxplots/relative_mse.html".format(DIR_out)
-        pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig_xz, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
-                            print_png=True, print_html=True, print_pdf=False)
-        figX = make_subplots(specs=[[{"secondary_y": True}]]) 
-        figX.add_trace(go.Scatter(
-                                y=per_param_ers["X_rot_translated_mseOverMatrix"], 
-                                x=np.arange(iteration),
-                                name="X - min MSE<br>(under rot/transl)"
-                            ), secondary_y=False)
-        figX.add_trace(go.Scatter(
-                                y=mse_theta_full, 
-                                x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                            ), secondary_y=True)
-        
-        figZ = make_subplots(specs=[[{"secondary_y": True}]]) 
-        figZ.add_trace(go.Scatter(
-                                y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
-                                x=np.arange(iteration),
-                                name="Z - min MSE<br>(under rot/trl)"
-                            ), secondary_y=False)
-        figZ.add_trace(go.Scatter(
-                                y=mse_theta_full, 
-                                x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                            ), secondary_y=True)
-        ###############################
-        for itm in plot_restarts:
-            scanrep, totaliterations, halvedgammas, restarted = itm
-            if halvedgammas:
-                vcolor = "red"
+            fig_x.update_layout(boxmode="group")   
+            savename = "{}/xz_boxplots/relative_mse_x.html".format(DIR_out)
+            pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+            fix_plot_layout_and_save(fig_x, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
+                                print_png=True, print_html=True, print_pdf=False)
+            figX = make_subplots(specs=[[{"secondary_y": True}]]) 
+            figX.add_trace(go.Scatter(
+                                    y=per_param_ers["X_mseOverMatrix"], 
+                                    x=np.arange(iteration),
+                                    name="X - min MSE", line_color="green"
+                                ), secondary_y=False)
+            figX.add_trace(go.Scatter(
+                                    y=per_param_ers["X_rot_translated_mseOverMatrix"], 
+                                    x=np.arange(iteration),
+                                    name="X - min MSE<br>(under rot/transl)"
+                                ), secondary_y=False)
+            figX.add_trace(go.Scatter(
+                                    y=mse_theta_full, 
+                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                                ), secondary_y=True)
+        if target_param == "Z" or target_param is None:
+            Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+            mse_z_list.append(mse_z)   
+            mse_z_nonRT_list.append(mse_z_nonRT)
+            per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)            
+            per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)      
+        else:
+            if len(mse_z_list) > 0:
+                mse_z_list.append(mse_z_list[-1])
+                mse_z_nonRT_list.append(mse_z_nonRT_list[-1])
+                per_param_ers["Z_rot_translated_mseOverMatrix"].append(per_param_ers["Z_rot_translated_mseOverMatrix"][-1])                         
+                per_param_ers["Z_mseOverMatrix"].append(per_param_ers["Z_mseOverMatrix"][-1])
             else:
-                vcolor = "green"
-            if restarted=="fullrestart":
-                figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
-                figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
-            else:
-                # partial restart
-                figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
-                figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                            font=dict(size=16, family="Times New Roman"),),)
+                mse_z_list.append(None)
+                mse_z_nonRT_list.append(None)
+                per_param_ers["Z_rot_translated_mseOverMatrix"].append(None)
+                per_param_ers["Z_mseOverMatrix"].append(None)        
+        if plot_online:
+            fig_z.add_trace(go.Box(
+                                y=np.asarray([zzz for zzz in mse_z_list if zzz is not None]).flatten().tolist(), 
+                                showlegend=False, x=xbox, 
+                                name="Z - total iter. {}".format(iteration),
+                                boxpoints="outliers", line=dict(color="blue")
+                                ))
+            fig_z.add_trace(go.Box(
+                                y=np.asarray([zzz for zzz in mse_z_nonRT_list if zzz is not None]).flatten().tolist(), 
+                                opacity=0.5, showlegend=False, x=xbox, 
+                                name="Z (nonRT) - total iter. {}".format(iteration),
+                                boxpoints="outliers", line=dict(color="green")
+                                ))
+            fig_z.update_layout(boxmode="group")               
+            savename = "{}/xz_boxplots/relative_mse_z.html".format(DIR_out)
+            pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+            fix_plot_layout_and_save(fig_z, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
+                                print_png=True, print_html=True, print_pdf=False)       
+            figZ = make_subplots(specs=[[{"secondary_y": True}]]) 
+            figZ.add_trace(go.Scatter(
+                                    y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
+                                    x=np.arange(iteration),
+                                    name="Z - min MSE<br>(under rot/trl)"
+                                ), secondary_y=False)
+            figZ.add_trace(go.Scatter(
+                                    y=per_param_ers["Z_mseOverMatrix"], 
+                                    x=np.arange(iteration),
+                                    name="Z - min MSE", line=dict(color="green")
+                                ), secondary_y=False)
+            figZ.add_trace(go.Scatter(
+                                    y=mse_theta_full, 
+                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
+                                ), secondary_y=True)
         ###############################
-        savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
-        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                print_pdf=False)
-        savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_mse.html".format(DIR_out)
-        pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(figZ, savenameZ, xaxis_title="", yaxis_title="MSE", title="", 
-                                showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                print_pdf=False)
+        if plot_online:
+            for itm in plot_restarts:            
+                scanrep, totaliterations, halvedgammas, restarted = itm
+                if halvedgammas:
+                    vcolor = "red"
+                else:
+                    vcolor = "green"
+                if restarted=="fullrestart":
+                    if target_param == "X" or target_param is None:
+                        figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
+                    elif target_param == "Z" or target_param is None:
+                        figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                font=dict(size=16, family="Times New Roman"),),)
+                else:
+                    # partial restart
+                    if target_param == "X" or target_param is None:
+                        figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                font=dict(size=16, family="Times New Roman"),),)
+                    elif target_param == "Z" or target_param is None:
+                        figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                font=dict(size=16, family="Times New Roman"),),)
+            ###############################
+            if target_param == "X" or target_param is None:
+                savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
+                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                        print_pdf=False)
+            elif target_param == "Z" or target_param is None:
+                savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_mse.html".format(DIR_out)
+                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(figZ, savenameZ, xaxis_title="", yaxis_title="MSE", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
+                                        print_pdf=False)
 
-    return mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox
+    return mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_ers, per_param_heats, xbox
 
 
 def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
@@ -2838,10 +2991,11 @@ def log_full_posterior(Y, theta_curr, param_positions_dict, args):
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
 
-    # if False:
-    if K*J <= 10e4:
+    if False:
+    # if K*J <= 10e5:
         loglik = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
     else:
+        print("fullposter")
         loglik = -negative_loglik_parallel(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
             
     params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)
@@ -3009,7 +3163,7 @@ def log_conditional_posterior_phi_jl(phi_jl, l, j, Y, theta, J, K, d, parameter_
 
 def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                     prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, 
-                                    debug=False, numbafast=True, block_size_rows=5000):
+                                    debug=False, numbafast=True, block_size_rows=1000):
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
@@ -3026,8 +3180,8 @@ def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, d
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpz_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(zj, mean=prior_loc_z, cov=prior_scale_z)
     
-    # if False:
-    if K*J <= 10e4:
+    if False:
+    # if K*J <= 10e5:
         if numbafast:
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
             gamma = params_hat["gamma"][0]
@@ -3044,6 +3198,9 @@ def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, d
             assert np.allclose(log1mcdfs, log1mcdfsbase)
             assert(np.allclose(logpz_j, _logpz_j))
     else:
+        X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
+        gamma = params_hat["gamma"][0]
+        beta = params_hat["beta"]
         row_blocks = (K + block_size_rows - 1) // block_size_rows
         block_size_cols = j
         col_blocks = -1
@@ -3064,7 +3221,7 @@ def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, d
 
 def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                    prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, 
-                                   debug=False, numbafast=True, block_size_rows=5000):
+                                   debug=False, numbafast=True, block_size_rows=1000):
     # l denotes the coordinate of vector z_j
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -3082,14 +3239,17 @@ def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_name
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpz_jl += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(z_jl, loc=prior_loc_z, scale=prior_scale_z)
 
-    # if False:
-    if K*J <= 10e4:
+    
+    # ipdb.set_trace()
+    if False:
+    # if K*J <= 10e5:
         if numbafast:
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
             gamma = params_hat["gamma"][0]
             alphaj = params_hat["alpha"][j]
             beta = params_hat["beta"]
             pijs = p_j_arg_numbafast(X, Z[:, j], alphaj, beta, gamma)
+            # _pij_arg = p_ij_arg_numbafast(X, Z[:, j], alphaj, beta, gamma, K)  
         else:
             pijs = p_ij_arg(None, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
         logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)    
@@ -3098,7 +3258,13 @@ def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_name
         if debug:
             log1mcdfsbase = log_complement_from_log_cdf_vec(logcdfs, pijs, mean=mu_e, variance=sigma_e)       
             assert np.allclose(log1mcdfs, log1mcdfsbase)       
-            assert(np.allclose(logpz_jl, _logpz_jl))
+            assert(np.allclose(logpz_jl, _logpz_jl))    
+
+        # print(pijs[0])
+        # pijs = p_ij_arg(None, j, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
+        # print(pijs[0])
+        
+
     else:
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         gamma = params_hat["gamma"][0]
@@ -3123,7 +3289,7 @@ def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_name
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, 
                                     param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1, 
-                                    debug=False, numbafast=True, block_size_rows=5000):    
+                                    debug=False, numbafast=True, block_size_rows=1000):    
     
     # Assuming independent, Gaussian alphas.
     # Hence, even when evaluating with vector parameters, we use the uni-dimensional posterior for alpha.
@@ -3144,8 +3310,8 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
 
-    # if False:
-    if K*J <= 10e4:
+    if False:
+    # if K*J <= 10e5:
         if numbafast:
             params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
@@ -3166,6 +3332,7 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
             assert np.allclose(log1mcdfs, log1mcdfsbase)
             assert np.allclose(logpalpha_j, _logpalpha_j)
     else:
+        print("alpha")
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma = params_hat["gamma"][0]        
@@ -3226,7 +3393,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     return logpbeta_k*gamma
 
 def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1, prior_loc_gamma=0, 
-                                    prior_scale_gamma=1, debug=False, numbafast=True, block_size_rows=5000, block_size_cols=100):    
+                                    prior_scale_gamma=1, debug=False, numbafast=True, block_size_rows=1000, block_size_cols=100):    
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
@@ -3242,16 +3409,14 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpgamma += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma)
 
-    # if False:
-    if K*J <= 10e4:
-        if numbafast:
-            params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
+    if False:
+    # if K*J <= 10e5:
+        if numbafast:            
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
-            Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
-            gamma_nbfast = params_hat["gamma"][0]
+            Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                 
             alpha = params_hat["alpha"]
             beta = params_hat["beta"]
-            pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma_nbfast, K)     
+            pijs = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
         else:
             pijs = p_ij_arg(None, None, theta_test, J, K, d, parameter_names, dst_func, param_positions_dict)        
         logcdfs = norm.logcdf(pijs, loc=mu_e, scale=sigma_e)        
@@ -3263,8 +3428,7 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
             assert(np.allclose(logpgamma, _logpgamma))
     else:
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
-        Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
-        gamma_nbfast = params_hat["gamma"][0]
+        Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")             
         alpha = params_hat["alpha"]
         beta = params_hat["beta"]
         row_blocks = (K + block_size_rows - 1) // block_size_rows
@@ -3305,7 +3469,7 @@ def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, d
 
 def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, 
                                     prior_loc_sigmae=0, prior_scale_sigmae=1, min_sigma_e=0.0001, 
-                                    debug=False, numbafast=True, block_size_rows=5000, block_size_cols=100):    
+                                    debug=False, numbafast=True, block_size_rows=1000, block_size_cols=100):    
     
     tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=min_sigma_e, upper=10*np.sqrt(prior_scale_sigmae)+prior_scale_sigmae)    
     mu_e = 0
@@ -3320,10 +3484,10 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf + tig.logpdf(sigma_e)
     
-    # if False:
-    if K*J <= 10e4:
+    if False:
+    # if K*J <= 10e5:
         if numbafast:
-            params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+            params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
             Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
             gamma = params_hat["gamma"][0]
@@ -3341,7 +3505,7 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
             assert np.allclose(log1mcdfs, log1mcdfsbase)
             assert(np.allclose(logpsigma_e, _logpsigma_e)) 
     else:
-        params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+        params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma = params_hat["gamma"][0]
