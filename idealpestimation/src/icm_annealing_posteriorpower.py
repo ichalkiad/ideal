@@ -762,7 +762,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                             Y, gamma, theta_curr.copy(), param_positions_dict, L, args)    
                 milliseconds = (time.time()-t00)*1000                     
-                out_file = "/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_1k.jsonl"
+                out_file = "/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_500.jsonl"
                 with open(out_file, 'a') as f:         
                     writer = jsonlines.Writer(f)
                     writer.write({"K":K, "J":J, "block_size_rows": None, 

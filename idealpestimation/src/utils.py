@@ -2995,7 +2995,6 @@ def log_full_posterior(Y, theta_curr, param_positions_dict, args):
     # if K*J <= 10e5:
         loglik = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
     else:
-        print("fullposter")
         loglik = -negative_loglik_parallel(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
             
     params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)
@@ -3163,7 +3162,7 @@ def log_conditional_posterior_phi_jl(phi_jl, l, j, Y, theta, J, K, d, parameter_
 
 def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                     prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, 
-                                    debug=False, numbafast=True, block_size_rows=1000):
+                                    debug=False, numbafast=True, block_size_rows=500):
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                         
@@ -3221,7 +3220,7 @@ def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, d
 
 def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                    prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, 
-                                   debug=False, numbafast=True, block_size_rows=1000):
+                                   debug=False, numbafast=True, block_size_rows=500):
     # l denotes the coordinate of vector z_j
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -3289,7 +3288,7 @@ def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_name
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, 
                                     param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1, 
-                                    debug=False, numbafast=True, block_size_rows=1000):    
+                                    debug=False, numbafast=True, block_size_rows=500):    
     
     # Assuming independent, Gaussian alphas.
     # Hence, even when evaluating with vector parameters, we use the uni-dimensional posterior for alpha.
@@ -3332,7 +3331,6 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
             assert np.allclose(log1mcdfs, log1mcdfsbase)
             assert np.allclose(logpalpha_j, _logpalpha_j)
     else:
-        print("alpha")
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
         gamma = params_hat["gamma"][0]        
@@ -3393,7 +3391,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     return logpbeta_k*gamma
 
 def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1, prior_loc_gamma=0, 
-                                    prior_scale_gamma=1, debug=False, numbafast=True, block_size_rows=1000, block_size_cols=100):    
+                                    prior_scale_gamma=1, debug=False, numbafast=True, block_size_rows=500, block_size_cols=100):    
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
@@ -3469,7 +3467,7 @@ def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, d
 
 def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, 
                                     prior_loc_sigmae=0, prior_scale_sigmae=1, min_sigma_e=0.0001, 
-                                    debug=False, numbafast=True, block_size_rows=1000, block_size_cols=100):    
+                                    debug=False, numbafast=True, block_size_rows=500, block_size_cols=100):    
     
     tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=min_sigma_e, upper=10*np.sqrt(prior_scale_sigmae)+prior_scale_sigmae)    
     mu_e = 0
