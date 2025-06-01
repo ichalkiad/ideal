@@ -1,9 +1,16 @@
 import os 
+
+os.environ["OMP_NUM_THREADS"] = "100"
+os.environ["MKL_NUM_THREADS"] = "100"
+os.environ["OPENBLAS_NUM_THREADS"] = "100"
+os.environ["NUMBA_NUM_THREADS"] = "100"
+os.environ["JAX_NUM_THREADS"] = "100"
+os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=100"
+
 import sys
 import ipdb
 import jax
 import pathlib
-import pickle
 import jsonlines
 import numpy as np
 import random
@@ -11,7 +18,7 @@ import itertools
 from scipy.optimize import minimize
 import plotly.graph_objects as go
 from idealpestimation.src.parallel_manager import jsonlines, ProcessManager
-from idealpestimation.src.utils import sample_theta_curr_init, \
+from idealpestimation.src.utils import pickle, sample_theta_curr_init, \
                                         create_constraint_functions_icm, \
                                             update_annealing_temperature, \
                                                 compute_and_plot_mse, time, datetime, \
@@ -21,7 +28,9 @@ from idealpestimation.src.utils import sample_theta_curr_init, \
                                                                 get_parameter_name_and_vector_coordinate,\
                                                                     get_posterior_for_optimisation_vec,\
                                                                         rank_and_plot_solutions, get_evaluation_grid, check_convergence,\
-                                                                            data_annealing_init_theta_given_theta_prev, plot_posterior_vec_runtimes
+                                                                            data_annealing_init_theta_given_theta_prev, plot_posterior_vec_runtimes, \
+                                                                                print_threadpool_info, error_polarisation_plots
+from idealpestimation.src.efficiency_monitor import Monitor
 
 
 class ProcessManagerSynthetic(ProcessManager):
@@ -386,9 +395,15 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         
         delta_rate_prev = None
         mse_theta_full = []
+        err_theta_full = []
         fig_xz = None
         mse_x_list = []
         mse_z_list = []
+        err_x_list = []
+        err_z_list = []
+        err_x_nonRT_list = []
+        err_z_nonRT_list = []
+        per_param_sq_ers = dict()
         per_param_ers = dict()
         plotting_thetas = dict()
         per_param_heats = dict()
@@ -396,16 +411,25 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
         fig_posteriors_annealed = dict()
         for param in parameter_names:
             plotting_thetas[param] = []
+            per_param_sq_ers[param] = []        
             per_param_ers[param] = []        
             fig_posteriors[param] = None
             fig_posteriors_annealed[param] = None
             if param in ["gamma", "delta", "sigma_e"]:
                 continue
             else:
-                per_param_heats[param] = []
-        per_param_ers["X_rot_translated_mseOverMatrix"] = []
-        per_param_ers["Z_rot_translated_mseOverMatrix"] = []
-        per_param_heats["theta"] = []
+                per_param_heats["{}_sq_e".format(param)] = []
+                per_param_heats["{}_e".format(param)] = []
+        per_param_heats["theta_sq_e"] = []
+        per_param_heats["theta_e"] = []
+        per_param_sq_ers["X_rot_translated_mseOverMatrix"] = []
+        per_param_sq_ers["Z_rot_translated_mseOverMatrix"] = []        
+        per_param_sq_ers["X_mseOverMatrix"] = []
+        per_param_sq_ers["Z_mseOverMatrix"] = []   
+        per_param_ers["X_rot_translated_errOverMatrix"] = []
+        per_param_ers["Z_rot_translated_errOverMatrix"] = []
+        per_param_ers["X_errOverMatrix"] = []
+        per_param_ers["Z_errOverMatrix"] = []   
         plot_restarts = []
         xbox = []
         total_iter = 1   
@@ -432,11 +456,13 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                                                 Y, gamma, theta_curr.copy(), param_positions_dict, L, args)                   
                     theta_curr = theta_test.copy()                    
                     gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)                   
-                    mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                    mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+                         err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list = \
                                     compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
-                                        param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
+                                        param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, 
                                         fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
-                                        mse_z_nonRT_list=mse_z_nonRT_list, per_param_ers=per_param_ers, 
+                                        mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list, err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
+                                        per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers,
                                         per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)       
 
                     #########################
@@ -532,11 +558,13 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                         theta_curr = theta_test.copy()
                         gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, 
                                                                         temperature_steps, all_gammas)                 
-                        mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+                        mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+                             err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list = \
                                         compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
-                                            plot_online=plot_online, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                                            mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
-                                            xbox=xbox, plot_restarts=plot_restarts)                            
+                                            plot_online=plot_online, mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                                            mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list,
+                                            err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list, per_param_sq_ers=per_param_sq_ers, 
+                                            per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)                            
                         #########################
                         if testparam is not None:
                             for param in parameter_names:
@@ -618,10 +646,13 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                 print(l, total_iter, converged, random_restart, restarts, halving_rate)                                      
                            
             
-        mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_ers, per_param_heats, xbox = \
+        mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_xz, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+             err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list = \
                         compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
-                            plot_online=True, mse_theta_full=mse_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
-                            mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
+                            plot_online=True, mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
+                            mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list,
+                            err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list, per_param_sq_ers=per_param_sq_ers, 
+                            per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
                                                                                         fig_posteriors_annealed, gamma, param_positions_dict, args, 
                                                                                         plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index) 
@@ -630,7 +661,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
             estimated_thetas.append((theta_curr, mse_x_list[-1], mse_z_list[-1], mse_x_nonRT_list[-1], mse_z_nonRT_list[-1]))
         
         elapsedtime = str(timedelta(seconds=time.time()-t0)) 
-        rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args)
+        rank_and_plot_solutions(estimated_thetas, elapsedtime, None, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args)
 
         if elementwise:
             teststep = 1
@@ -690,7 +721,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         if theta_part_annealing is not None:
             theta_curr = data_annealing_init_theta_given_theta_prev(theta_curr.copy(), theta_part_annealing, 
                                                                     K, J, d, param_positions_dict, 
-                                                                    parameter_names, annealing_prev, diff_elementwise=elementwise)
+                                                                    parameter_names, annealing_prev, 
+                                                                    diff_elementwise=elementwise)
     else:
         all_gammas = []
         for gidx in range(len(temperature_steps[1:])):
@@ -705,8 +737,12 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
 
     delta_rate_prev = None
     mse_theta_full = []
+    err_theta_full = []
     fig_x = None
     fig_z = None
+    fig_x_err = None
+    fig_z_err = None
+    per_param_sq_ers = dict()
     per_param_ers = dict()
     plotting_thetas = dict()
     per_param_heats = dict()
@@ -714,18 +750,25 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     fig_posteriors_annealed = dict()
     for param in parameter_names:
         plotting_thetas[param] = []
+        per_param_sq_ers[param] = []        
         per_param_ers[param] = []        
         fig_posteriors[param] = None
         fig_posteriors_annealed[param] = None
         if param in ["gamma", "delta", "sigma_e"]:
             continue
         else:
-            per_param_heats[param] = []
-    per_param_ers["X_rot_translated_mseOverMatrix"] = []
-    per_param_ers["Z_rot_translated_mseOverMatrix"] = []
-    per_param_ers["X_mseOverMatrix"] = []
-    per_param_ers["Z_mseOverMatrix"] = []
-    per_param_heats["theta"] = []   
+            per_param_heats["{}_sq_e".format(param)] = []
+            per_param_heats["{}_e".format(param)] = []
+    per_param_heats["theta_sq_e"] = []
+    per_param_heats["theta_e"] = []   
+    per_param_sq_ers["X_rot_translated_mseOverMatrix"] = []
+    per_param_sq_ers["Z_rot_translated_mseOverMatrix"] = []
+    per_param_sq_ers["X_mseOverMatrix"] = []
+    per_param_sq_ers["Z_mseOverMatrix"] = []    
+    per_param_ers["X_rot_translated_errOverMatrix"] = []
+    per_param_ers["Z_rot_translated_errOverMatrix"] = []
+    per_param_ers["X_errOverMatrix"] = []
+    per_param_ers["Z_errOverMatrix"] = []    
     plot_restarts = []
     xbox = []
     total_iter = 1   
@@ -735,8 +778,12 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
 
     mse_x_list = []
     mse_z_list = []
+    err_x_list = []
+    err_z_list = []
     mse_x_nonRT_list = []
     mse_z_nonRT_list = []
+    err_x_nonRT_list = []
+    err_z_nonRT_list = []
     xbox = []
 
     if plot_online and not fastrun:
@@ -755,45 +802,61 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if ((target_param == "gamma" or target_param == "sigma_e") and (l == 0 or not (l % 5 == 0))):                    
+                if ((target_param == "gamma" or target_param == "sigma_e") and (not (l % 5 == 0))):      #l == 0 or 
                     continue                   
                 
-                t00 = time.time()
+                # t00 = time.time()
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                             Y, gamma, theta_curr.copy(), param_positions_dict, L, args)    
-                milliseconds = (time.time()-t00)*1000                     
-                out_file = "/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_500.jsonl"
-                with open(out_file, 'a') as f:         
-                    writer = jsonlines.Writer(f)
-                    writer.write({"K":K, "J":J, "block_size_rows": None, 
-                                "block_size_cols":None, "parallel": 1, 
-                                "milliseconds":milliseconds})
+                # milliseconds = (time.time()-t00)*1000                     
+                # out_file = "/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_500.jsonl"
+                # with open(out_file, 'a') as f:         
+                #     writer = jsonlines.Writer(f)
+                #     writer.write({"K":K, "J":J, "block_size_rows": None, 
+                #                 "block_size_cols":None, "parallel": 1, 
+                #                 "milliseconds":milliseconds})
                 
-
                 theta_curr = theta_test.copy()                    
                 gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)      
 
-                if plot_online: # and i in [10, 75, 82, 115, 120, 121]:  ######################################################                    
-                    mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, _fig_x, _fig_z, per_param_ers, per_param_heats, xbox = \
+                if plot_online:
+                    subset_coord2plot = None
+                    # subset_coord2plot = [10, 75, 82, 115, 120, 121]
+                    mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, _fig_x, _fig_z, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+                         err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list, _fig_x_err, _fig_z_err = \
                                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
-                                    param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
-                                    fig_x=None, fig_z=None, mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
-                                    mse_z_nonRT_list=mse_z_nonRT_list, per_param_ers=per_param_ers, 
-                                    per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, fastrun=fastrun, target_param=target_param)      
+                                    param_positions_dict=param_positions_dict, plot_online=plot_online, 
+                                    mse_theta_full=mse_theta_full, err_theta_full=err_theta_full,
+                                    fig_x=None, fig_z=None, fig_x_err=None, fig_z_err=None, 
+                                    mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
+                                    mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list, 
+                                    err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
+                                    per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers,
+                                    per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, 
+                                    fastrun=fastrun, target_param=target_param, subset_coord2plot=subset_coord2plot)      
                 delta_rate_prev = delta_rate                                                                    
                 total_iter += 1   
                 i += 1   
-                # if i % 1000 == 0:
-                #     print(i, l)                               
+                if i % 1000 == 0:
+                    print(i, l)                               
             
             # last entry in mse lists in the same, has been stored twice
             if plot_online: # and l==4: ################################################################
-                mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_ers, per_param_heats, xbox = \
+                subset_coord2plot = None
+                # subset_coord2plot = [10, 75, 82, 115, 120, 121]
+                mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, \
+                    fig_x, fig_z, fig_x_err, fig_z_err, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+                    err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list, fig_x_err, fig_z_err = \
                                 compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, 
-                                    param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
-                                    fig_x=fig_x, fig_z=fig_z, mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
-                                    mse_z_nonRT_list=mse_z_nonRT_list, per_param_ers=per_param_ers, 
-                                    per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, fastrun=fastrun)
+                                    param_positions_dict=param_positions_dict, plot_online=plot_online, 
+                                    mse_theta_full=mse_theta_full, err_theta_full=err_theta_full,
+                                    fig_x=fig_x, fig_z=fig_z, fig_x_err=fig_x_err, fig_z_err=fig_z_err, 
+                                    mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
+                                    mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list, 
+                                    err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
+                                    per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers,
+                                    per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, 
+                                    fastrun=fastrun, subset_coord2plot=subset_coord2plot)
             # plot posteriors during estimation   
             if plot_online and not fastrun: # and l==4:      ########################################################
                 fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, 
@@ -819,43 +882,54 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     param_no = 1                    
                 for idx in range(param_no):
                     
-                    t00 = time.time()
+                    # t00 = time.time()
                     theta_test, _ = optimise_posterior_vector(target_param, idx, Y, gamma, theta_curr.copy(), 
                                                             param_positions_dict, L, args)                       
-                    milliseconds = (time.time()-t00)*1000                     
-                    out_file = "/mnt/hdd2/ioannischalkiadakis/timings_vector_parallel_1k.jsonl"
-                    with open(out_file, 'a') as f:         
-                        writer = jsonlines.Writer(f)
-                        writer.write({"K":K, "J":J, "block_size_rows": None, 
-                                    "block_size_cols":None, "parallel": 1, 
-                                    "milliseconds":milliseconds})
+                    # milliseconds = (time.time()-t00)*1000                     
+                    # out_file = "/mnt/hdd2/ioannischalkiadakis/timings_vector_parallel_1k.jsonl"
+                    # with open(out_file, 'a') as f:         
+                    #     writer = jsonlines.Writer(f)
+                    #     writer.write({"K":K, "J":J, "block_size_rows": None, 
+                    #                 "block_size_cols":None, "parallel": 1, 
+                    #                 "milliseconds":milliseconds})
             
                     theta_curr = theta_test.copy()
                     gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, 
                                                                     temperature_steps, all_gammas)
-                    if plot_online:                        
-                        mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, _fig_x, _fig_z, per_param_ers, per_param_heats, xbox = \
-                                compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
-                                    plot_online=plot_online, mse_theta_full=mse_theta_full, fig_x=None, fig_z=None, mse_x_list=mse_x_list, 
-                                    mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, 
-                                    per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
-                                    xbox=xbox, plot_restarts=plot_restarts, fastrun=fastrun, target_param=target_param)     
+                    if plot_online: 
+                        subset_coord2plot = None
+                        # subset_coord2plot = [10, 75, 82, 115, 120, 121]                       
+                        mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, _fig_x, _fig_z, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+                             err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list, fig_x_err, fig_z_err = \
+                                compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
+                                                    param_positions_dict=param_positions_dict,
+                                                    plot_online=plot_online, mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, 
+                                                    fig_x=None, fig_z=None, fig_x_err=None, fig_z_err=None, mse_x_list=mse_x_list, 
+                                                    mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, 
+                                                    err_x_list=err_x_list, err_z_list=err_z_list, err_x_nonRT_list=err_x_nonRT_list, 
+                                                    err_z_nonRT_list=err_z_nonRT_list, per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers, 
+                                                    per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, fastrun=fastrun, 
+                                                    target_param=target_param, subset_coord2plot=subset_coord2plot)     
 
                     delta_rate_prev = delta_rate                                                                        
-                    total_iter += 1   
-
-                # if total_iter % 1000 == 0:
-                #     print(total_iter, l)                               
+                    total_iter += 1                         
             
             # last entry in mse lists in the same, has been stored twice
-            if plot_online:                
-                mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_ers, per_param_heats, xbox = \
+            if plot_online:        
+                subset_coord2plot = None
+                # subset_coord2plot = [10, 75, 82, 115, 120, 121]        
+                mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+                    err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list, fig_x_err, fig_z_err = \
                                     compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter+1, args=args, 
                                         param_positions_dict=param_positions_dict, plot_online=plot_online, 
-                                        mse_theta_full=mse_theta_full, fig_x=fig_x, fig_z=fig_z, mse_x_list=mse_x_list, mse_z_list=mse_z_list, 
-                                        mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, 
-                                        per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, 
-                                        plot_restarts=plot_restarts, fastrun=fastrun)  
+                                        mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, fig_x=fig_x, 
+                                        fig_z=fig_z, fig_x_err=fig_x_err, fig_z_err=fig_z_err, mse_x_list=mse_x_list, 
+                                        mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
+                                        mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list, 
+                                        err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list, 
+                                        per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers,
+                                        per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, 
+                                        fastrun=fastrun, subset_coord2plot=subset_coord2plot)  
             
             # plot posteriors during estimation 
             if plot_online and not fastrun:       
@@ -873,16 +947,26 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             if not plot_online:
                 estimated_thetas.append((theta_curr, None, None, None, None))
             else:
-                mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_ers, per_param_heats, xbox = \
+                subset_coord2plot = None
+                # subset_coord2plot = [10, 75, 82, 115, 120, 121]
+                mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+                    err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list, fig_x_err, fig_z_err = \
                     compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
-                        plot_online=plot_online, mse_theta_full=mse_theta_full, fig_x=fig_x, fig_z=fig_z, mse_x_list=mse_x_list, 
-                        mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, 
-                        per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, fastrun=False) 
+                                        plot_online=plot_online, mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, fig_x=fig_x, 
+                                        fig_z=fig_z, fig_x_err=fig_x_err, fig_z_err=fig_z_err, mse_x_list=mse_x_list, mse_z_list=mse_z_list, 
+                                        mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, 
+                                        err_z_list=err_z_list, err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
+                                        per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
+                                        xbox=xbox, plot_restarts=plot_restarts, fastrun=False, subset_coord2plot=subset_coord2plot) 
                 estimated_thetas.append((theta_curr, mse_x_list[-1], mse_z_list[-1], mse_x_nonRT_list[-1], mse_z_nonRT_list[-1])) 
                 mse_x_list = []
                 mse_z_list = []
                 mse_x_nonRT_list = []
                 mse_z_nonRT_list = []
+                err_x_list = []
+                err_z_list = []                
+                err_x_nonRT_list = []
+                err_z_nonRT_list = []
             converged = False
             halved = False
             if (halving_rate < max_halving) and not data_annealing:              
@@ -938,11 +1022,18 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                     param_positions_dict, L, args)     
             theta_curr = theta_test.copy()
 
-    mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_ers, per_param_heats, xbox = \
-                    compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, param_positions_dict=param_positions_dict,
-                        plot_online=plot_online, mse_theta_full=mse_theta_full, fig_x=fig_x, fig_z=fig_z, mse_x_list=mse_x_list, 
-                        mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, 
-                        per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, fastrun=False)  
+    subset_coord2plot = None
+    # subset_coord2plot = [10, 75, 82, 115, 120, 121]
+    mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_sq_ers, per_param_ers, per_param_heats, xbox, \
+        err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list, fig_x_err, fig_z_err = \
+                    compute_and_plot_mse(theta_true, theta_curr, l, iteration=total_iter, args=args, 
+                                        param_positions_dict=param_positions_dict, plot_online=plot_online, mse_theta_full=mse_theta_full, 
+                                        err_theta_full=err_theta_full, fig_x=fig_x, fig_z=fig_z, fig_x_err=fig_x_err, 
+                                        fig_z_err=fig_z_err, mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
+                                        mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list, 
+                                        err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list, per_param_sq_ers=per_param_sq_ers, 
+                                        per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, 
+                                        fastrun=False, subset_coord2plot=subset_coord2plot)  
     if plot_online and not fastrun:
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), i, fig_posteriors, 
                                                                                     fig_posteriors_annealed, gamma, param_positions_dict, args, 
@@ -969,16 +1060,16 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:                    
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_cmpjz_selectgammaupd/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_allmetrics_June2025/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing_perturb/".format(data_location, m)
                 else:
-                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise_May2/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
             else:
                 if evaluate_posterior:
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_cmpjz_selectgammaupd/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_vector_annealing/".format(data_location, m)
@@ -1029,21 +1120,37 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                     prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
                     prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
                     gridpoints_num, diff_iter, disp, min_sigma_e, theta_true)   
-            t0 = time.time()
+            
+            # start efficiency monitoring - interval in seconds
+            print_threadpool_info()
+            monitor = Monitor(interval=60)
+            monitor.start()            
+
+            t_start = time.time()            
             theta = icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rate=temperature_rate, 
                                                 temperature_steps=temperature_steps, plot_online=plot_online, 
                                                 percentage_parameter_change=percentage_parameter_change, fastrun=fastrun,
                                                 data_annealing=False, annealing_prev=None, theta_part_annealing=None,
                                                 max_restarts=max_restarts, max_partial_restarts=max_partial_restarts, 
                                                 max_halving=max_halving)
-            elapsedtime = str(timedelta(seconds=time.time()-t0))   
-            rank_and_plot_solutions(theta, elapsedtime, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args)
+            t_end = time.time()
+            monitor.stop()
+            wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+                avg_threads, max_threads, avg_processes, max_processes = monitor.report(t_end - t_start)
+            efficiency_measures = (wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+                                        avg_threads, max_threads, avg_processes, max_processes)
+            elapsedtime = str(timedelta(seconds=t_end - t_start))   
+            rank_and_plot_solutions(theta, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args)
 
 
 if __name__ == "__main__":
 
-    # files = ["/mnt/hdd2/ioannischalkiadakis/timings_vector_parallel_5k.jsonl", "/mnt/hdd2/ioannischalkiadakis/timings_vector_numba.jsonl"]
-    # names = ["parallel-block-5k", "numba-only"]
+    # datain = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K30_J10_sigmae001/"
+    # estimation_folder = "estimation_ICM_evaluate_posterior_elementwise_May2"
+    # error_polarisation_plots(datain, estimation_folder, M=1, K=30, J=10, d=2)
+
+    # files = ["/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_500.jsonl", "/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_1k.jsonl", "/mnt/hdd2/ioannischalkiadakis/timings_vector_parallel_1k.jsonl", "/mnt/hdd2/ioannischalkiadakis/timings_vector_numba.jsonl"]
+    # names = ["element-parallel-block-500", "element-parallel-block-1k", "vector-parallel-block-1k", "vector-numba-only"]
     # plot_posterior_vec_runtimes(files, names, outdir="/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K10000_J100_sigmae0001/0/")
     # import sys
     # sys.exit(0)
@@ -1064,7 +1171,7 @@ if __name__ == "__main__":
         J = 10
         sigma_e_true = 0.01
         total_running_processes = 20   
-        elementwise = False
+        elementwise = True
         evaluate_posterior = True
     else:
         parallel = args.parallel
@@ -1128,12 +1235,12 @@ if __name__ == "__main__":
     # temperature_steps = [0, 1, 2, 5, 10]
     # temperature_rate = [0.1, 0.2, 0.5, 1] 
 
-    niter = 2
-    fastrun = True
-    max_restarts = 2
-    max_partial_restarts = 2
-    max_halving = 2
-    plot_online = False
+    niter = 5
+    fastrun = False
+    max_restarts = 1 #2
+    max_partial_restarts = 1 #2
+    max_halving = 1 #2
+    plot_online = True
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
@@ -1142,7 +1249,7 @@ if __name__ == "__main__":
     tol = 1e-6    
     #/home/ioannischalkiadakis/ideal
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30      
 

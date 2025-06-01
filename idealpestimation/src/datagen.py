@@ -390,6 +390,12 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     # utilities_matrix[:, math.ceil(8*J/10):math.ceil(9*J/10)] *= -1.25
     # utilities_matrix[:, math.ceil(9*J/10):math.ceil(10*J/10)] *= -1.5
 
+    # save data
+    pathlib.Path("{}/".format(data_location)).mkdir(parents=True, exist_ok=True)
+    with open("{}/Y.pickle".format(data_location), "wb") as f:
+        pickle.dump(follow_matrix, f, protocol=4)
+    with open("{}/Utilities.pickle".format(data_location), "wb") as f:
+        pickle.dump(utilities_matrix, f, protocol=4)
     # utilities_matrix = generate_normal_data(n_samples=K, n_dimensions=J, mu=0.6*np.ones((J,)), sigma=0.1*np.eye(J))
     sigma_noise = sigma_e*np.eye(J)
     stochastic_component = generate_normal_data(n_samples=K, n_dimensions=J, mu=mu_e*np.ones((J,)), sigma=sigma_noise, rng=rng)
@@ -399,12 +405,8 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
 
     snr = 10*np.log10((K*x_var + J*z_var + J*alpha_var + K*beta_var)/(K*J*sigma_e))
     
-    # save data
-    pathlib.Path("{}/".format(data_location)).mkdir(parents=True, exist_ok=True)
-    with open("{}/Y.pickle".format(data_location), "wb") as f:
-        pickle.dump(follow_matrix, f, protocol=4)
-    with open("{}/Utilities.pickle".format(data_location), "wb") as f:
-        pickle.dump(utilities_matrix, f, protocol=4)
+    with open("{}/Utilities_mat_probabilities.pickle".format(data_location), "wb") as f:
+        pickle.dump(utilities_mat_probab, f, protocol=4)
 
     # full, with status quo
     if delta > 0:
@@ -564,12 +566,12 @@ if __name__ == "__main__":
 
     # Generate synthetic data
     # trials
-    M = 10
+    M = 1
     # number of leaders
-    Js = [100, 500, 1000]
+    Js = [100] #, 500, 1000]
     # number of followers
-    Ks = [10000]
-    sigma_es = [0.001, 0.1, 0.25, 0.5]
+    Ks = [1000000]
+    sigma_es = [0.001] #, 0.1, 0.25, 0.5]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:
