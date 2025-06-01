@@ -24,6 +24,14 @@ import numba
 from numba import prange
 from joblib import Parallel, delayed
 import pandas as pd
+from threadpoolctl import threadpool_info
+import pickle
+
+def print_threadpool_info():
+    print("\n📊 Threadpool Info:")
+    for lib in threadpool_info():
+        print(f"- {lib['prefix']} ({lib['internal_api']}) → Threads: {lib['num_threads']}")
+
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=True):
@@ -652,7 +660,8 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                                 params_out[param][start*d:end*d] = theta
                                 X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
                                 X_hat = np.asarray(theta).reshape((d, end-start), order="F")
-                                Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                                Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
+                                    get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                             else:
                                 params_out[param][start:end] = theta                            
                                 mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])**2)
@@ -664,7 +673,8 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                             if param == "Z":
                                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")  
                                 Z_hat = np.asarray(theta).reshape((d, J), order="F")
-                                Rz, tz, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                                Rz, tz, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
+                                    get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                             else:
                                 mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]))**2)
             
@@ -1117,19 +1127,19 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
                 params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                 X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                 X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
-                Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                 estimation_error_per_trial[param].append(mse_x)
             elif param == "Z":
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                 estimation_error_per_trial[param].append(mse_z)                      
             elif param == "Phi":            
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                Rphi, tphi, mse_phi, mse_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
                 estimation_error_per_trial[param].append(mse_phi)                        
             elif param in ["beta", "alpha"]:
                 params_out_jsonl[param] = params_out[param].tolist()     
@@ -1220,21 +1230,21 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
                     params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                     X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                     X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
-                    Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                    Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                     estimation_error_per_trial[param][batchsize].append(float(mse_x))
                     estimation_error_per_trial_nonrotated[param][batchsize].append(float(mse_x_nonRT))
                 elif param == "Z":
                     params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                     Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                     Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                    Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                    Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                     estimation_error_per_trial[param][batchsize].append(float(mse_z))  
                     estimation_error_per_trial_nonrotated[param][batchsize].append(float(mse_z_nonRT))            
                 elif param == "Phi":            
                     params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                     Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                     Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                    Rphi, tphi, mse_phi, mse_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                    Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
                     estimation_error_per_trial[param][batchsize].append(float(mse_phi))
                     estimation_error_per_trial[param][batchsize].append(float(mse_phi_nonRT))
                 elif param in ["beta", "alpha"]:
@@ -1735,8 +1745,11 @@ def parse_timedelta_string(time_str):
 
     return tdelta, int(hours), int(minutes), int(seconds), int(microseconds)
 
-def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter_names, dst_func, 
+def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, 
                             param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None):
+
+    wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+                avg_threads, max_threads, avg_processes, max_processes = efficiency_measures
 
     best_theta = None
     computed_logfullposterior = []
@@ -1801,7 +1814,20 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, Y, J, K, d, parameter
         fix_plot_layout_and_save(fig, "{}/solution_plots/utilities_solution_index_{}.html".format(DIR_out, sorted_idx_lst.index(i)), 
                                 xaxis_title="Leaders", yaxis_title="Followers", title="Utilities with estimated parameters", 
                                 showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
-    
+      
+    out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
+    with open(out_file, 'a') as f:         
+        writer = jsonlines.Writer(f)
+        writer.write({"wall_duration": wall_duration, 
+                    "avg_total_cpu_util": avg_total_cpu_util, 
+                    "max_total_cpu_util": max_total_cpu_util, 
+                    "avg_total_ram_residentsetsize_MB": avg_total_ram_residentsetsize_MB, 
+                    "max_total_ram_residentsetsize_MB": max_total_ram_residentsetsize_MB,
+                    "avg_threads": avg_threads, 
+                    "max_threads": max_threads, 
+                    "avg_processes": avg_processes, 
+                    "max_processes": max_processes})
+
     # 2D projection of solutions
     # raw_symbols = SymbolValidator().values    
     theta_matrix = np.asarray(theta_list)
@@ -1985,24 +2011,31 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
     reconstructed = param_hat @ R + t
     rec = reconstructed.reshape((param_true.shape[0]*param_true.shape[1],), order="F")
     true_reshaped = param_true.reshape((param_true.shape[0]*param_true.shape[1],), order="F")
-    error = np.sum(((true_reshaped - rec)/true_reshaped)**2)/len(rec)
+    rel_err = (true_reshaped - rec)/true_reshaped
+    sq_err = rel_err**2
+    meanrelerror = np.mean(rel_err)
+    meansquarederror = np.mean(sq_err)
     # non-rotated/non-translated relative error
     hat_reshaped = param_hat.reshape((param_hat.shape[0]*param_hat.shape[1],), order="F")
-    error_nonRT = np.sum(((true_reshaped - hat_reshaped)/true_reshaped)**2)/len(rec)
-    
+    rel_err_nonRT = (true_reshaped - hat_reshaped)/true_reshaped
+    sq_err_nonRT = rel_err_nonRT**2
+    meanrelerror_nonRT = np.mean(rel_err_nonRT)
+    meansquarederror_nonRT = np.mean(sq_err_nonRT)
+        
     orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
     det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
     t_shape_correct = t.shape == (param_hat.shape[1],)
     if not (orthogonality_error < 1e-10 and det_is_one and t_shape_correct):
         raise AttributeError("Error in solving projection problem?")
-    
-    return R, t, error, error_nonRT
+
+    return R, t, meansquarederror, meansquarederror_nonRT, meanrelerror, meanrelerror_nonRT
 
 
 def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param_positions_dict,
-                        plot_online=True, mse_theta_full=[], fig_x=None, fig_z=None,mse_x_list=[], mse_z_list=[],
-                        mse_x_nonRT_list=[], mse_z_nonRT_list=[], per_param_ers=dict(), 
-                        per_param_heats=dict(), xbox=[], plot_restarts=[], fastrun=False, target_param=None):
+                        plot_online=True, mse_theta_full=[], err_theta_full=[], fig_x=None, fig_z=None, fig_x_err=None, fig_z_err=None, mse_x_list=[], mse_z_list=[],
+                        mse_x_nonRT_list=[], mse_z_nonRT_list=[], err_x_list=[], err_z_list=[], err_x_nonRT_list=[], err_z_nonRT_list=[],
+                        per_param_sq_ers=dict(), per_param_ers=dict(), per_param_heats=dict(), xbox=[], plot_restarts=[], fastrun=False, 
+                        target_param=None, subset_coord2plot=None):
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -2010,25 +2043,32 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true = args
     
-    # compute with full theta vector - relative
-    sse = ((theta_true - theta_hat)/theta_true)**2
-    rel_se = sse/len(sse)
+    # compute with full theta vector - relative error and relative squared error
+    rel_err  = (theta_true - theta_hat)/theta_true
+    rel_se = rel_err**2    
     if fastrun is False:
-        per_param_heats["theta"].append(rel_se)
-    # total relative error
-    mse_theta_full.append(float(np.sum(rel_se)))
+        per_param_heats["theta_sq_e"].append(rel_se)
+        per_param_heats["theta_e"].append(rel_err)
+    # mean relative error
+    mse_theta_full.append(float(np.mean(rel_se)))
+    err_theta_full.append(float(np.mean(rel_err)))
     
     ###############################
-    if plot_online:  
-        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta"], colorscale = 'Viridis'))
+    if plot_online and (fastrun is False):  
+        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta_sq_e"], colorscale = 'Viridis'))
         savename = "{}/theta_heatmap/theta_full_relativised_squarederror.html".format(DIR_out)
+        pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+        fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", 
+                                title="", showgrid=False, showlegend=True, print_png=True, 
+                                print_html=False, print_pdf=False)        
+        fig = go.Figure(data=go.Heatmap(z=per_param_heats["theta_e"], colorscale = 'Viridis'))
+        savename = "{}/theta_heatmap/theta_full_relativised_error.html".format(DIR_out)
         pathlib.Path("{}/theta_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
         fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", 
                                 title="", showgrid=False, showlegend=True, print_png=True, 
                                 print_html=False, print_pdf=False)        
     ###############################
 
-    # compute min achievable mse for X, Z under rotation and scaling
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
     X_true = np.asarray(params_true["X"]) # d x K       
     Z_true = np.asarray(params_true["Z"]) # d x J                         
@@ -2036,19 +2076,35 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
 
     for param in parameter_names:        
         if param in ["gamma", "delta", "sigma_e"]:
-            rel_se = np.sum((((params_true[param] - params_hat[param])/params_true[param])**2))/len(params_true[param])
+            # scalars
+            rel_err = (params_true[param] - params_hat[param])/params_true[param]
+            rel_se = rel_err**2
             # time series plots
-            per_param_ers[param].append(float(rel_se))
-            if plot_online:
+            per_param_ers[param].append(float(rel_err))
+            per_param_sq_ers[param].append(float(rel_se))
+            if plot_online and (fastrun is False):
+                fig_sq = make_subplots(specs=[[{"secondary_y": True}]])   
                 fig = make_subplots(specs=[[{"secondary_y": True}]])   
-                fig.add_trace(go.Scatter(
-                                        y=per_param_ers[param], showlegend=False,
+                fig_sq.add_trace(go.Scatter(
+                                        y=per_param_sq_ers[param], 
+                                        showlegend=False,
                                         x=np.arange(iteration)                                    
-                                    ), secondary_y=False)
-                fig.add_trace(go.Scatter(
+                                    ),  secondary_y=False)
+                fig_sq.add_trace(go.Scatter(
                                         y=mse_theta_full, showlegend=True,
-                                        x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                    ), secondary_y=True)
+                                        x=np.arange(iteration), 
+                                        line_color="red", name="Θ Mean relative Sq. Err"                                
+                                    ),  secondary_y=True)
+                fig.add_trace(go.Scatter(
+                                        y=per_param_ers[param], 
+                                        showlegend=False,
+                                        x=np.arange(iteration)                                    
+                                    ),  secondary_y=False)
+                fig.add_trace(go.Scatter(
+                                        y=err_theta_full, showlegend=True,
+                                        x=np.arange(iteration), 
+                                        line_color="red", name="Θ Mean relative Err"                                
+                                    ),  secondary_y=True)
                 ###############################
                 for itm in plot_restarts:
                     scanrep, totaliterations, halvedgammas, restarted = itm
@@ -2057,110 +2113,157 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                     else:
                         vcolor = "green"
                     if restarted=="fullrestart":
+                        fig_sq.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
                         fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                     font=dict(size=16, family="Times New Roman"),),)
                     else:
                         # partial restart
+                        fig_sq.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
                         fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                     font=dict(size=16, family="Times New Roman"),),)
                 ###############################
-                savename = "{}/timeseries_plots/{}_squarederror.html".format(DIR_out, param)
-                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Squared error", title="", 
-                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                        print_pdf=False)
+                savename = "{}/timeseries_plots/squared_err/{}_squarederror.html".format(DIR_out, param)
+                pathlib.Path("{}/timeseries_plots/squared_err/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(fig_sq, savename, xaxis_title="Annealing iterations", yaxis_title="Relative Squared error", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, print_pdf=False)
+                savename = "{}/timeseries_plots/err/{}_error.html".format(DIR_out, param)
+                pathlib.Path("{}/timeseries_plots/err/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative error", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, print_pdf=False)                
         else:
             if param == "X":
                 X_hat = np.asarray(params_hat[param]) # d x K       
                 X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
                 X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
-                se = (((X_true_vec - X_hat_vec)/X_true_vec)**2)/(d*K)                
+                rel_err = (X_true_vec - X_hat_vec)/X_true_vec
+                sq_err = rel_err**2
             elif param == "Z":
                 Z_hat = np.asarray(params_hat[param]) # d x J          
                 Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
                 Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
-                se = (((Z_true_vec - Z_hat_vec)/Z_true_vec)**2)/(d*J) 
+                rel_err = (Z_true_vec - Z_hat_vec)/Z_true_vec
+                sq_err = rel_err**2
             else:
-                se = (((params_true[param] - params_hat[param])/params_true[param])**2)/len(params_true[param])            
-            
+                rel_err = (params_true[param] - params_hat[param])/params_true[param]
+                sq_err = rel_err**2            
             if fastrun is False:
-                per_param_heats[param].append(se)   
-            rel_se = float(np.sum(se)) 
-            per_param_ers[param].append(float(rel_se))           
-            if plot_online and fastrun is False:
-                ###############################
-                fig = go.Figure(data=go.Heatmap(z=per_param_heats[param], colorscale = 'Viridis'))
-                savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)
+                per_param_heats["{}_sq_e".format(param)].append(sq_err)   
+                per_param_heats["{}_e".format(param)].append(rel_err)               
+            # mean relative error
+            per_param_sq_ers[param].append(float(np.mean(sq_err)))
+            per_param_ers[param].append(float(np.mean(rel_err)))           
+            if plot_online and (fastrun is False):                
                 pathlib.Path("{}/params_heatmap/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                fig = go.Figure(data=go.Heatmap(z=per_param_heats["{}_sq_e".format(param)], colorscale = 'Viridis'))
+                savename = "{}/params_heatmap/{}_relativised_squarederror.html".format(DIR_out, param)                
                 fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
                                         showgrid=False, showlegend=True, print_png=True, print_html=False, 
                                         print_pdf=False)            
-                ###############################
-                parray = np.stack(per_param_heats[param])
-                # timeseries plots
-                for pidx in range(parray.shape[1]):
-
-                    # if pidx not in [10, 75, 82, 115]:  #################################################
-                    #     continue
-
-                    fig = make_subplots(specs=[[{"secondary_y": True}]]) 
-                    fig.add_trace(go.Scatter(
-                                    y=parray[:, pidx], showlegend=False,
-                                    x=np.arange(iteration)                                    
-                                ), secondary_y=False)
-                    fig.add_trace(go.Scatter(
-                                    y=mse_theta_full, showlegend=True,
-                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                ), secondary_y=True)
-                    ###############################
-                    for itm in plot_restarts:
-                        scanrep, totaliterations, halvedgammas, restarted = itm
-                        if halvedgammas:
-                            vcolor = "red"
+                fig = go.Figure(data=go.Heatmap(z=per_param_heats["{}_e".format(param)], colorscale = 'Viridis'))
+                savename = "{}/params_heatmap/{}_relativised_error.html".format(DIR_out, param)                
+                fix_plot_layout_and_save(fig, savename, xaxis_title="Coordinate", yaxis_title="Iteration", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                        print_pdf=False)                            
+                for param2plot in ["{}_sq_e".format(param), "{}_e".format(param)]:
+                    parray = np.stack(per_param_heats[param2plot])
+                    # timeseries plots
+                    for pidx in range(parray.shape[1]):
+                        if ((subset_coord2plot is not None) and (pidx not in subset_coord2plot)):
+                            print("Plotting subset of coordinates...")
+                            continue
+                        fig = make_subplots(specs=[[{"secondary_y": True}]]) 
+                        fig.add_trace(go.Scatter(
+                                        y=parray[:, pidx], showlegend=False,
+                                        x=np.arange(iteration)                                    
+                                    ), secondary_y=False)
+                        if "sq_e" in param2plot:
+                            fig.add_trace(go.Scatter(
+                                            y=mse_theta_full, showlegend=True,
+                                            x=np.arange(iteration), 
+                                            line_color="red", name="Θ Mean relative Sq. Err"                                
+                                        ),  secondary_y=True)
                         else:
-                            vcolor = "green"
-                        if restarted == "fullrestart":
-                            fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                        font=dict(size=16, family="Times New Roman"),),)
+                            fig.add_trace(go.Scatter(
+                                            y=err_theta_full, showlegend=True,
+                                            x=np.arange(iteration), 
+                                            line_color="red", name="Θ Mean relative Err"                                
+                                        ),  secondary_y=True)
+                        ###############################
+                        for itm in plot_restarts:
+                            scanrep, totaliterations, halvedgammas, restarted = itm
+                            if halvedgammas:
+                                vcolor = "red"
+                            else:
+                                vcolor = "green"
+                            if restarted == "fullrestart":
+                                fig.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                            font=dict(size=16, family="Times New Roman"),),)
+                            else:
+                                # partial restart
+                                fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                            label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                            font=dict(size=16, family="Times New Roman"),),)
+                        ###############################
+                        if "sq_e" in param2plot:
+                            savename = "{}/timeseries_plots/squared_err/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
+                            pathlib.Path("{}/timeseries_plots/squared_err/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                            fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative Squared error", title="", 
+                                                    showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                                    print_pdf=False)
                         else:
-                            # partial restart
-                            fig.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
-                                        label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
-                                        font=dict(size=16, family="Times New Roman"),),)
-                    ###############################
-                    savename = "{}/timeseries_plots/{}_idx_{}_relativised_squarederror.html".format(DIR_out, param, pidx)
-                    pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                    fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative squared error", title="", 
-                                            showgrid=False, showlegend=True, print_png=True, print_html=False, 
-                                            print_pdf=False)     
+                            savename = "{}/timeseries_plots/err/{}_idx_{}_relativised_error.html".format(DIR_out, param, pidx)
+                            pathlib.Path("{}/timeseries_plots/err/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+                            fix_plot_layout_and_save(fig, savename, xaxis_title="Annealing iterations", yaxis_title="Relative error", title="", 
+                                                    showgrid=False, showlegend=True, print_png=True, print_html=False, 
+                                                    print_pdf=False)     
     if fastrun is False:
         if fig_x is None:
             fig_x = go.Figure()  
         if fig_z is None:
             fig_z = go.Figure()  
+        if fig_x_err is None:
+            fig_x_err = go.Figure()  
+        if fig_z_err is None:
+            fig_z_err = go.Figure()      
         if fullscan not in xbox:
             xbox.extend([fullscan]*2)
         if target_param == "X" or target_param is None:
             # mean error over all elements of the matrices  
-            Rx, tx, mse_x, mse_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+            Rx, tx, mse_x, mse_x_nonRT, meanrelerror_x, meanrelerror_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
             mse_x_list.append(mse_x)
             mse_x_nonRT_list.append(mse_x_nonRT)
-            per_param_ers["X_rot_translated_mseOverMatrix"].append(mse_x)                         
-            per_param_ers["X_mseOverMatrix"].append(mse_x_nonRT)
+            err_x_list.append(meanrelerror_x)
+            err_x_nonRT_list.append(meanrelerror_x_nonRT)
+            per_param_sq_ers["X_rot_translated_mseOverMatrix"].append(mse_x)                         
+            per_param_sq_ers["X_mseOverMatrix"].append(mse_x_nonRT)
+            per_param_ers["X_rot_translated_errOverMatrix"].append(meanrelerror_x)
+            per_param_ers["X_errOverMatrix"].append(meanrelerror_x_nonRT)
         else:
             if len(mse_x_list) > 0:
                 mse_x_list.append(mse_x_list[-1])
                 mse_x_nonRT_list.append(mse_x_nonRT_list[-1])
-                per_param_ers["X_rot_translated_mseOverMatrix"].append(per_param_ers["X_rot_translated_mseOverMatrix"][-1])                         
-                per_param_ers["X_mseOverMatrix"].append(per_param_ers["X_mseOverMatrix"][-1])
+                err_x_list.append(err_x_list[-1])
+                err_x_nonRT_list.append(err_x_nonRT_list[-1])
+                per_param_sq_ers["X_rot_translated_mseOverMatrix"].append(per_param_sq_ers["X_rot_translated_mseOverMatrix"][-1])                         
+                per_param_sq_ers["X_mseOverMatrix"].append(per_param_sq_ers["X_mseOverMatrix"][-1])
+                per_param_ers["X_rot_translated_errOverMatrix"].append(per_param_ers["X_rot_translated_errOverMatrix"][-1])                         
+                per_param_ers["X_errOverMatrix"].append(per_param_ers["X_errOverMatrix"][-1])
             else:
                 mse_x_list.append(None)
                 mse_x_nonRT_list.append(None)
-                per_param_ers["X_rot_translated_mseOverMatrix"].append(None)
-                per_param_ers["X_mseOverMatrix"].append(None)     
+                err_x_list.append(None)
+                err_x_nonRT_list.append(None)
+                per_param_sq_ers["X_rot_translated_mseOverMatrix"].append(None)
+                per_param_sq_ers["X_mseOverMatrix"].append(None)     
+                per_param_ers["X_rot_translated_errOverMatrix"].append(None)
+                per_param_ers["X_errOverMatrix"].append(None)     
         if plot_online:       
             fig_x.add_trace(go.Box(
                             y=np.asarray([xxx for xxx in mse_x_list if xxx is not None]).flatten().tolist(), 
@@ -2178,39 +2281,89 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
             savename = "{}/xz_boxplots/relative_mse_x.html".format(DIR_out)
             pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
             fix_plot_layout_and_save(fig_x, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
-                                print_png=True, print_html=True, print_pdf=False)
+                                print_png=True, print_html=True, print_pdf=False)            
+            fig_x_err.add_trace(go.Box(
+                            y=np.asarray([xxx for xxx in err_x_list if xxx is not None]).flatten().tolist(), 
+                            showlegend=False, x=xbox, 
+                            name="X - total iter. {}".format(iteration),
+                            boxpoints="outliers", line=dict(color="blue")
+                            ))
+            fig_x_err.add_trace(go.Box(
+                            y=np.asarray([xxx for xxx in err_x_nonRT_list if xxx is not None]).flatten().tolist(), 
+                            opacity=0.5, showlegend=False, x=xbox, 
+                            name="X (nonRT) - total iter. {}".format(iteration),
+                            boxpoints="outliers", line=dict(color="green")
+                            ))
+            fig_x_err.update_layout(boxmode="group")   
+            savename = "{}/xz_boxplots/relative_meanerr_x.html".format(DIR_out)
+            pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+            fix_plot_layout_and_save(fig_x_err, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
+                                print_png=True, print_html=True, print_pdf=False)            
+            figX_sq = make_subplots(specs=[[{"secondary_y": True}]]) 
+            figX_sq.add_trace(go.Scatter(
+                                    y=per_param_sq_ers["X_mseOverMatrix"], 
+                                    x=np.arange(iteration),
+                                    name="X - min Mean relative Sq. Err", 
+                                    line_color="green"
+                                ),  secondary_y=False)
+            figX_sq.add_trace(go.Scatter(
+                                    y=per_param_sq_ers["X_rot_translated_mseOverMatrix"], 
+                                    x=np.arange(iteration),  
+                                    line=dict(color="blue"),
+                                    name="X - min Mean relative Sq. Err<br>(under rot/transl)"
+                                ),  secondary_y=False)
+            figX_sq.add_trace(go.Scatter(
+                                    y=mse_theta_full, 
+                                    x=np.arange(iteration), 
+                                    line_color="red", 
+                                    name="Θ Mean relative Sq. Err"                                
+                                ),  secondary_y=True)
             figX = make_subplots(specs=[[{"secondary_y": True}]]) 
             figX.add_trace(go.Scatter(
-                                    y=per_param_ers["X_mseOverMatrix"], 
+                                    y=per_param_ers["X_errOverMatrix"], 
                                     x=np.arange(iteration),
-                                    name="X - min MSE", line_color="green"
-                                ), secondary_y=False)
+                                    name="X - min Mean relative Err", line_color="green"
+                                ),  secondary_y=False)
             figX.add_trace(go.Scatter(
-                                    y=per_param_ers["X_rot_translated_mseOverMatrix"], 
-                                    x=np.arange(iteration),
-                                    name="X - min MSE<br>(under rot/transl)"
-                                ), secondary_y=False)
+                                    y=per_param_ers["X_rot_translated_errOverMatrix"], 
+                                    x=np.arange(iteration), line=dict(color="blue"),
+                                    name="X - min Mean relative Err<br>(under rot/transl)"
+                                ),  secondary_y=False)
             figX.add_trace(go.Scatter(
-                                    y=mse_theta_full, 
-                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                ), secondary_y=True)
+                                    y=err_theta_full, 
+                                    x=np.arange(iteration), 
+                                    line_color="red", 
+                                    name="Θ Mean relative Err"                                
+                                ),  secondary_y=True)
         if target_param == "Z" or target_param is None:
-            Rz, tz, mse_z, mse_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+            Rz, tz, mse_z, mse_z_nonRT, meanrelerror_z, meanrelerror_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
             mse_z_list.append(mse_z)   
             mse_z_nonRT_list.append(mse_z_nonRT)
-            per_param_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)            
-            per_param_ers["Z_mseOverMatrix"].append(mse_z_nonRT)      
+            err_z_list.append(meanrelerror_z)
+            err_z_nonRT_list.append(meanrelerror_z_nonRT)
+            per_param_sq_ers["Z_rot_translated_mseOverMatrix"].append(mse_z)            
+            per_param_sq_ers["Z_mseOverMatrix"].append(mse_z_nonRT)   
+            per_param_ers["Z_rot_translated_errOverMatrix"].append(meanrelerror_z)
+            per_param_ers["Z_errOverMatrix"].append(meanrelerror_z_nonRT)   
         else:
             if len(mse_z_list) > 0:
                 mse_z_list.append(mse_z_list[-1])
                 mse_z_nonRT_list.append(mse_z_nonRT_list[-1])
-                per_param_ers["Z_rot_translated_mseOverMatrix"].append(per_param_ers["Z_rot_translated_mseOverMatrix"][-1])                         
-                per_param_ers["Z_mseOverMatrix"].append(per_param_ers["Z_mseOverMatrix"][-1])
+                err_z_list.append(err_z_list[-1])
+                err_z_nonRT_list.append(err_z_nonRT_list[-1])
+                per_param_sq_ers["Z_rot_translated_mseOverMatrix"].append(per_param_sq_ers["Z_rot_translated_mseOverMatrix"][-1])                         
+                per_param_sq_ers["Z_mseOverMatrix"].append(per_param_sq_ers["Z_mseOverMatrix"][-1])
+                per_param_ers["Z_rot_translated_errOverMatrix"].append(per_param_ers["Z_rot_translated_errOverMatrix"][-1])                         
+                per_param_ers["Z_errOverMatrix"].append(per_param_ers["Z_errOverMatrix"][-1])
             else:
                 mse_z_list.append(None)
                 mse_z_nonRT_list.append(None)
-                per_param_ers["Z_rot_translated_mseOverMatrix"].append(None)
-                per_param_ers["Z_mseOverMatrix"].append(None)        
+                err_z_list.append(None)
+                err_z_nonRT_list.append(None)
+                per_param_sq_ers["Z_rot_translated_mseOverMatrix"].append(None)
+                per_param_sq_ers["Z_mseOverMatrix"].append(None)        
+                per_param_ers["Z_rot_translated_errOverMatrix"].append(None)
+                per_param_ers["Z_errOverMatrix"].append(None)        
         if plot_online:
             fig_z.add_trace(go.Box(
                                 y=np.asarray([zzz for zzz in mse_z_list if zzz is not None]).flatten().tolist(), 
@@ -2228,22 +2381,59 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
             savename = "{}/xz_boxplots/relative_mse_z.html".format(DIR_out)
             pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
             fix_plot_layout_and_save(fig_z, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
-                                print_png=True, print_html=True, print_pdf=False)       
+                                print_png=True, print_html=True, print_pdf=False)
+            fig_z_err.add_trace(go.Box(
+                                y=np.asarray([zzz for zzz in err_z_list if zzz is not None]).flatten().tolist(), 
+                                showlegend=False, x=xbox, 
+                                name="Z - total iter. {}".format(iteration),
+                                boxpoints="outliers", line=dict(color="blue")
+                                ))
+            fig_z_err.add_trace(go.Box(
+                                y=np.asarray([zzz for zzz in err_z_nonRT_list if zzz is not None]).flatten().tolist(), 
+                                opacity=0.5, showlegend=False, x=xbox, 
+                                name="Z (nonRT) - total iter. {}".format(iteration),
+                                boxpoints="outliers", line=dict(color="green")
+                                ))
+            fig_z_err.update_layout(boxmode="group")               
+            savename = "{}/xz_boxplots/relative_meanerr_z.html".format(DIR_out)
+            pathlib.Path("{}/xz_boxplots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
+            fix_plot_layout_and_save(fig_z_err, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=True,
+                                print_png=True, print_html=True, print_pdf=False)
+            figZ_sq = make_subplots(specs=[[{"secondary_y": True}]]) 
+            figZ_sq.add_trace(go.Scatter(
+                                    y=per_param_sq_ers["Z_rot_translated_mseOverMatrix"], 
+                                    x=np.arange(iteration), line=dict(color="blue"),
+                                    name="Z - min Mean relative Sq. Err<br>(under rot/trl)"
+                                ),  secondary_y=False)
+            figZ_sq.add_trace(go.Scatter(
+                                    y=per_param_sq_ers["Z_mseOverMatrix"], 
+                                    x=np.arange(iteration),
+                                    name="Z - min Mean relative Sq. Err", 
+                                    line=dict(color="green")
+                                ),  secondary_y=False)
+            figZ_sq.add_trace(go.Scatter(
+                                    y=mse_theta_full, 
+                                    x=np.arange(iteration), line_color="red", 
+                                    name="Θ Mean relative Sq. Err"                                
+                                ),  secondary_y=True)
             figZ = make_subplots(specs=[[{"secondary_y": True}]]) 
             figZ.add_trace(go.Scatter(
-                                    y=per_param_ers["Z_rot_translated_mseOverMatrix"], 
-                                    x=np.arange(iteration),
-                                    name="Z - min MSE<br>(under rot/trl)"
-                                ), secondary_y=False)
+                                    y=per_param_ers["Z_rot_translated_errOverMatrix"], 
+                                    x=np.arange(iteration), line=dict(color="blue"),
+                                    name="Z - min Mean relative Err<br>(under rot/trl)"
+                                ),  secondary_y=False)
             figZ.add_trace(go.Scatter(
-                                    y=per_param_ers["Z_mseOverMatrix"], 
-                                    x=np.arange(iteration),
-                                    name="Z - min MSE", line=dict(color="green")
-                                ), secondary_y=False)
+                                    y=per_param_ers["Z_errOverMatrix"], 
+                                    x=np.arange(iteration), 
+                                    name="Z - min Mean relative Err", 
+                                    line=dict(color="green")
+                                ),  secondary_y=False)
             figZ.add_trace(go.Scatter(
-                                    y=mse_theta_full, 
-                                    x=np.arange(iteration), line_color="red", name="Θ MSE"                                
-                                ), secondary_y=True)
+                                    y=err_theta_full, 
+                                    x=np.arange(iteration), 
+                                    line_color="red", 
+                                    name="Θ Mean relative Err"                                
+                                ),  secondary_y=True)
         ###############################
         if plot_online:
             for itm in plot_restarts:            
@@ -2254,38 +2444,56 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                     vcolor = "green"
                 if restarted=="fullrestart":
                     if target_param == "X" or target_param is None:
+                        figX_sq.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                    label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                    font=dict(size=16, family="Times New Roman"),),)
                         figX.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                     label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                     font=dict(size=16, family="Times New Roman"),),)
                     elif target_param == "Z" or target_param is None:
+                        figZ_sq.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                font=dict(size=16, family="Times New Roman"),),)
                         figZ.add_vline(x=totaliterations, opacity=1, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                 label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                 font=dict(size=16, family="Times New Roman"),),)
                 else:
                     # partial restart
                     if target_param == "X" or target_param is None:
+                        figX_sq.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                font=dict(size=16, family="Times New Roman"),),)
                         figX.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                 label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                 font=dict(size=16, family="Times New Roman"),),)
                     elif target_param == "Z" or target_param is None:
+                        figZ_sq.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
+                                label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
+                                font=dict(size=16, family="Times New Roman"),),)
                         figZ.add_vline(x=totaliterations, opacity=0.5, line_width=2, line_dash="dash", line_color=vcolor, showlegend=False, 
                                 label=dict(text="l={}, total_iter={}".format(scanrep, totaliterations), textposition="top left",
                                 font=dict(size=16, family="Times New Roman"),),)
             ###############################
+            pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
             if target_param == "X" or target_param is None:
-                savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)
-                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="MSE", title="", 
-                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
-                                        print_pdf=False)
-            elif target_param == "Z" or target_param is None:
-                savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_mse.html".format(DIR_out)
-                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)     
-                fix_plot_layout_and_save(figZ, savenameZ, xaxis_title="", yaxis_title="MSE", title="", 
-                                        showgrid=False, showlegend=True, print_png=True, print_html=True, 
-                                        print_pdf=False)
+                pathlib.Path("{}/timeseries_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)                                 
+                savenameX = "{}/timeseries_plots/X_rot_translated_relative_mse.html".format(DIR_out)                
+                fix_plot_layout_and_save(figX_sq, savenameX, xaxis_title="", yaxis_title="Mean relative Sq. Err", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
+                savenameX = "{}/timeseries_plots/X_rot_translated_relative_err.html".format(DIR_out)                
+                fix_plot_layout_and_save(figX, savenameX, xaxis_title="", yaxis_title="Mean relative Err", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
+            elif target_param == "Z" or target_param is None:                
+                savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_mse.html".format(DIR_out)                
+                fix_plot_layout_and_save(figZ_sq, savenameZ, xaxis_title="", yaxis_title="Mean relative Sq. Err", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
+                savenameZ = "{}/timeseries_plots/Z_rot_translated_relative_err.html".format(DIR_out)                
+                fix_plot_layout_and_save(figZ, savenameZ, xaxis_title="", yaxis_title="Mean relative Err", title="", 
+                                        showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
 
-    return mse_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, fig_x, fig_z, per_param_ers, per_param_heats, xbox
+    return mse_theta_full, err_theta_full, mse_x_list, mse_z_list, mse_x_nonRT_list, mse_z_nonRT_list, \
+                fig_x, fig_z, per_param_sq_ers, per_param_ers, per_param_heats, xbox,\
+                    err_x_list, err_z_list, err_x_nonRT_list, err_z_nonRT_list, fig_x_err, fig_z_err
 
 
 def get_parameter_name_and_vector_coordinate(param_positions_dict, i, d):
@@ -2644,7 +2852,8 @@ def plot_posterior_elementwise(outdir, param, Y, idx, vector_coordinate, theta_c
 
 
 def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr, vect_iter, fig_posteriors, 
-                                    fig_posteriors_annealed, gamma, param_positions_dict, args, plot_arrows=False, testparam=None, testidx=None, testvec=None):
+                                    fig_posteriors_annealed, gamma, param_positions_dict, args, plot_arrows=False, 
+                                    testparam=None, testidx=None, testvec=None):
     
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
@@ -2808,6 +3017,93 @@ def plot_posteriors_during_estimation(Y, iteration, plotting_thetas, theta_curr,
     return fig_posteriors, fig_posteriors_annealed, plotting_thetas
 
 
+def error_polarisation_plots(datain, estimation_folder, M, K, J, d=2):
+
+    popularities_rel_err = []
+    Zrel_err = []
+    alpharel_err = []
+    for m in range(M):
+        # load true utilities
+        with open("{}/{}/Utilities.pickle".format(datain, m), "rb") as f:
+            pij = pickle.load(f)   
+        popularity_js = np.sum(pij, axis=0)
+        # decreasing order
+        sorted_indices = np.argsort(popularity_js)[::-1]
+        sorted_popularity = popularity_js[sorted_indices]
+        # load estimated parameters - best solution, i.e. first line in the file
+        with jsonlines.open("{}/{}/{}/params_out_global_theta_hat.jsonl".format(datain, m, estimation_folder), mode="r") as f:                    
+            for result in f.iter(type=dict, skip_invalid=True):
+                Xhat = np.asarray(result["X"]).reshape((d, K), order="F")     
+                Zhat = np.asarray(result["Z"]).reshape((d, J), order="F")     
+                gammahat = result["gamma"][0]
+                alphahat = np.asarray(result["alpha"])
+                betahat  = np.asarray(result["beta"])                
+                sigma_ehat  = result["sigma_e"][0]                
+                pijshat = p_ij_arg_numbafast(Xhat, Zhat, alphahat, betahat, gammahat, K)    
+                popularity_js_hat_m = np.sum(pijshat, axis=0)
+                rel_err = (sorted_popularity - popularity_js_hat_m[sorted_indices])/sorted_popularity
+                popularities_rel_err.append(rel_err)
+                break
+        # parameters        
+        with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(datain, m), mode="r") as f:                    
+            for paramtrue in f.iter(type=dict, skip_invalid=True):
+                X = np.asarray(paramtrue["X"]).reshape((d, K), order="F")     
+                Z = np.asarray(paramtrue["Z"]).reshape((d, J), order="F")     
+                gamma = paramtrue["gamma"]
+                alpha = np.asarray(paramtrue["alpha"])
+                beta  = np.asarray(paramtrue["beta"])                
+                sigma_e  = paramtrue["sigma_e"]
+                break
+            # reorder columns of Z, alpha according to true rank
+            Ztrue_rank = Z[:, sorted_indices]
+            Ztrue_rank_vec = Ztrue_rank.reshape((d*J,), order="F")   
+            Zhat_rank = Zhat[:, sorted_indices]  
+            Zhat_rank_vec = Zhat_rank.reshape((d*J,), order="F")   
+            rel_err_Z = (Ztrue_rank_vec - Zhat_rank_vec)/Ztrue_rank_vec
+            Zrel_err.append(rel_err_Z)
+
+            alpha_true_rank = alpha[sorted_indices]
+            alpha_hat_rank = alphahat[sorted_indices]
+            rel_err_alpha = (alpha_true_rank - alpha_hat_rank)/alpha_true_rank
+            alpharel_err.append(rel_err_alpha)
+
+    popularities_all_rel_err = np.stack(popularities_rel_err)
+    fig = go.Figure()
+    for j in range(J):
+        fig.add_trace(go.Box(
+                y=popularities_all_rel_err[:, j].flatten().tolist(), 
+                showlegend=False, x=[j],                 
+                boxpoints="outliers", line=dict(color="salmon")
+                ))
+    savename = "{}/popularity_error_pj_plot.html".format(datain)
+    fix_plot_layout_and_save(fig, savename, xaxis_title="Popularity (most to least popular)", yaxis_title="p.j relative error", 
+                            title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
+
+    Z_all_rel_err = np.stack(Zrel_err)
+    fig = go.Figure()
+    for j in range(J):
+        fig.add_trace(go.Box(
+                y=Z_all_rel_err[:, j].flatten().tolist(), 
+                showlegend=False, x=[j],                 
+                boxpoints="outliers", line=dict(color="salmon")
+                ))
+    savename = "{}/popularity_error_Z_plot.html".format(datain)
+    fix_plot_layout_and_save(fig, savename, xaxis_title="Popularity (most to least popular)", yaxis_title="Zj relative error", 
+                            title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
+    
+    alpha_all_rel_err = np.stack(alpharel_err)
+    fig = go.Figure()
+    for j in range(J):
+        fig.add_trace(go.Box(
+                y=alpha_all_rel_err[:, j].flatten().tolist(), 
+                showlegend=False, x=[j],                 
+                boxpoints="outliers", line=dict(color="salmon")
+                ))
+    savename = "{}/popularity_error_alpha_plot.html".format(datain)
+    fix_plot_layout_and_save(fig, savename, xaxis_title="Popularity (most to least popular)", yaxis_title="alphaj relative error", 
+                            title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
+    
+    
 
 
 class TruncatedInverseGamma:
@@ -2991,8 +3287,8 @@ def log_full_posterior(Y, theta_curr, param_positions_dict, args):
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
 
-    if False:
-    # if K*J <= 10e5:
+    # if False:
+    if K*J <= 10e5:
         loglik = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
     else:
         loglik = -negative_loglik_parallel(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
@@ -3179,8 +3475,7 @@ def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, d
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpz_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + multivariate_normal.logpdf(zj, mean=prior_loc_z, cov=prior_scale_z)
     
-    if False:
-    # if K*J <= 10e5:
+    if K*J <= 10e5:
         if numbafast:
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
             gamma = params_hat["gamma"][0]
@@ -3238,10 +3533,8 @@ def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_name
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpz_jl += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(z_jl, loc=prior_loc_z, scale=prior_scale_z)
 
-    
-    # ipdb.set_trace()
-    if False:
-    # if K*J <= 10e5:
+    # if False:
+    if K*J <= 10e5:
         if numbafast:
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
             gamma = params_hat["gamma"][0]
@@ -3309,8 +3602,8 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
 
-    if False:
-    # if K*J <= 10e5:
+    # if False:
+    if K*J <= 10e5:
         if numbafast:
             params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
@@ -3407,8 +3700,8 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpgamma += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma)
 
-    if False:
-    # if K*J <= 10e5:
+    # if False:
+    if K*J <= 10e5:
         if numbafast:            
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
             Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")                 
@@ -3482,8 +3775,8 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf + tig.logpdf(sigma_e)
     
-    if False:
-    # if K*J <= 10e5:
+    # if False:
+    if K*J <= 10e5:
         if numbafast:
             params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
