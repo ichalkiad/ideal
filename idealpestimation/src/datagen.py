@@ -13,7 +13,7 @@ import random
 import time
 from tabulate import tabulate
 from sklearn.utils import check_random_state
-from idealpestimation.src.utils import p_ij_arg, params2optimisation_dict, optimisation_dict2params
+from idealpestimation.src.utils import p_ij_arg, p_ij_arg_numbafast, params2optimisation_dict, optimisation_dict2params
 import ipdb
 
 def generate_normal_data(n_samples, n_dimensions, mu=0, sigma=1, rng=None):
@@ -337,12 +337,10 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
         if print_png:
             pio.write_image(fig, savename.replace("html", "png"), width=1540, height=871, scale=1)
 
-
 def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=None, z_var=None, 
                             alpha_var=None, beta_var=None, debug=False, rng=None):
 
-    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
-    pijs = p_ij_arg(None, None, theta, J, K, d, parameter_names, distance_func, param_positions_dict, use_jax=False)    
+    params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
     if "delta" in params_hat.keys():
@@ -351,9 +349,11 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     else:
         delta = -1
         phis = None
-    
+    alpha = params_hat["alpha"]
+    beta = params_hat["beta"]
     xs = np.asarray(params_hat["X"]).reshape((d, K), order="F")                     
     zs = np.asarray(params_hat["Z"]).reshape((d, J), order="F")        
+    pijs = p_ij_arg_numbafast(xs, zs, alpha, beta, gamma, K)
     if debug:              
         utilities_matrix = np.zeros((K, J))    
         # assuming linear utility in this formulation
@@ -461,75 +461,84 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
                     title="Following",
                     xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=False
                 )    
-            allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data")        
-            fix_plot_layout_and_save(allplots, "{}/{}/dataset_{}_{}/utilities_following_relationships.html".format(data_location, N, from_row, to_row), 
-                                    xaxis_title="", yaxis_title="", title="Synthetic data", showgrid=False, showlegend=False,
-                                    print_png=True, print_html=True, print_pdf=False)
-            fix_plot_layout_and_save(probabfig, "{}/{}/dataset_{}_{}/utilities_mat_probab.html".format(data_location, N, from_row, to_row), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
-                                showgrid=False, showlegend=False,
-                                print_png=True, print_html=True, print_pdf=False)        
+            try:
+                allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data")        
+                fix_plot_layout_and_save(allplots, "{}/{}/dataset_{}_{}/utilities_following_relationships.html".format(data_location, N, from_row, to_row), 
+                                        xaxis_title="", yaxis_title="", title="Synthetic data", showgrid=False, showlegend=False,
+                                        print_png=True, print_html=True, print_pdf=False)
+                fix_plot_layout_and_save(probabfig, "{}/{}/dataset_{}_{}/utilities_mat_probab.html".format(data_location, N, from_row, to_row), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
+                                    showgrid=False, showlegend=False,
+                                    print_png=True, print_html=True, print_pdf=False)    
+            except:
+                print("Plotting for K = {}, J = {}, batchsize = {} failed.".format(K, J, N))    
             if i+2*N > K:
                 break
 
     # plots
-    fig = plot_array_heatmap(
-        utilities_matrix,
-        title="Computed utilities",
-        colorscale="sunsetdark",
-        colorbar=dict(x=0.3, thickness=10, title='U'),
-        xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-    )    
-    
-    followfig = plot_array_heatmap(
-            follow_matrix.astype(np.int8),
-            title="Following",
-            xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=False
+    try:
+        fig = plot_array_heatmap(
+            utilities_matrix,
+            title="Computed utilities",
+            colorscale="sunsetdark",
+            colorbar=dict(x=0.3, thickness=10, title='U'),
+            xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
         )    
-    errfig = plot_array_heatmap(
-            stochastic_component,
-            title="Error component - SNR = {} dB".format(snr),
-            colorbar=dict(thickness=15, title='E'),
-            colorscale="blues",
-            xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-        ) 
-    probabfig = plot_array_heatmap(
-            utilities_mat_probab,
-            title="Pij CDF matrix",
-            colorscale="Viridis", boundcolorscale=True,
-            colorbar=dict(thickness=15, title='CDF'),
-            xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
-            )         
-    allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data") 
-    fix_plot_layout_and_save(allplots, "{}/utilities_following_relationships.html".format(data_location), xaxis_title="", yaxis_title="", title="Synthetic data", 
-                             showgrid=False, showlegend=False,
-                             print_png=True, print_html=True, print_pdf=False)
-    fix_plot_layout_and_save(probabfig, "{}/utilities_mat_probab.html".format(data_location), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
-                             showgrid=False, showlegend=False,
-                             print_png=True, print_html=True, print_pdf=False)
+        
+        followfig = plot_array_heatmap(
+                follow_matrix.astype(np.int8),
+                title="Following",
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=False
+            )    
+        errfig = plot_array_heatmap(
+                stochastic_component,
+                title="Error component - SNR = {} dB".format(snr),
+                colorbar=dict(thickness=15, title='E'),
+                colorscale="blues",
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
+            ) 
+        probabfig = plot_array_heatmap(
+                utilities_mat_probab,
+                title="Pij CDF matrix",
+                colorscale="Viridis", boundcolorscale=True,
+                colorbar=dict(thickness=15, title='CDF'),
+                xtitle="Leaders", ytitle="Followers", show_values=False, show_scale=True
+                )         
+        allplots = plot_side_by_side_subplots(fig, followfig, errfig, title="Synthetic data") 
+        fix_plot_layout_and_save(allplots, "{}/utilities_following_relationships.html".format(data_location), xaxis_title="", yaxis_title="", title="Synthetic data", 
+                                showgrid=False, showlegend=False,
+                                print_png=True, print_html=True, print_pdf=False)
+        fix_plot_layout_and_save(probabfig, "{}/utilities_mat_probab.html".format(data_location), xaxis_title="", yaxis_title="", title="CDF(Pij)", 
+                                showgrid=False, showlegend=False,
+                                print_png=True, print_html=True, print_pdf=False)
+    except:
+        print("Global plotting for K = {}, J = {} failed.".format(K, J))    
 
-    if delta > 0:
-        fig = create_scatter_plot(
-                data_sets=[(xs[0, :], xs[1, :]), (zs[0, :], zs[1, :]), (phis[0, :], phis[1, :])],
-                labels=["Followers", "Leaders", "Status quo"],
-                colors=["blue", "orange", "green"],
-                sizes=[8, 12, 10],
-                symbols=["circle", "diamond", "star"],
-                title=""
-            )
-    else:
-        fig = create_scatter_plot(
-                data_sets=[(xs[0, :], xs[1, :]), (zs[0, :], zs[1, :])],
-                labels=["Followers", "Leaders"],
-                colors=["blue", "orange"],
-                sizes=[8, 12],
-                symbols=["circle", "diamond"],
-                title=""
-            )
-    fig.layout.height = 700    
-    fix_plot_layout_and_save(fig, "{}/network_users_vis.html".format(data_location), 
-                            xaxis_title="", yaxis_title="", title="Ideal points", 
-                            showgrid=False, showlegend=False, print_png=True, 
-                            print_html=True, print_pdf=False)
+    try:
+        if delta > 0:
+            fig = create_scatter_plot(
+                    data_sets=[(xs[0, :], xs[1, :]), (zs[0, :], zs[1, :]), (phis[0, :], phis[1, :])],
+                    labels=["Followers", "Leaders", "Status quo"],
+                    colors=["blue", "orange", "green"],
+                    sizes=[8, 12, 10],
+                    symbols=["circle", "diamond", "star"],
+                    title=""
+                )
+        else:
+            fig = create_scatter_plot(
+                    data_sets=[(xs[0, :], xs[1, :]), (zs[0, :], zs[1, :])],
+                    labels=["Followers", "Leaders"],
+                    colors=["blue", "orange"],
+                    sizes=[8, 12],
+                    symbols=["circle", "diamond"],
+                    title=""
+                )
+        fig.layout.height = 700    
+        fix_plot_layout_and_save(fig, "{}/network_users_vis.html".format(data_location), 
+                                xaxis_title="", yaxis_title="", title="Ideal points", 
+                                showgrid=False, showlegend=False, print_png=True, 
+                                print_html=True, print_pdf=False)
+    except:
+        print("Followers plotting for K = {}, J = {} failed.".format(K, J))    
 
 
 if __name__ == "__main__":
@@ -566,12 +575,12 @@ if __name__ == "__main__":
 
     # Generate synthetic data
     # trials
-    M = 1
+    M = 10
     # number of leaders
     Js = [100] #, 500, 1000]
     # number of followers
-    Ks = [1000000]
-    sigma_es = [0.001] #, 0.1, 0.25, 0.5]
+    Ks = [10000, 50000, 100000]
+    sigma_es = [0.001, 0.1, 0.5, 1.0, 5.0]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:
@@ -606,7 +615,7 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
                     # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)
