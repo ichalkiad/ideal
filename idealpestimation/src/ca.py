@@ -4,7 +4,7 @@ os.environ["OMP_NUM_THREADS"] = "500"
 os.environ["MKL_NUM_THREADS"] = "500"
 os.environ["OPENBLAS_NUM_THREADS"] = "500"
 os.environ["NUMBA_NUM_THREADS"] = "500"
-os.environ["JAX_NUM_THREADS"] = "500"
+os.environ["JAX_NUM_THREADS"] = "1000"
 os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
 
 import sys
@@ -14,22 +14,11 @@ import pathlib
 import jsonlines
 import numpy as np
 import random
-import itertools
-from scipy.optimize import minimize
-import plotly.graph_objects as go
-from idealpestimation.src.parallel_manager import jsonlines, ProcessManager
+from idealpestimation.src.parallel_manager import jsonlines
 from idealpestimation.src.utils import pickle, optimisation_dict2params,\
-                                        create_constraint_functions_icm, \
-                                            update_annealing_temperature, \
-                                                compute_and_plot_mse, time, datetime, \
-                                                    timedelta, parse_input_arguments, \
-                                                        halve_annealing_rate_upd_schedule,\
-                                                            plot_posteriors_during_estimation, \
-                                                                get_parameter_name_and_vector_coordinate,\
-                                                                    get_posterior_for_optimisation_vec,\
-                                                                        rank_and_plot_solutions, get_evaluation_grid, check_convergence,\
-                                                                            data_annealing_init_theta_given_theta_prev, plot_posterior_vec_runtimes, \
-                                                                                print_threadpool_info, error_polarisation_plots, get_min_achievable_mse_under_rotation_trnsl
+                                        time, timedelta, parse_input_arguments, \
+                                            rank_and_plot_solutions, print_threadpool_info, \
+                                                get_min_achievable_mse_under_rotation_trnsl
 from idealpestimation.src.efficiency_monitor import Monitor
 import prince
 
@@ -148,7 +137,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             
             # start efficiency monitoring - interval in seconds
             print_threadpool_info()
-            monitor = Monitor(interval=0.01)
+            monitor = Monitor(interval=0.005)
             monitor.start()            
 
             t_start = time.time()            
