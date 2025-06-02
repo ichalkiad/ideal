@@ -1,4 +1,12 @@
 import os 
+
+os.environ["OMP_NUM_THREADS"] = "500"
+os.environ["MKL_NUM_THREADS"] = "500"
+os.environ["OPENBLAS_NUM_THREADS"] = "500"
+os.environ["NUMBA_NUM_THREADS"] = "500"
+os.environ["JAX_NUM_THREADS"] = "500"
+os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
+
 import sys
 import ipdb
 import pathlib
@@ -569,14 +577,11 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
         prior_loc_sigmae=None, prior_scale_sigmae=None, param_positions_dict=None, rng=None, batchsize=None):
 
     if parallel:
-        manager = ProcessManagerSynthetic(total_running_processes)        
+        manager = ProcessManagerSynthetic(total_running_processes)       
+    else:
+        manager = None 
     DIR_top = data_location      
 
-    # start efficiency monitoring - interval in seconds
-    print_threadpool_info()
-    monitor = Monitor(interval=60)
-    monitor.start()   
-    t_start = time.time()  
     try:    
         if parallel:  
             manager.create_results_dict(optim_target="all")    
@@ -658,18 +663,11 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             with jsonlines.open("{}/spawnedprocesses.jsonl".format(DIR_out), "w") as f:
                 f.write(manager.shared_dict)
         sys.exit(0)
-    t_end = time.time()
-    monitor.stop()
-    wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
-        avg_threads, max_threads, avg_processes, max_processes = monitor.report(t_end - t_start)
-    efficiency_measures = (wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
-                                avg_threads, max_threads, avg_processes, max_processes)
-    elapsedtime = str(timedelta(seconds=t_end - t_start))   
     if parallel:
         with jsonlines.open("{}/spawnedprocesses.jsonl".format(DIR_out), "w") as f:
             f.write(dict(manager.shared_dict))      
-
-    return efficiency_measures 
+    
+    return manager, args
 
 
 if __name__ == "__main__":
@@ -724,7 +722,7 @@ if __name__ == "__main__":
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 30
-    batchsize = 256
+    batchsize = 13
     # In parameter names keep the order fixed as is
     # full, with status quo
     # parameter_names = ["X", "Z", "Phi", "alpha", "beta", "gamma", "delta", "sigma_e"]
@@ -792,21 +790,38 @@ if __name__ == "__main__":
         elif param == "sigma_e":
             param_positions_dict[param] = (k, k + 1)                                
             k += 1    
-    efficiency_measures = main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-                            data_location=data_location, parallel=parallel, 
-                            parameter_names=parameter_names, optimisation_method=optimisation_method, 
-                            dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-                            trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
-                            prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
-                            prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
-                            prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-                            prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
-                            prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
-                            prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
-                            rng=rng, batchsize=batchsize)
-
+    
+    
+    # start efficiency monitoring - interval in seconds
+    print_threadpool_info()
+    monitor = Monitor(interval=0.01)
+    monitor.start()   
+    t_start = time.time()  
+    par_manager, main_run_args = main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+                                                data_location=data_location, parallel=parallel, 
+                                                parameter_names=parameter_names, optimisation_method=optimisation_method, 
+                                                dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+                                                trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
+                                                prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
+                                                prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
+                                                prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+                                                prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
+                                                prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+                                                prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
+                                                rng=rng, batchsize=batchsize)
 
     data_topdir = data_location
-    collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize)
+    if par_manager is not None:
+        while not par_manager.all_processes_complete.is_set():
+            print("Waiting for parallel processing to complete all batches...")
+            continue
+    t_end = time.time()
+    monitor.stop()
+    wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+        avg_threads, max_threads, avg_processes, max_processes = monitor.report(t_end - t_start)
+    efficiency_measures = (wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+                                avg_threads, max_threads, avg_processes, max_processes)
+    elapsedtime = str(timedelta(seconds=t_end - t_start))   
+    collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize, main_run_args)
     # collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
     

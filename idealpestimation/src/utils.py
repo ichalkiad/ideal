@@ -679,7 +679,8 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 Rz, tz, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
                                     get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                             else:
-                                mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]))**2)
+                                rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - theta)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                                mse_trial_m_batch_index = np.mean(rel_err**2)
             
             sq_error_dict[param].append(mse_trial_m_batch_index)
             if param in ["X", "Z", "Phi"]:
@@ -1112,13 +1113,12 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
-def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize):
+def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize, args):
     
     wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
                 avg_threads, max_threads, avg_processes, max_processes = efficiency_measures
                 
     parameter_space_dim = (K+J)*d + J + K + 2
-    params_out_jsonl = dict()
     estimation_sq_error_per_trial_per_batch = dict()
     estimation_sq_error_per_trial_per_batch_nonRT = dict()
     estimation_error_per_trial_per_batch = dict()
@@ -1134,6 +1134,8 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
         estimation_error_per_trial_nonRT[param] = []
     
     for m in range(M):
+        params_out_jsonl = dict()
+        params_out_jsonl["param_positions_dict"] = param_positions_dict
         theta_true = np.zeros((parameter_space_dim,))
         with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_topdir, m), "r") as f:
             for result in f.iter(type=dict, skip_invalid=True):
@@ -1144,7 +1146,9 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
         fig_m_over_databatches = go.Figure()
         fig_m_over_databatches_nonRT = go.Figure()
         estimation_sq_error_per_trial_per_batch[m] = dict()
+        estimation_sq_error_per_trial_per_batch_nonRT[m] = dict()
         estimation_error_per_trial_per_batch[m] = dict()
+        estimation_error_per_trial_per_batch_nonRT[m] = dict()
         for param in parameter_names:            
             estimation_sq_error_per_trial_per_batch[m][param] = []
             estimation_sq_error_per_trial_per_batch_nonRT[m][param] = []
@@ -1171,6 +1175,10 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 estimation_sq_error_per_trial_nonRT[param].append(mse_x_nonRT)
                 estimation_error_per_trial[param].append(err_x)
                 estimation_error_per_trial_nonRT[param].append(err_x_nonRT)
+                params_out_jsonl["mse_x_RT"] = mse_x
+                params_out_jsonl["mse_x_nonRT"] = mse_x_nonRT
+                params_out_jsonl["err_x_RT"] = err_x
+                params_out_jsonl["err_x_nonRT"] = err_x_nonRT
             elif param == "Z":
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
@@ -1179,7 +1187,11 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 estimation_sq_error_per_trial[param].append(mse_z)
                 estimation_sq_error_per_trial_nonRT[param].append(mse_z_nonRT)
                 estimation_error_per_trial[param].append(err_z)
-                estimation_error_per_trial_nonRT[param].append(err_z_nonRT)                 
+                estimation_error_per_trial_nonRT[param].append(err_z_nonRT)  
+                params_out_jsonl["mse_z_RT"] = mse_z
+                params_out_jsonl["mse_z_nonRT"] = mse_z_nonRT
+                params_out_jsonl["err_z_RT"] = err_z
+                params_out_jsonl["err_z_nonRT"] = err_z_nonRT               
             elif param == "Phi":            
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
@@ -1210,8 +1222,19 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                     y=estimation_sq_error_per_trial_per_batch[m][param], 
                     x=[param]*len(estimation_sq_error_per_trial_per_batch[m][param]),
                     showlegend=False, boxpoints='outliers'))
+            fig_sq_m_over_databatches_nonRT.add_trace(go.Box(
+                    y=estimation_sq_error_per_trial_per_batch_nonRT[m][param], 
+                    x=[param]*len(estimation_sq_error_per_trial_per_batch_nonRT[m][param]),
+                    showlegend=False, boxpoints='outliers'))
+            fig_m_over_databatches.add_trace(go.Box(
+                    y=estimation_error_per_trial_per_batch[m][param], 
+                    x=[param]*len(estimation_error_per_trial_per_batch[m][param]),
+                    showlegend=False, boxpoints='outliers'))
+            fig_m_over_databatches_nonRT.add_trace(go.Box(
+                    y=estimation_error_per_trial_per_batch_nonRT[m][param], 
+                    x=[param]*len(estimation_error_per_trial_per_batch_nonRT[m][param]),
+                    showlegend=False, boxpoints='outliers'))
             
-
         pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)         
         savename = "{}/mle_estimation_plots/mse_trial{}_perparam_unweighted_boxplot.html".format(data_topdir, m)
         fix_plot_layout_and_save(fig_sq_m_over_databatches, savename, xaxis_title="Parameter", yaxis_title="Mean relative Sq. Err Θ", title="", 
@@ -1229,7 +1252,15 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
         fix_plot_layout_and_save(fig_m_over_databatches_nonRT, savename, xaxis_title="Parameter", yaxis_title="Mean relative Err Θ", title="", 
                                 showgrid=False, showlegend=True, 
                                 print_png=True, print_html=True, print_pdf=False)
-            
+        
+        theta_m = np.zeros((parameter_space_dim, ))
+        for param in parameter_names:
+            theta_m[param_positions_dict[param][0]:param_positions_dict[param][1]] = params_out_jsonl[param] 
+        with open("{}/{}/Y.pickle".format(data_topdir, m), "rb") as f:
+            Y = pickle.load(f)
+        Y = Y.astype(np.int8).reshape((K, J), order="F")  
+        loglik, _ = log_full_posterior(Y, theta_m, param_positions_dict, args)
+        params_out_jsonl["loglik"] = loglik
         out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
         with open(out_file, 'a') as f:         
             writer = jsonlines.Writer(f)
