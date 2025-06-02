@@ -392,8 +392,6 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
 
     # save data
     pathlib.Path("{}/".format(data_location)).mkdir(parents=True, exist_ok=True)
-    with open("{}/Y.pickle".format(data_location), "wb") as f:
-        pickle.dump(follow_matrix, f, protocol=4)
     with open("{}/Utilities.pickle".format(data_location), "wb") as f:
         pickle.dump(utilities_matrix, f, protocol=4)
     # utilities_matrix = generate_normal_data(n_samples=K, n_dimensions=J, mu=0.6*np.ones((J,)), sigma=0.1*np.eye(J))
@@ -403,10 +401,12 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
     utilities_mat_probab = norm.cdf(pijs, loc=mu_e, scale=sigma_e)
     follow_matrix = utilities_mat_probab > 0.5 
 
-    snr = 10*np.log10((K*x_var + J*z_var + J*alpha_var + K*beta_var)/(K*J*sigma_e))
-    
+    with open("{}/Y.pickle".format(data_location), "wb") as f:
+        pickle.dump(follow_matrix, f, protocol=4)    
     with open("{}/Utilities_mat_probabilities.pickle".format(data_location), "wb") as f:
         pickle.dump(utilities_mat_probab, f, protocol=4)
+
+    snr = 10*np.log10((K*x_var + J*z_var + J*alpha_var + K*beta_var)/(K*J*sigma_e))
 
     # full, with status quo
     if delta > 0:
