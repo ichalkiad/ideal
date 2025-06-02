@@ -1772,6 +1772,10 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
         mse_z_RT = estimated_thetas[i][2]
         mse_x_nonRT = estimated_thetas[i][3]
         mse_z_nonRT = estimated_thetas[i][4]
+        err_x_RT = estimated_thetas[i][5]
+        err_z_RT = estimated_thetas[i][6]
+        err_x_nonRT = estimated_thetas[i][7]
+        err_z_nonRT = estimated_thetas[i][8]
         logposterior = computed_logfullposterior[i]
         posterior_list.append(logposterior)
         params_out = dict()
@@ -1780,6 +1784,10 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
         params_out["mse_z_RT"] = mse_z_RT
         params_out["mse_x_nonRT"] = mse_x_nonRT
         params_out["mse_z_nonRT"] = mse_z_nonRT
+        params_out["err_x_RT"] = err_x_RT
+        params_out["err_z_RT"] = err_z_RT
+        params_out["err_x_nonRT"] = err_x_nonRT
+        params_out["err_z_nonRT"] = err_z_nonRT
         params_out["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")        
         params_out["elapsedtime"] = elapsedtime        
         time_obj, hours, mins, sec, microsec = parse_timedelta_string(params_out["elapsedtime"])
