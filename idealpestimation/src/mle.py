@@ -23,7 +23,9 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                                     negative_loglik_coordwise, negative_loglik_coordwise_jax, collect_mle_results, \
                                                                         collect_mle_results_batchsize_analysis, sample_theta_curr_init,\
                                                                         get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta,\
-                                                                        negative_loglik_coordwise_parallel, plot_loglik_runtimes, parse_timedelta_string
+                                                                        negative_loglik_coordwise_parallel, plot_loglik_runtimes, parse_timedelta_string,\
+                                                                        print_threadpool_info
+from idealpestimation.src.efficiency_monitor import Monitor
 
 
 from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
@@ -256,7 +258,8 @@ def estimate_mle(args):
                                                                     param_positions_dict_theta, 
                                                                     args, samples_list=theta_samples_list, 
                                                                     idx_all=idx_all, rng=rng)
-    args_theta = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, J, N, d, N, dst_func, L,
+    args_theta = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, parameter_names, 
+                J, N, d, N, dst_func, L,
                 parameter_space_dim_theta, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
                 prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
                 prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,
@@ -553,10 +556,8 @@ class ProcessManagerSynthetic(ProcessManager):
         current_pid = os.getpid()
         with self.execution_counter.get_lock():
             self.execution_counter.value += 1
-            self.shared_dict[current_pid] = self.execution_counter.value
-        
+            self.shared_dict[current_pid] = self.execution_counter.value        
         estimate_mle(args)         
-
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
@@ -570,6 +571,12 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
     if parallel:
         manager = ProcessManagerSynthetic(total_running_processes)        
     DIR_top = data_location      
+
+    # start efficiency monitoring - interval in seconds
+    print_threadpool_info()
+    monitor = Monitor(interval=60)
+    monitor.start()   
+    t_start = time.time()  
     try:    
         if parallel:  
             manager.create_results_dict(optim_target="all")    
@@ -651,9 +658,18 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             with jsonlines.open("{}/spawnedprocesses.jsonl".format(DIR_out), "w") as f:
                 f.write(manager.shared_dict)
         sys.exit(0)
+    t_end = time.time()
+    monitor.stop()
+    wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+        avg_threads, max_threads, avg_processes, max_processes = monitor.report(t_end - t_start)
+    efficiency_measures = (wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+                                avg_threads, max_threads, avg_processes, max_processes)
+    elapsedtime = str(timedelta(seconds=t_end - t_start))   
     if parallel:
         with jsonlines.open("{}/spawnedprocesses.jsonl".format(DIR_out), "w") as f:
-            f.write(dict(manager.shared_dict))       
+            f.write(dict(manager.shared_dict))      
+
+    return efficiency_measures 
 
 
 if __name__ == "__main__":
@@ -732,7 +748,7 @@ if __name__ == "__main__":
     prior_scale_delta= 1        
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_mmtest_batchsize/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
@@ -776,21 +792,21 @@ if __name__ == "__main__":
         elif param == "sigma_e":
             param_positions_dict[param] = (k, k + 1)                                
             k += 1    
-    # main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-    #     data_location=data_location, parallel=parallel, 
-    #     parameter_names=parameter_names, optimisation_method=optimisation_method, 
-    #     dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-    #     trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
-    #     prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
-    #     prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
-    #     prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-    #     prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
-    #     prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
-    #     prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
-    #     rng=rng, batchsize=batchsize)
+    efficiency_measures = main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+                            data_location=data_location, parallel=parallel, 
+                            parameter_names=parameter_names, optimisation_method=optimisation_method, 
+                            dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+                            trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
+                            prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
+                            prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
+                            prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+                            prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
+                            prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+                            prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
+                            rng=rng, batchsize=batchsize)
 
 
     data_topdir = data_location
-    # collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize)
-    collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
+    collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize)
+    # collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
     

@@ -623,7 +623,8 @@ def rank_and_return_best_theta(estimated_thetas, Y, J, K, d, parameter_names, ds
     
     return best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus
 
-def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict, error_nonrotated_dict, theta_true, param_positions_dict):
+def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_dict, sq_error_nonrotated_dict, error_dict, error_nonrotated_dict,
+                                   theta_true, param_positions_dict):
 
     params_out = dict()
     params_out["X"] = np.zeros((d*K,))
@@ -663,8 +664,10 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                                 Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
                                     get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
                             else:
-                                params_out[param][start:end] = theta                            
-                                mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end])**2)
+                                params_out[param][start:end] = theta      
+                                rel_err = (theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end] - theta)/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end]                      
+                                err_trial_m_batch_index = np.mean(rel_err)
+                                mse_trial_m_batch_index = np.mean(rel_err**2)
                         else:                            
                             weight = result["variance_{}".format(param)]                            
                             theta = result[param]
@@ -678,11 +681,21 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
                             else:
                                 mse_trial_m_batch_index = np.mean(((theta - theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]))**2)
             
-            if error_dict is not None:
-                error_dict[param].append(mse_trial_m_batch_index)
-            if error_nonrotated_dict is not None and param in ["X", "Z", "Phi"]:
-                error_nonrotated_dict[param].append(mse_nonrotated_trial_m_batch_index)
+            sq_error_dict[param].append(mse_trial_m_batch_index)
+            if param in ["X", "Z", "Phi"]:
+                sq_error_nonrotated_dict[param].append(mse_nonrotated_trial_m_batch_index)
+            else: 
+                # for parameters that are not rotated in any case, just add the same estimate
+                sq_error_nonrotated_dict[param].append(mse_trial_m_batch_index)
 
+            error_dict[param].append(err_trial_m_batch_index)
+            if param in ["X", "Z", "Phi"]:
+                error_nonrotated_dict[param].append(err_nonrotated_trial_m_batch_index)
+            else: 
+                # for parameters that are not rotated in any case, just add the same estimate
+                error_nonrotated_dict[param].append(err_trial_m_batch_index)
+            
+            
         if param in ["X", "beta"]:
             params_out[param] = params_out[param]        
         else:             
@@ -698,7 +711,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, error_dict
             weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
             params_out[param] = weighted_estimate
     
-    return params_out, error_dict, error_nonrotated_dict
+    return params_out, sq_error_dict, sq_error_nonrotated_dict, error_dict, error_nonrotated_dict
 
 def parse_input_arguments():
 
@@ -860,7 +873,7 @@ def process_single_block(Y, X, Z, alpha, beta, gamma, errloc, errscale, block_si
 def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y, J, K, d, 
                                     parameter_names, dst_func, param_positions_dict, 
                                     penalty_weight_Z, constant_Z, debug=False, numbafast=True,
-                                    block_size_rows=5000, block_size_cols=100):
+                                    block_size_rows=500, block_size_cols=100):
 
     full_theta[theta_idx] = theta_coordval
     params_hat = optimisation_dict2params(full_theta, param_positions_dict, J, K, d, parameter_names)    
@@ -893,12 +906,12 @@ def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y,
         milliseconds = (time.time()-t0)*1000 
         hours = total_seconds // 3600
         minutes = (total_seconds % 3600) // 60
-        out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
-        with open(out_file, 'a') as f:         
-            writer = jsonlines.Writer(f)
-            writer.write({"K":K, "J":J, "block_size_rows": block_size_rows, 
-                          "block_size_cols":block_size_cols, "parallel": 0, 
-                          "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
+        # out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
+        # with open(out_file, 'a') as f:         
+        #     writer = jsonlines.Writer(f)
+        #     writer.write({"K":K, "J":J, "block_size_rows": block_size_rows, 
+        #                   "block_size_cols":block_size_cols, "parallel": 0, 
+        #                   "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
     
     row_blocks = (K + block_size_rows - 1) // block_size_rows
     col_blocks = (J + block_size_cols - 1) // block_size_cols
@@ -911,12 +924,12 @@ def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y,
         total_seconds = int(elapsedtime.total_seconds())
         hours = total_seconds // 3600
         minutes = (total_seconds % 3600) // 60
-        out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
-        with open(out_file, 'a') as f:         
-            writer = jsonlines.Writer(f)
-            writer.write({"K":K, "J":J, "block_size_rows":block_size_rows, 
-                        "block_size_cols":block_size_cols, "parallel":1, 
-                        "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
+        # out_file = "/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl"
+        # with open(out_file, 'a') as f:         
+        #     writer = jsonlines.Writer(f)
+        #     writer.write({"K":K, "J":J, "block_size_rows":block_size_rows, 
+        #                 "block_size_cols":block_size_cols, "parallel":1, 
+        #                 "hours": hours, "minutes": minutes, "seconds":total_seconds, "milliseconds":milliseconds})
 
     if debug:
         assert(np.allclose(nll, _nll))
@@ -1099,14 +1112,26 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
-def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize):
+def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize):
     
+    wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+                avg_threads, max_threads, avg_processes, max_processes = efficiency_measures
+                
     parameter_space_dim = (K+J)*d + J + K + 2
     params_out_jsonl = dict()
+    estimation_sq_error_per_trial_per_batch = dict()
+    estimation_sq_error_per_trial_per_batch_nonRT = dict()
     estimation_error_per_trial_per_batch = dict()
+    estimation_error_per_trial_per_batch_nonRT = dict()
+    estimation_sq_error_per_trial = dict()
+    estimation_sq_error_per_trial_nonRT = dict()
     estimation_error_per_trial = dict()
+    estimation_error_per_trial_nonRT = dict()
     for param in parameter_names:
+        estimation_sq_error_per_trial[param] = []
+        estimation_sq_error_per_trial_nonRT[param] = []
         estimation_error_per_trial[param] = []
+        estimation_error_per_trial_nonRT[param] = []
     
     for m in range(M):
         theta_true = np.zeros((parameter_space_dim,))
@@ -1114,52 +1139,94 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
             for result in f.iter(type=dict, skip_invalid=True):
                 for param in parameter_names:
                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+        fig_sq_m_over_databatches = go.Figure()
+        fig_sq_m_over_databatches_nonRT = go.Figure()
         fig_m_over_databatches = go.Figure()
+        fig_m_over_databatches_nonRT = go.Figure()
+        estimation_sq_error_per_trial_per_batch[m] = dict()
         estimation_error_per_trial_per_batch[m] = dict()
         for param in parameter_names:            
+            estimation_sq_error_per_trial_per_batch[m][param] = []
+            estimation_sq_error_per_trial_per_batch_nonRT[m][param] = []
             estimation_error_per_trial_per_batch[m][param] = []
+            estimation_error_per_trial_per_batch_nonRT[m][param] = []
                 
         data_location = "{}/{}/{}/".format(data_topdir, m, batchsize)
-        params_out, estimation_error_per_trial_per_batch[m] = combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
-                                                                estimation_error_per_trial_per_batch[m], theta_true, param_positions_dict)    
+        params_out, estimation_sq_error_per_trial_per_batch[m], estimation_sq_error_per_trial_per_batch_nonRT[m],\
+            estimation_error_per_trial_per_batch[m], estimation_error_per_trial_per_batch_nonRT[m] = \
+                    combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
+                                                estimation_sq_error_per_trial_per_batch[m], 
+                                                estimation_sq_error_per_trial_per_batch_nonRT[m],
+                                                estimation_error_per_trial_per_batch[m], 
+                                                estimation_error_per_trial_per_batch_nonRT[m],
+                                                theta_true, param_positions_dict)    
+
         for param in parameter_names:
             if param == "X":                
                 params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                 X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                 X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
                 Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
-                estimation_error_per_trial[param].append(mse_x)
+                estimation_sq_error_per_trial[param].append(mse_x)
+                estimation_sq_error_per_trial_nonRT[param].append(mse_x_nonRT)
+                estimation_error_per_trial[param].append(err_x)
+                estimation_error_per_trial_nonRT[param].append(err_x_nonRT)
             elif param == "Z":
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
                 Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
-                estimation_error_per_trial[param].append(mse_z)                      
+                estimation_sq_error_per_trial[param].append(mse_z)
+                estimation_sq_error_per_trial_nonRT[param].append(mse_z_nonRT)
+                estimation_error_per_trial[param].append(err_z)
+                estimation_error_per_trial_nonRT[param].append(err_z_nonRT)                 
             elif param == "Phi":            
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
                 Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
-                estimation_error_per_trial[param].append(mse_phi)                        
+                estimation_sq_error_per_trial[param].append(mse_phi)    
+                estimation_sq_error_per_trial_nonRT[param].append(mse_phi_nonRT)
+                estimation_error_per_trial[param].append(err_phi)
+                estimation_error_per_trial_nonRT[param].append(err_phi_nonRT)                    
             elif param in ["beta", "alpha"]:
-                params_out_jsonl[param] = params_out[param].tolist()     
-                mse = np.mean((theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])**2)  
-                estimation_error_per_trial[param].append(mse)        
+                params_out_jsonl[param] = params_out[param].tolist()
+                rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
+                mse = np.mean(rel_err**2)  
+                estimation_sq_error_per_trial[param].append(mse)    
+                estimation_sq_error_per_trial_nonRT[param].append(mse)
+                estimation_error_per_trial[param].append(np.mean(rel_err))
+                estimation_error_per_trial_nonRT[param].append(np.mean(rel_err))      
             else:
                 params_out_jsonl[param] = params_out[param]
-                mse = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])**2
-                estimation_error_per_trial[param].append(mse[0]) 
+                rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                mse = rel_err**2
+                estimation_sq_error_per_trial[param].append(mse)    
+                estimation_sq_error_per_trial_nonRT[param].append(mse)
+                estimation_error_per_trial[param].append(rel_err)
+                estimation_error_per_trial_nonRT[param].append(rel_err)      
             
-            fig_m_over_databatches.add_trace(go.Box(
-                    y=estimation_error_per_trial_per_batch[m][param], 
-                    x=[param]*len(estimation_error_per_trial_per_batch[m][param]),
-                    showlegend=False,  
-                    boxpoints='outliers'
-                    ))
+            fig_sq_m_over_databatches.add_trace(go.Box(
+                    y=estimation_sq_error_per_trial_per_batch[m][param], 
+                    x=[param]*len(estimation_sq_error_per_trial_per_batch[m][param]),
+                    showlegend=False, boxpoints='outliers'))
             
+
+        pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)         
         savename = "{}/mle_estimation_plots/mse_trial{}_perparam_unweighted_boxplot.html".format(data_topdir, m)
-        pathlib.Path("{}/mle_estimation_plots/".format(data_topdir)).mkdir(parents=True, exist_ok=True)     
-        fix_plot_layout_and_save(fig_m_over_databatches, savename, xaxis_title="Parameter", yaxis_title="MSE Θ", title="", 
+        fix_plot_layout_and_save(fig_sq_m_over_databatches, savename, xaxis_title="Parameter", yaxis_title="Mean relative Sq. Err Θ", title="", 
+                                showgrid=False, showlegend=True, 
+                                print_png=True, print_html=True, print_pdf=False)
+        savename = "{}/mle_estimation_plots/mse_nonRT_trial{}_perparam_unweighted_boxplot.html".format(data_topdir, m)
+        fix_plot_layout_and_save(fig_sq_m_over_databatches_nonRT, savename, xaxis_title="Parameter", yaxis_title="Mean relative Sq. Err Θ", title="", 
+                                showgrid=False, showlegend=True, 
+                                print_png=True, print_html=True, print_pdf=False)
+        savename = "{}/mle_estimation_plots/err_trial{}_perparam_unweighted_boxplot.html".format(data_topdir, m)
+        fix_plot_layout_and_save(fig_m_over_databatches, savename, xaxis_title="Parameter", yaxis_title="Mean relative Err Θ", title="", 
+                                showgrid=False, showlegend=True, 
+                                print_png=True, print_html=True, print_pdf=False)
+        savename = "{}/mle_estimation_plots/err_nonRT_trial{}_perparam_unweighted_boxplot.html".format(data_topdir, m)
+        fix_plot_layout_and_save(fig_m_over_databatches_nonRT, savename, xaxis_title="Parameter", yaxis_title="Mean relative Err Θ", title="", 
                                 showgrid=False, showlegend=True, 
                                 print_png=True, print_html=True, print_pdf=False)
             
@@ -1169,18 +1236,48 @@ def collect_mle_results(data_topdir, M, K, J, sigma_e_true, d, parameter_names, 
             writer.write(params_out_jsonl)
     
     # box plot - mse relativised per parameter over trials
-    fig = go.Figure()
+    fig_sq_err = go.Figure()
+    fig_sq_err_nonRT = go.Figure()
+    fig_err = go.Figure()
+    fig_err_nonRT = go.Figure()
     for param in parameter_names:
         # df = pd.DataFrame.from_dict({"vals":estimation_error_per_trial[param]})
         # lower_bound = df.vals.quantile(0.05)
         # upper_bound = df.vals.quantile(0.95)
         # df_filtered = df.vals[(df.vals >= lower_bound) & (df.vals <= upper_bound)].dropna()
-        fig.add_trace(go.Box(
+        fig_sq_err.add_trace(go.Box(
+                        y=np.asarray(estimation_sq_error_per_trial[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_sq_error_per_trial[param]), boxpoints='outliers'                                
+                    ))
+        fig_sq_err_nonRT.add_trace(go.Box(
+                        y=np.asarray(estimation_sq_error_per_trial_nonRT[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_sq_error_per_trial_nonRT[param]), boxpoints='outliers'                                
+                    ))
+        fig_err.add_trace(go.Box(
                         y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True, name=param,
                         x=[param]*len(estimation_error_per_trial[param]), boxpoints='outliers'                                
                     ))
+        fig_err_nonRT.add_trace(go.Box(
+                        y=np.asarray(estimation_error_per_trial_nonRT[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_error_per_trial_nonRT[param]), boxpoints='outliers'                                
+                    ))
     savename = "{}/mle_estimation_plots/mse_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
-    fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="MSE Θ", title="", 
+    fix_plot_layout_and_save(fig_sq_err, savename, xaxis_title="", yaxis_title="Mean relative Sq. Err Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)
+    savename = "{}/mle_estimation_plots/mse_nonRT_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
+    fix_plot_layout_and_save(fig_sq_err_nonRT, savename, xaxis_title="", yaxis_title="Mean relative Sq. Err Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)
+    savename = "{}/mle_estimation_plots/err_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
+    fix_plot_layout_and_save(fig_err, savename, xaxis_title="", yaxis_title="Mean relative Err Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)
+    savename = "{}/mle_estimation_plots/err_nonRT_overAllTrials_perparam_weighted_boxplot.html".format(data_topdir)
+    fix_plot_layout_and_save(fig_err_nonRT, savename, xaxis_title="", yaxis_title="Mean relative Err Θ", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=True, print_html=True, 
                             print_pdf=False)
