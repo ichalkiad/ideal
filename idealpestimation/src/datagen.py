@@ -580,7 +580,7 @@ if __name__ == "__main__":
     Js = [100] #, 500, 1000]
     # number of followers
     Ks = [10000, 50000, 100000]
-    sigma_es = [0.001, 0.1, 0.5, 1.0, 5.0]
+    sigma_es = [0.01]#, 0.1, 0.5, 1.0, 5.0]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:

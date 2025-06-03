@@ -680,6 +680,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                     get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
                             else:
                                 rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - theta)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                                err_trial_m_batch_index = rel_err
                                 mse_trial_m_batch_index = np.mean(rel_err**2)
             
             sq_error_dict[param].append(mse_trial_m_batch_index)
@@ -1200,7 +1201,11 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 estimation_sq_error_per_trial[param].append(mse_phi)    
                 estimation_sq_error_per_trial_nonRT[param].append(mse_phi_nonRT)
                 estimation_error_per_trial[param].append(err_phi)
-                estimation_error_per_trial_nonRT[param].append(err_phi_nonRT)                    
+                estimation_error_per_trial_nonRT[param].append(err_phi_nonRT)        
+                params_out_jsonl["mse_phi_RT"] = mse_phi
+                params_out_jsonl["mse_phi_nonRT"] = mse_phi_nonRT
+                params_out_jsonl["err_phi_RT"] = err_phi
+                params_out_jsonl["err_phi_nonRT"] = err_phi_nonRT            
             elif param in ["beta", "alpha"]:
                 params_out_jsonl[param] = params_out[param].tolist()
                 rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
@@ -1208,7 +1213,9 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 estimation_sq_error_per_trial[param].append(mse)    
                 estimation_sq_error_per_trial_nonRT[param].append(mse)
                 estimation_error_per_trial[param].append(np.mean(rel_err))
-                estimation_error_per_trial_nonRT[param].append(np.mean(rel_err))      
+                estimation_error_per_trial_nonRT[param].append(np.mean(rel_err))   
+                params_out_jsonl["mse_{}".format(param)] = mse
+                params_out_jsonl["rel_err_{}".format(param)] = np.mean(rel_err)
             else:
                 params_out_jsonl[param] = params_out[param]
                 rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out_jsonl[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
@@ -1217,6 +1224,8 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 estimation_sq_error_per_trial_nonRT[param].append(mse)
                 estimation_error_per_trial[param].append(rel_err)
                 estimation_error_per_trial_nonRT[param].append(rel_err)      
+                params_out_jsonl["mse_{}".format(param)] = mse
+                params_out_jsonl["rel_err_{}".format(param)] = rel_err
             
             fig_sq_m_over_databatches.add_trace(go.Box(
                     y=estimation_sq_error_per_trial_per_batch[m][param], 
@@ -1876,8 +1885,19 @@ def parse_timedelta_string(time_str):
 def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, 
                             param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None):
 
-    wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
+    if efficiency_measures is not None:
+        wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
                 avg_threads, max_threads, avg_processes, max_processes = efficiency_measures
+    else:
+        wall_duration = None 
+        avg_total_cpu_util = None
+        max_total_cpu_util = None
+        avg_total_ram_residentsetsize_MB = None
+        max_total_ram_residentsetsize_MB = None
+        avg_threads = None
+        max_threads = None
+        avg_processes = None
+        max_processes = None
 
     best_theta = None
     computed_logfullposterior = []
@@ -1951,18 +1971,19 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                                 xaxis_title="Leaders", yaxis_title="Followers", title="Utilities with estimated parameters", 
                                 showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
       
-    out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
-    with open(out_file, 'a') as f:         
-        writer = jsonlines.Writer(f)
-        writer.write({"wall_duration": wall_duration, 
-                    "avg_total_cpu_util": avg_total_cpu_util, 
-                    "max_total_cpu_util": max_total_cpu_util, 
-                    "avg_total_ram_residentsetsize_MB": avg_total_ram_residentsetsize_MB, 
-                    "max_total_ram_residentsetsize_MB": max_total_ram_residentsetsize_MB,
-                    "avg_threads": avg_threads, 
-                    "max_threads": max_threads, 
-                    "avg_processes": avg_processes, 
-                    "max_processes": max_processes})
+    if not (efficiency_measures is None):
+        out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write({"wall_duration": wall_duration, 
+                        "avg_total_cpu_util": avg_total_cpu_util, 
+                        "max_total_cpu_util": max_total_cpu_util, 
+                        "avg_total_ram_residentsetsize_MB": avg_total_ram_residentsetsize_MB, 
+                        "max_total_ram_residentsetsize_MB": max_total_ram_residentsetsize_MB,
+                        "avg_threads": avg_threads, 
+                        "max_threads": max_threads, 
+                        "avg_processes": avg_processes, 
+                        "max_processes": max_processes})
 
     # 2D projection of solutions
     # raw_symbols = SymbolValidator().values    
@@ -2067,11 +2088,12 @@ def data_annealing_init_theta_given_theta_prev(theta_curr, theta_prev, K, J, d, 
  
     for param in parameter_names:
         if (not diff_elementwise) and param in ["X", "beta"]:
+            print("not init from prev")
             continue
         elif diff_elementwise and param in ["X", "beta"]:
-            if param=="X":
-                theta_curr[annealing_prev[param][0]:annealing_prev[param][1]] = theta_prev[annealing_prev[param][0]:annealing_prev[param][1]].copy()
-                print(param, theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], np.allclose(theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], theta_curr[annealing_prev[param][0]:annealing_prev[param][1]]))
+            # if param=="X":
+            theta_curr[annealing_prev[param][0]:annealing_prev[param][1]] = theta_prev[annealing_prev[param][0]:annealing_prev[param][1]].copy()
+            print(param, theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], np.allclose(theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], theta_curr[annealing_prev[param][0]:annealing_prev[param][1]]))
         else:
             theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_prev[annealing_prev[param][0]:annealing_prev[param][1]].copy()
             print(param, theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], np.allclose(theta_prev[annealing_prev[param][0]:annealing_prev[param][1]], theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]]))
@@ -3240,6 +3262,234 @@ def error_polarisation_plots(datain, estimation_folder, M, K, J, d=2):
                             title="", showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
     
     
+
+def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_base, 
+                                                theta_true, param_positions_dict, topdir="/tmp/"):
+    
+
+    estimation_sq_error_per_trial = dict()
+    estimation_sq_error_per_trial_nonRT = dict()
+    estimation_error_per_trial = dict()
+    estimation_error_per_trial_nonRT = dict()  
+    for param in parameter_names:   
+        estimation_sq_error_per_trial[param] = []
+        estimation_sq_error_per_trial_nonRT[param] = []
+        estimation_error_per_trial[param] = []
+        estimation_error_per_trial_nonRT[param] = []  
+    
+    for m in range(M):
+        local_mse = dict()
+        local_mse_nonrotated = dict()
+        local_err = dict()
+        local_err_nonrotated = dict()
+        params_out = dict()
+        params_out["X"] = np.zeros((d*K,))
+        params_out["beta"] = np.zeros((K,))    
+        for param in parameter_names:     
+            local_mse[param] = []
+            local_mse_nonrotated[param] = []
+            local_err[param] = []
+            local_err_nonrotated[param] = []      
+            theta = None
+            all_estimates = []
+            path = pathlib.Path(DIR_base)  
+            subdatasets_names = [file.name for file in path.iterdir() if not file.is_file()]                    
+            for dataset_index in range(len(subdatasets_names)):                    
+                subdataset_name = subdatasets_names[dataset_index]                        
+                DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
+                path = pathlib.Path(DIR_read)  
+                estimates_names = [file.name for file in path.iterdir() if file.is_file() and "_best" in file.name]
+                if len(estimates_names) > 1:
+                    raise AttributeError("Should have 1 output estimation file.")
+                for estim in estimates_names:
+                    with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
+                        for result in f.iter(type=dict, skip_invalid=True):
+                            if param in ["X", "beta"]:
+                                # single estimate per data split
+                                theta = result[param]
+                                namesplit = estim.split("_")
+                                start = int(namesplit[5])
+                                end   = int(namesplit[6].replace(".jsonl", ""))
+                                if param == "X":
+                                    params_out[param][start*d:end*d] = theta
+                                    X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
+                                    X_hat = np.asarray(theta).reshape((d, end-start), order="F")
+                                    Rx, tx, mse, mse_nonrotated, err, err_nonrotated = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                                else:
+                                    params_out[param][start:end] = theta 
+                                    rel_err = (theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end] - theta)/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end]                      
+                                    err = np.mean(rel_err)
+                                    mse = np.mean(rel_err**2)
+                            else:                                                        
+                                theta = result[param]
+                                all_estimates.append(theta)
+                                if param == "Z":
+                                    Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")  
+                                    Z_hat = np.asarray(theta).reshape((d, J), order="F")
+                                    Rz, tz, mse, mse_nonrotated, err, err_nonrotated = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                                else:
+                                    rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - theta)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                                    err = rel_err
+                                    mse = np.mean(rel_err**2)
+                
+                local_mse[param].append(mse)
+                if param in ["X", "Z", "Phi"]:
+                    local_mse_nonrotated[param].append(mse_nonrotated)
+                else: 
+                    # for parameters that are not rotated in any case, just add the same estimate
+                    local_mse_nonrotated[param].append(mse)
+
+                local_err[param].append(err)
+                if param in ["X", "Z", "Phi"]:
+                    local_err_nonrotated[param].append(err_nonrotated)
+                else: 
+                    # for parameters that are not rotated in any case, just add the same estimate
+                    local_err_nonrotated[param].append(err)
+
+            if param in ["X", "beta"]:
+                params_out[param] = params_out[param].tolist()       
+            else:             
+                all_estimates = np.stack(all_estimates)
+                if param not in ["Z", "Phi", "alpha"]:
+                    all_estimates = all_estimates.flatten()
+                # compute variance over columns
+                column_variances = np.var(all_estimates, axis=0)
+                # sum acrocs each coordinate's weight
+                all_weights_sum = np.sum(column_variances, axis=0)
+                all_weights_norm = column_variances/all_weights_sum
+                assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
+                # element-wise multiplication
+                weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
+                params_out[param] = weighted_estimate.tolist()
+        
+
+        for param in parameter_names:
+            if param == "X":                 
+                X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
+                X_hat = np.asarray(params_out[param]).reshape((d, K), order="F")
+                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+
+                estimation_sq_error_per_trial[param].append(mse_x)
+                estimation_sq_error_per_trial_nonRT[param].append(mse_x_nonRT)
+                estimation_error_per_trial[param].append(err_x)
+                estimation_error_per_trial_nonRT[param].append(err_x_nonRT)
+                params_out["mse_x_RT"] = mse_x
+                params_out["mse_x_nonRT"] = mse_x_nonRT
+                params_out["err_x_RT"] = err_x
+                params_out["err_x_nonRT"] = err_x_nonRT
+            elif param == "Z":
+                Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                Z_hat = np.asarray(params_out[param]).reshape((d, J), order="F")
+                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+
+                estimation_sq_error_per_trial[param].append(mse_z)
+                estimation_sq_error_per_trial_nonRT[param].append(mse_z_nonRT)
+                estimation_error_per_trial[param].append(err_z)
+                estimation_error_per_trial_nonRT[param].append(err_z_nonRT)  
+                params_out["mse_z_RT"] = mse_z
+                params_out["mse_z_nonRT"] = mse_z_nonRT
+                params_out["err_z_RT"] = err_z
+                params_out["err_z_nonRT"] = err_z_nonRT               
+            elif param == "Phi":            
+                Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                Phi_hat = np.asarray(params_out[param]).reshape((d, J), order="F")
+                Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+
+                estimation_sq_error_per_trial[param].append(mse_phi)    
+                estimation_sq_error_per_trial_nonRT[param].append(mse_phi_nonRT)
+                estimation_error_per_trial[param].append(err_phi)
+                estimation_error_per_trial_nonRT[param].append(err_phi_nonRT)                    
+            elif param in ["beta", "alpha"]:
+                rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
+                mse = np.mean(rel_err**2)  
+
+                estimation_sq_error_per_trial[param].append(mse)    
+                estimation_sq_error_per_trial_nonRT[param].append(mse)
+                estimation_error_per_trial[param].append(np.mean(rel_err))
+                estimation_error_per_trial_nonRT[param].append(np.mean(rel_err))      
+
+                params_out["mse_{}".format(param)] = mse
+                params_out["rel_err_{}".format(param)] = np.mean(rel_err)
+            else:
+                rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                mse = rel_err**2
+
+                estimation_sq_error_per_trial[param].append(mse)    
+                estimation_sq_error_per_trial_nonRT[param].append(mse)
+                estimation_error_per_trial[param].append(rel_err)
+                estimation_error_per_trial_nonRT[param].append(rel_err)      
+
+                params_out["mse_{}".format(param)] = mse[0]
+                params_out["rel_err_{}".format(param)] = rel_err[0]
+
+
+        # out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
+        # with jsonlines.open(out_file, mode='r') as f:         
+        #     for result in f.iter(type=dict, skip_invalid=True):
+        #         wall_duration = result["wall_duration"]
+        #         avg_total_cpu_util = result["avg_total_cpu_util"]
+        #         max_total_cpu_util = result["max_total_cpu_util"]
+        #         avg_total_ram_residentsetsize_MB = result["avg_total_ram_residentsetsize_MB"]
+        #         max_total_ram_residentsetsize_MB = result["max_total_ram_residentsetsize_MB"]
+        #         avg_threads = result["avg_threads"]
+        #         max_threads = result["max_threads"]
+        #         avg_processes = result["avg_processes"]
+        #         ax_processes = result["max_processes"]
+        ipdb.set_trace()
+        out_file = "{}/params_out_global_theta_hat.jsonl".format(DIR_base)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out)
+    
+    fig_sq_err = go.Figure()
+    fig_sq_err_nonRT = go.Figure()
+    fig_err = go.Figure()
+    fig_err_nonRT = go.Figure()
+    pathlib.Path("{}/icm_data_tempering_estimation_plots/".format(topdir)).mkdir(parents=True, exist_ok=True)     
+    for param in parameter_names:
+        # df = pd.DataFrame.from_dict({"vals":estimation_error_per_trial[param]})
+        # lower_bound = df.vals.quantile(0.05)
+        # upper_bound = df.vals.quantile(0.95)
+        # df_filtered = df.vals[(df.vals >= lower_bound) & (df.vals <= upper_bound)].dropna()
+        fig_sq_err.add_trace(go.Box(
+                        y=np.asarray(estimation_sq_error_per_trial[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_sq_error_per_trial[param]), boxpoints='outliers'                                
+                    ))
+        fig_sq_err_nonRT.add_trace(go.Box(
+                        y=np.asarray(estimation_sq_error_per_trial_nonRT[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_sq_error_per_trial_nonRT[param]), boxpoints='outliers'                                
+                    ))
+        fig_err.add_trace(go.Box(
+                        y=np.asarray(estimation_error_per_trial[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_error_per_trial[param]), boxpoints='outliers'                                
+                    ))
+        fig_err_nonRT.add_trace(go.Box(
+                        y=np.asarray(estimation_error_per_trial_nonRT[param]).tolist(), showlegend=True, name=param,
+                        x=[param]*len(estimation_error_per_trial_nonRT[param]), boxpoints='outliers'                                
+                    ))
+    savename = "{}/icm_data_tempering_estimation_plots/mse_overAllTrials_perparam_weighted_boxplot.html".format(topdir)
+    fix_plot_layout_and_save(fig_sq_err, savename, xaxis_title="", yaxis_title="Mean relative Sq. Err Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)
+    savename = "{}/icm_data_tempering_estimation_plots/mse_nonRT_overAllTrials_perparam_weighted_boxplot.html".format(topdir)
+    fix_plot_layout_and_save(fig_sq_err_nonRT, savename, xaxis_title="", yaxis_title="Mean relative Sq. Err Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)
+    savename = "{}/icm_data_tempering_estimation_plots/err_overAllTrials_perparam_weighted_boxplot.html".format(topdir)
+    fix_plot_layout_and_save(fig_err, savename, xaxis_title="", yaxis_title="Mean relative Err Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)
+    savename = "{}/icm_data_tempering_estimation_plots/err_nonRT_overAllTrials_perparam_weighted_boxplot.html".format(topdir)
+    fix_plot_layout_and_save(fig_err_nonRT, savename, xaxis_title="", yaxis_title="Mean relative Err Θ", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=True, print_html=True, 
+                            print_pdf=False)      
+        
+    return params_out, local_mse, local_mse_nonrotated, local_err, local_err_nonrotated
+
 
 
 class TruncatedInverseGamma:

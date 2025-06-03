@@ -710,11 +710,11 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     theta_prev = np.zeros((parameter_space_dim,))
 
     if data_annealing:
-        if parameter_space_dim == 122:  # FIX ###############################
-            plot_online = True
-            fastrun = False
-        else:
-            plot_online = False
+        # if parameter_space_dim == 122:  # FIX ###############################
+        #     plot_online = True
+        #     fastrun = False
+        # else:
+        #     plot_online = False
         gamma = 1
         all_gammas = np.ones((10,)).tolist()
         N = len(all_gammas)
@@ -722,7 +722,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             theta_curr = data_annealing_init_theta_given_theta_prev(theta_curr.copy(), theta_part_annealing, 
                                                                     K, J, d, param_positions_dict, 
                                                                     parameter_names, annealing_prev, 
-                                                                    diff_elementwise=elementwise)
+                                                                    diff_elementwise=(elementwise and (not evaluate_posterior)))
     else:
         all_gammas = []
         for gidx in range(len(temperature_steps[1:])):
@@ -818,6 +818,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 
                 theta_curr = theta_test.copy()                    
                 gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)      
+                if data_annealing:
+                    assert gamma == 1
 
                 if plot_online:
                     subset_coord2plot = None
