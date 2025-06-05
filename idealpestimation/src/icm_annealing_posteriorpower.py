@@ -9,9 +9,8 @@ os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelis
 
 import sys
 import ipdb
-import jax
+# import jax
 import pathlib
-import jsonlines
 import numpy as np
 import random
 import itertools
@@ -1129,7 +1128,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             
             # start efficiency monitoring - interval in seconds
             print_threadpool_info()
-            monitor = Monitor(interval=60)
+            monitor = Monitor(interval=30)
             monitor.start()            
 
             t_start = time.time()            
@@ -1216,7 +1215,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2  
-    gridpoints_num = 10 #, 15, 30
+    gridpoints_num = 30 #, 15, 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -1241,12 +1240,12 @@ if __name__ == "__main__":
     # temperature_steps = [0, 1, 2, 5, 10]
     # temperature_rate = [0.1, 0.2, 0.5, 1] 
 
-    niter = 1
-    fastrun = False
-    max_restarts = 1 #2
-    max_partial_restarts = 1 #2
-    max_halving = 1 #2
-    plot_online = True
+    niter = 10
+    fastrun = True
+    max_restarts = 2
+    max_partial_restarts = 2
+    max_halving = 2
+    plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))

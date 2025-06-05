@@ -10,7 +10,6 @@ os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelis
 import sys
 import ipdb
 import pathlib
-import jsonlines
 import pickle
 import numpy as np
 from scipy.stats import norm
@@ -18,15 +17,14 @@ from scipy.optimize import minimize
 from jax import hessian
 import math
 import random
-from idealpestimation.src.parallel_manager import ProcessManager, \
-                                                    jsonlines
+from idealpestimation.src.parallel_manager import ProcessManager, jsonlines
 from idealpestimation.src.utils import params2optimisation_dict, \
                                             optimisation_dict2params, \
                                                 initialise_optimisation_vector_sobol, \
                                                     visualise_hessian, fix_plot_layout_and_save, \
                                                         get_hessian_diag_jax, get_jacobian, \
                                                             combine_estimate_variance_rule, optimisation_dict2paramvectors,\
-                                                            create_constraint_functions, jax, jnp, \
+                                                            create_constraint_functions, jnp, \
                                                                 time, datetime, timedelta, parse_input_arguments, \
                                                                     negative_loglik_coordwise, negative_loglik_coordwise_jax, collect_mle_results, \
                                                                         collect_mle_results_batchsize_analysis, sample_theta_curr_init,\

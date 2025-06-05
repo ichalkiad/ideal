@@ -9,12 +9,11 @@ os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelis
 
 import sys
 import ipdb
-import jax
+# import jax
 import pathlib
 import jsonlines
 import numpy as np
 import random
-from idealpestimation.src.parallel_manager import jsonlines
 from idealpestimation.src.utils import pickle, optimisation_dict2params,\
                                         time, timedelta, parse_input_arguments, \
                                             rank_and_plot_solutions, print_threadpool_info, \
@@ -71,6 +70,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         max_restarts=2, max_partial_restarts=2, max_halving=2, plot_online=False, seedint=None):
         
         for m in range(trialsmin, trialsmax, 1):
+            print(trialsmin)
             DIR_out = "{}/{}/estimation_CA/".format(data_location, m)
             pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
             

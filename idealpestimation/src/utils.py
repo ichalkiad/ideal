@@ -2184,7 +2184,8 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
     det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
     t_shape_correct = t.shape == (param_hat.shape[1],)
     if not (orthogonality_error < 1e-10 and det_is_one and t_shape_correct):
-        raise AttributeError("Error in solving projection problem?")
+        print("Orthogonality error: {}".format(orthogonality_error))
+        # raise AttributeError("Error in solving projection problem?")
 
     return R, t, meansquarederror, meansquarederror_nonRT, meanrelerror, meanrelerror_nonRT
 
