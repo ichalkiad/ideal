@@ -1,9 +1,9 @@
 import os 
 
-os.environ["OMP_NUM_THREADS"] = "500"
-os.environ["MKL_NUM_THREADS"] = "500"
+os.environ["OMP_NUM_THREADS"] = "48"
+os.environ["MKL_NUM_THREADS"] = "48"
 os.environ["OPENBLAS_NUM_THREADS"] = "500"
-os.environ["NUMBA_NUM_THREADS"] = "500"
+os.environ["NUMBA_NUM_THREADS"] = "48"
 os.environ["JAX_NUM_THREADS"] = "1000"
 os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
 
@@ -19,7 +19,103 @@ from idealpestimation.src.utils import pickle, optimisation_dict2params,\
                                             rank_and_plot_solutions, print_threadpool_info, \
                                                 get_min_achievable_mse_under_rotation_trnsl
 from idealpestimation.src.efficiency_monitor import Monitor
-import prince
+from prince import CA
+from prince import utils as ca_utils
+from prince import svd as ca_svd
+import pandas as pd
+from scipy import sparse
+from sklearn.utils import check_array
+
+class CA_custom(CA):
+    
+    @ca_utils.check_is_dataframe_input
+    def fit(self, X, y=None):
+        
+        if self.check_input:
+            check_array(X)
+
+        if (X < 0).any().any():
+            raise ValueError("All values in X should be positive")
+
+        _, row_names, _, col_names = ca_utils.make_labels_and_names(X)
+
+        if isinstance(X, pd.DataFrame):
+            X = X.to_numpy()
+
+        if self.copy:
+            X = np.copy(X)
+
+        # Compute the correspondence matrix which contains the relative frequencies
+        X = X.astype(float) / np.sum(X)
+
+        # Compute row and column masses
+        rsum = X.sum(axis=1)
+        csum = X.sum(axis=0)
+        if 0 in rsum:
+            rsum += 10e-12
+        if 0 in csum:
+            csum += 10e-12
+        self.row_masses_ = pd.Series(rsum, index=row_names)
+        self.col_masses_ = pd.Series(csum, index=col_names)
+
+        self.active_rows_ = self.row_masses_.index.unique()
+        self.active_cols_ = self.col_masses_.index.unique()
+
+        # Compute standardised residuals
+        r = self.row_masses_.to_numpy()
+        c = self.col_masses_.to_numpy()
+        S = sparse.diags(r**-0.5) @ (X - np.outer(r, c)) @ sparse.diags(c**-0.5)
+
+        # Compute SVD on the standardised residuals
+        self.svd_ = ca_svd.compute_svd(
+            X=S,
+            n_components=min(self.n_components, min(X.shape) - 1),
+            n_iter=self.n_iter,
+            random_state=self.random_state,
+            engine=self.engine,
+        )
+
+        # Compute total inertia
+        self.total_inertia_ = np.einsum("ij,ji->", S, S.T)
+
+        self.row_contributions_ = pd.DataFrame(
+            sparse.diags(self.row_masses_.values)
+            @ np.divide(
+                # Same as row_coordinates(X)
+                (
+                    sparse.diags(self.row_masses_.values**-0.5)
+                    @ self.svd_.U
+                    @ sparse.diags(self.svd_.s)
+                )
+                ** 2,
+                self.eigenvalues_,
+                out=np.zeros((len(self.row_masses_), len(self.eigenvalues_))),
+                where=self.eigenvalues_ > 0,
+            ),
+            index=self.row_masses_.index,
+        )
+
+        self.column_contributions_ = pd.DataFrame(
+            sparse.diags(self.col_masses_.values)
+            @ np.divide(
+                # Same as col_coordinates(X)
+                (
+                    sparse.diags(self.col_masses_.values**-0.5)
+                    @ self.svd_.V.T
+                    @ sparse.diags(self.svd_.s)
+                )
+                ** 2,
+                self.eigenvalues_,
+                out=np.zeros((len(self.col_masses_), len(self.eigenvalues_))),
+                where=self.eigenvalues_ > 0,
+            ),
+            index=self.col_masses_.index,
+        )
+
+        return self
+
+
+
 
 
 def do_correspondence_analysis(ca_runner, Y, param_positions_dict, args, plot_online=False):
@@ -36,10 +132,11 @@ def do_correspondence_analysis(ca_runner, Y, param_positions_dict, args, plot_on
     X_true = np.asarray(params_true["X"]) # d x K       
     Z_true = np.asarray(params_true["Z"]) # d x J          
 
-    ca_out = ca_runner.fit(Y)
+    df = pd.DataFrame(Y, index=np.arange(0, K, 1), columns=np.arange(0, J, 1))
+    ca_out = ca_runner.fit(df)
     
-    Xhat = ca_out.row_coordinates(Y).values.T
-    Zhat = ca_out.column_coordinates(Y).values.T
+    Xhat = ca_out.row_coordinates(df).values.T
+    Zhat = ca_out.column_coordinates(df).values.T
     theta_hat = np.zeros((parameter_space_dim,))
     for param in parameter_names:
         if param == "X":
@@ -88,7 +185,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             # wn_diag = np.diag(1/np.sqrt(wn))
             # Smat = (wm_diag @ (Y - ypp *(wm @ wn)) @ wn_diag)/ypp
 
-            ca = prince.CA(
+            ca = CA_custom(
                 n_components=d,
                 n_iter=10,
                 copy=True,
@@ -227,7 +324,7 @@ if __name__ == "__main__":
     tol = 1e-6    
     #/home/ioannischalkiadakis/ideal
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30      
 
     args = (None, total_running_processes, data_location, None, parameter_names, J, K, d, None, None, tol,                     

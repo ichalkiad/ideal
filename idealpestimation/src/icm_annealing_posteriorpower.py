@@ -1,8 +1,8 @@
 import os 
 
 os.environ["OMP_NUM_THREADS"] = "500"
-os.environ["MKL_NUM_THREADS"] = "500"
-os.environ["OPENBLAS_NUM_THREADS"] = "500"
+os.environ["MKL_NUM_THREADS"] = "48"
+os.environ["OPENBLAS_NUM_THREADS"] = "48"
 os.environ["NUMBA_NUM_THREADS"] = "500"
 os.environ["JAX_NUM_THREADS"] = "500"
 os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
