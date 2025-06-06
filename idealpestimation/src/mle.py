@@ -820,6 +820,6 @@ if __name__ == "__main__":
     efficiency_measures = (wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
                                 avg_threads, max_threads, avg_processes, max_processes)
     elapsedtime = str(timedelta(seconds=t_end - t_start))   
-    collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize, main_run_args)
-    # collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict)    
+    collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize, main_run_args, seedint=seed_value)
+    # collect_mle_results_batchsize_analysis(data_topdir, [64, 128, 192, 256, 320], M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, seedint=seed_value)    
     

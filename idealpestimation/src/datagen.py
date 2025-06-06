@@ -396,10 +396,16 @@ def generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func
         pickle.dump(utilities_matrix, f, protocol=4)
     # utilities_matrix = generate_normal_data(n_samples=K, n_dimensions=J, mu=0.6*np.ones((J,)), sigma=0.1*np.eye(J))
     sigma_noise = sigma_e*np.eye(J)
+    # missing_data = True
+    # while missing_data:
     stochastic_component = generate_normal_data(n_samples=K, n_dimensions=J, mu=mu_e*np.ones((J,)), sigma=sigma_noise, rng=rng)
-    pijs += stochastic_component
-    utilities_mat_probab = norm.cdf(pijs, loc=mu_e, scale=sigma_e)
+    pijs_noise = pijs + stochastic_component
+    utilities_mat_probab = norm.cdf(pijs_noise, loc=mu_e, scale=sigma_e)
     follow_matrix = utilities_mat_probab > 0.5 
+    # r_sum = np.sum(follow_matrix, axis=1)
+    # c_sum = np.sum(follow_matrix, axis=0)
+    # if not (0 in r_sum or 0 in c_sum):
+    #     missing_data = False
 
     with open("{}/Y.pickle".format(data_location), "wb") as f:
         pickle.dump(follow_matrix, f, protocol=4)    
@@ -580,7 +586,7 @@ if __name__ == "__main__":
     Js = [100] #, 500, 1000]
     # number of followers
     Ks = [10000, 50000, 100000]
-    sigma_es = [0.01]#, 0.1, 0.5, 1.0, 5.0]
+    sigma_es = [0.1, 0.5, 1.0, 5.0, 0.001]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:
@@ -615,7 +621,7 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_nomissing/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
                     # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)

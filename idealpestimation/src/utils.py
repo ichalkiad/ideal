@@ -26,6 +26,7 @@ from joblib import Parallel, delayed
 import pandas as pd
 from threadpoolctl import threadpool_info
 import pickle
+from prince import svd as ca_svd
 
 def print_threadpool_info():
     print("\n📊 Threadpool Info:")
@@ -624,7 +625,7 @@ def rank_and_return_best_theta(estimated_thetas, Y, J, K, d, parameter_names, ds
     return best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus
 
 def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_dict, sq_error_nonrotated_dict, error_dict, error_nonrotated_dict,
-                                   theta_true, param_positions_dict):
+                                   theta_true, param_positions_dict, seedint=1234):
 
     params_out = dict()
     params_out["X"] = np.zeros((d*K,))
@@ -662,7 +663,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
                                 X_hat = np.asarray(theta).reshape((d, end-start), order="F")
                                 Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
-                                    get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                                    get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
                             else:
                                 params_out[param][start:end] = theta      
                                 rel_err = (theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end] - theta)/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end]                      
@@ -677,7 +678,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")  
                                 Z_hat = np.asarray(theta).reshape((d, J), order="F")
                                 Rz, tz, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
-                                    get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                                    get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
                             else:
                                 rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - theta)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                 err_trial_m_batch_index = rel_err
@@ -1114,7 +1115,7 @@ def negative_loglik_jax(theta, Y, J, K, d, parameter_names, dst_func, param_posi
     sum_Z_J_vectors = jnp.sum(Z, axis=1)
     return -nll[0] + jnp.asarray(penalty_weight_Z) * jnp.sum((sum_Z_J_vectors-jnp.asarray([constant_Z]*d))**2)    
 
-def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize, args):
+def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize, args, seedint=1234):
     
     wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
                 avg_threads, max_threads, avg_processes, max_processes = efficiency_measures
@@ -1164,14 +1165,14 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                                                 estimation_sq_error_per_trial_per_batch_nonRT[m],
                                                 estimation_error_per_trial_per_batch[m], 
                                                 estimation_error_per_trial_per_batch_nonRT[m],
-                                                theta_true, param_positions_dict)    
+                                                theta_true, param_positions_dict, seedint=seedint)    
 
         for param in parameter_names:
             if param == "X":                
                 params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                 X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                 X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
-                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
                 estimation_sq_error_per_trial[param].append(mse_x)
                 estimation_sq_error_per_trial_nonRT[param].append(mse_x_nonRT)
                 estimation_error_per_trial[param].append(err_x)
@@ -1184,7 +1185,7 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
                 estimation_sq_error_per_trial[param].append(mse_z)
                 estimation_sq_error_per_trial_nonRT[param].append(mse_z_nonRT)
                 estimation_error_per_trial[param].append(err_z)
@@ -1197,7 +1198,7 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                 Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat, seedint=seedint)
                 estimation_sq_error_per_trial[param].append(mse_phi)    
                 estimation_sq_error_per_trial_nonRT[param].append(mse_phi_nonRT)
                 estimation_error_per_trial[param].append(err_phi)
@@ -1323,7 +1324,7 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                             print_pdf=False)
 
 
-def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict):
+def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, seedint=1234):
     
     parameter_space_dim = (K+J)*d + J + K + 2    
     params_out_jsonl = dict()
@@ -1355,7 +1356,7 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
                                     combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
                                                                 estimation_error_per_trial_per_batch[m][batchsize], 
                                                                 estimation_error_per_trial_per_batch_nonrotated[m][batchsize], 
-                                                                theta_true, param_positions_dict)    
+                                                                theta_true, param_positions_dict, seedint=seedint)    
             all_lows = []
             all_highs = []
             for param in parameter_names:
@@ -1367,21 +1368,21 @@ def collect_mle_results_batchsize_analysis(data_topdir, batchsizes, M, K, J, sig
                     params_out_jsonl[param] = params_out[param].reshape((d*K,), order="F").tolist()     
                     X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                     X_hat = np.asarray(params_out_jsonl[param]).reshape((d, K), order="F")
-                    Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                    Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
                     estimation_error_per_trial[param][batchsize].append(float(mse_x))
                     estimation_error_per_trial_nonrotated[param][batchsize].append(float(mse_x_nonRT))
                 elif param == "Z":
                     params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                     Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                     Z_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                    Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                    Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
                     estimation_error_per_trial[param][batchsize].append(float(mse_z))  
                     estimation_error_per_trial_nonrotated[param][batchsize].append(float(mse_z_nonRT))            
                 elif param == "Phi":            
                     params_out_jsonl[param] = params_out[param].reshape((d*J,), order="F").tolist()
                     Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                     Phi_hat = np.asarray(params_out_jsonl[param]).reshape((d, J), order="F")
-                    Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                    Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat, seedint=seedint)
                     estimation_error_per_trial[param][batchsize].append(float(mse_phi))
                     estimation_error_per_trial[param][batchsize].append(float(mse_phi_nonRT))
                 elif param in ["beta", "alpha"]:
@@ -2131,7 +2132,7 @@ def update_annealing_temperature(gamma_prev, total_iter, temperature_rate, tempe
     return gamma, delta_n
 
 
-def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
+def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
 
     """
     Minimizes ||Y - (XR + t)||_F where ||.||_F is the Frobenius norm and R a rotation matrix
@@ -2150,8 +2151,20 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat):
     H = X_centered.T @ Y_centered
     
     # SVD
-    U, S, Vt = np.linalg.svd(H)
-    
+    try:
+        U, S, Vt = np.linalg.svd(H)
+    except:
+        ipdb.set_trace()
+        svd_out = ca_svd.compute_svd(
+            X=H,
+            n_iter=10,
+            n_components=2,
+            random_state=seedint,
+            engine='sklearn',
+        )
+        ipdb.set_trace()
+        U, S, Vt = svd_out.U, svd_out.s, svd_out.V
+
     # Construct the rotation matrix
     # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
     d = np.linalg.det(Vt.T @ U.T)
@@ -2194,7 +2207,7 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                         plot_online=True, mse_theta_full=[], err_theta_full=[], fig_x=None, fig_z=None, fig_x_err=None, fig_z_err=None, mse_x_list=[], mse_z_list=[],
                         mse_x_nonRT_list=[], mse_z_nonRT_list=[], err_x_list=[], err_z_list=[], err_x_nonRT_list=[], err_z_nonRT_list=[],
                         per_param_sq_ers=dict(), per_param_ers=dict(), per_param_heats=dict(), xbox=[], plot_restarts=[], fastrun=False, 
-                        target_param=None, subset_coord2plot=None):
+                        target_param=None, subset_coord2plot=None, seedint=1234):
     
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -2395,7 +2408,7 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
             xbox.extend([fullscan]*2)
         if target_param == "X" or target_param is None:
             # mean error over all elements of the matrices  
-            Rx, tx, mse_x, mse_x_nonRT, meanrelerror_x, meanrelerror_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+            Rx, tx, mse_x, mse_x_nonRT, meanrelerror_x, meanrelerror_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
             mse_x_list.append(mse_x)
             mse_x_nonRT_list.append(mse_x_nonRT)
             err_x_list.append(meanrelerror_x)
@@ -2495,7 +2508,7 @@ def compute_and_plot_mse(theta_true, theta_hat, fullscan, iteration, args, param
                                     name="Θ Mean relative Err"                                
                                 ),  secondary_y=True)
         if target_param == "Z" or target_param is None:
-            Rz, tz, mse_z, mse_z_nonRT, meanrelerror_z, meanrelerror_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+            Rz, tz, mse_z, mse_z_nonRT, meanrelerror_z, meanrelerror_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
             mse_z_list.append(mse_z)   
             mse_z_nonRT_list.append(mse_z_nonRT)
             err_z_list.append(meanrelerror_z)
@@ -3265,7 +3278,7 @@ def error_polarisation_plots(datain, estimation_folder, M, K, J, d=2):
     
 
 def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_base, 
-                                                theta_true, param_positions_dict, topdir="/tmp/"):
+                                                theta_true, param_positions_dict, topdir="/tmp/", seedint=1234):
     
 
     estimation_sq_error_per_trial = dict()
@@ -3315,7 +3328,7 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
                                     params_out[param][start*d:end*d] = theta
                                     X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
                                     X_hat = np.asarray(theta).reshape((d, end-start), order="F")
-                                    Rx, tx, mse, mse_nonrotated, err, err_nonrotated = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                                    Rx, tx, mse, mse_nonrotated, err, err_nonrotated = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
                                 else:
                                     params_out[param][start:end] = theta 
                                     rel_err = (theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end] - theta)/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end]                      
@@ -3327,7 +3340,7 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
                                 if param == "Z":
                                     Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")  
                                     Z_hat = np.asarray(theta).reshape((d, J), order="F")
-                                    Rz, tz, mse, mse_nonrotated, err, err_nonrotated = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                                    Rz, tz, mse, mse_nonrotated, err, err_nonrotated = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
                                 else:
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - theta)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                     err = rel_err
@@ -3368,7 +3381,7 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
             if param == "X":                 
                 X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                 X_hat = np.asarray(params_out[param]).reshape((d, K), order="F")
-                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat)
+                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
 
                 estimation_sq_error_per_trial[param].append(mse_x)
                 estimation_sq_error_per_trial_nonRT[param].append(mse_x_nonRT)
@@ -3381,7 +3394,7 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
             elif param == "Z":
                 Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Z_hat = np.asarray(params_out[param]).reshape((d, J), order="F")
-                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat)
+                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
 
                 estimation_sq_error_per_trial[param].append(mse_z)
                 estimation_sq_error_per_trial_nonRT[param].append(mse_z_nonRT)
@@ -3394,7 +3407,7 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
             elif param == "Phi":            
                 Phi_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                 Phi_hat = np.asarray(params_out[param]).reshape((d, J), order="F")
-                Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat)
+                Rphi, tphi, mse_phi, mse_phi_nonRT, err_phi, err_phi_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Phi_true, param_hat=Phi_hat, seedint=seedint)
 
                 estimation_sq_error_per_trial[param].append(mse_phi)    
                 estimation_sq_error_per_trial_nonRT[param].append(mse_phi_nonRT)

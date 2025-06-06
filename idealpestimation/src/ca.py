@@ -1,11 +1,11 @@
 import os 
 
-os.environ["OMP_NUM_THREADS"] = "48"
-os.environ["MKL_NUM_THREADS"] = "48"
-os.environ["OPENBLAS_NUM_THREADS"] = "500"
-os.environ["NUMBA_NUM_THREADS"] = "48"
-os.environ["JAX_NUM_THREADS"] = "1000"
-os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ["NUMBA_NUM_THREADS"] = "4"
+# os.environ["JAX_NUM_THREADS"] = "1000"
+# os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
 
 import sys
 import ipdb
@@ -118,7 +118,7 @@ class CA_custom(CA):
 
 
 
-def do_correspondence_analysis(ca_runner, Y, param_positions_dict, args, plot_online=False):
+def do_correspondence_analysis(ca_runner, Y, param_positions_dict, args, plot_online=False, seedint=1234):
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -147,8 +147,8 @@ def do_correspondence_analysis(ca_runner, Y, param_positions_dict, args, plot_on
             # Note: passing true parameter values for compatibility with rank_and_plot_solutions
             theta_hat[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
 
-    _, _, mse_x, mse_x_nonRT, meanrelerror_x, meanrelerror_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=Xhat)
-    _, _, mse_z, mse_z_nonRT, meanrelerror_z, meanrelerror_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Zhat)
+    _, _, mse_x, mse_x_nonRT, meanrelerror_x, meanrelerror_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=Xhat, seedint=seedint)
+    _, _, mse_z, mse_z_nonRT, meanrelerror_z, meanrelerror_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Zhat, seedint=seedint)
         
     estimated_theta.append((theta_hat, mse_x, mse_z, mse_x_nonRT, mse_z_nonRT, meanrelerror_x, meanrelerror_z, meanrelerror_x_nonRT, meanrelerror_z_nonRT))
 
@@ -238,7 +238,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             monitor.start()            
 
             t_start = time.time()            
-            theta = do_correspondence_analysis(ca, Y, param_positions_dict, args, plot_online=plot_online)
+            theta = do_correspondence_analysis(ca, Y, param_positions_dict, args, plot_online=plot_online, seedint=seedint)
             t_end = time.time()
             monitor.stop()
             wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     tol = 1e-6    
     #/home/ioannischalkiadakis/ideal
     # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
     total_running_processes = 30      
 
     args = (None, total_running_processes, data_location, None, parameter_names, J, K, d, None, None, tol,                     

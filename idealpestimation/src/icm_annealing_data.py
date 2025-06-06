@@ -99,7 +99,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         prior_loc_sigmae=0, prior_scale_sigmae=1,
         gridpoints_num=10, optimization_method="L-BFGS-B", diff_iter=None, disp=False,
         theta_true=None, percentage_parameter_change=1, min_sigma_e=None, fastrun=False,
-        max_restarts=1, max_partial_restarts=1, max_halving=1, plot_online=False):
+        max_restarts=1, max_partial_restarts=1, max_halving=1, plot_online=False, seedint=None):
         
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
@@ -390,7 +390,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                 "avg_processes": avg_processes, 
                                 "max_processes": max_processes})
                 elapsedtime = str(timedelta(seconds=t_end - t_start))       
-        get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_out, theta_true, param_positions_dict_init, topdir=data_location)
+        get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_out, theta_true, param_positions_dict_init, topdir=data_location, seedint=seedint)
 
 
 if __name__ == "__main__":
@@ -510,7 +510,7 @@ if __name__ == "__main__":
         prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae,
         gridpoints_num=gridpoints_num, diff_iter=diff_iter, disp=disp, theta_true=theta_true,
         percentage_parameter_change=percentage_parameter_change, min_sigma_e=min_sigma_e, fastrun=fastrun,
-        max_restarts=max_restarts, max_partial_restarts=max_partial_restarts, max_halving=max_halving, plot_online=plot_online)
+        max_restarts=max_restarts, max_partial_restarts=max_partial_restarts, max_halving=max_halving, plot_online=plot_online, seedint=seed_value)
     
     
     

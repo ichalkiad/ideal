@@ -306,7 +306,7 @@ def optimise_posterior_vector(param, idx, Y, gamma, theta_curr, param_positions_
     return theta_test_out, elapsedtime
 
 def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperature_rate=None, temperature_steps=None, 
-                                plot_online=True, percentage_parameter_change=1):
+                                plot_online=True, percentage_parameter_change=1, seedint=1234):
 
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -462,7 +462,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                         fig_xz=fig_xz, mse_x_list=mse_x_list, mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, 
                                         mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list, err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
                                         per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers,
-                                        per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)       
+                                        per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, seedint=seedint)       
 
                     #########################
                     if testparam is not None:
@@ -563,7 +563,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                                             plot_online=plot_online, mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                                             mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list,
                                             err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list, per_param_sq_ers=per_param_sq_ers, 
-                                            per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)                            
+                                            per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, seedint=seedint)                            
                         #########################
                         if testparam is not None:
                             for param in parameter_names:
@@ -651,7 +651,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
                             plot_online=True, mse_theta_full=mse_theta_full, err_theta_full=err_theta_full, fig_xz=fig_xz, mse_x_list=mse_x_list, 
                             mse_z_list=mse_z_list, mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list,
                             err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list, per_param_sq_ers=per_param_sq_ers, 
-                            per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts)  
+                            per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, seedint=seedint)  
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), total_iter, fig_posteriors, 
                                                                                         fig_posteriors_annealed, gamma, param_positions_dict, args, 
                                                                                         plot_arrows=True, testparam=testparam, testidx=testidx, testvec=vector_index) 
@@ -684,7 +684,7 @@ def icm_posterior_power_annealing_debug(Y, param_positions_dict, args, temperatu
 def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rate=None, temperature_steps=None, 
                                 plot_online=False, percentage_parameter_change=1, fastrun=False, 
                                 data_annealing=False, annealing_prev=None, theta_part_annealing=None, 
-                                max_restarts=2, max_partial_restarts=2, max_halving=2):
+                                max_restarts=2, max_partial_restarts=2, max_halving=2, seedint=1234):
   
     DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol, \
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, \
@@ -834,7 +834,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                     err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
                                     per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers,
                                     per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, 
-                                    fastrun=fastrun, target_param=target_param, subset_coord2plot=subset_coord2plot)      
+                                    fastrun=fastrun, target_param=target_param, subset_coord2plot=subset_coord2plot, seedint=seedint)      
                 delta_rate_prev = delta_rate                                                                    
                 total_iter += 1   
                 i += 1   
@@ -857,7 +857,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                     err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
                                     per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers,
                                     per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, 
-                                    fastrun=fastrun, subset_coord2plot=subset_coord2plot)
+                                    fastrun=fastrun, subset_coord2plot=subset_coord2plot, seedint=seedint)
             # plot posteriors during estimation   
             if plot_online and not fastrun: # and l==4:      ########################################################
                 fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, 
@@ -959,7 +959,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         mse_x_nonRT_list=mse_x_nonRT_list, mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, 
                                         err_z_list=err_z_list, err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list,
                                         per_param_sq_ers=per_param_sq_ers, per_param_ers=per_param_ers, per_param_heats=per_param_heats, 
-                                        xbox=xbox, plot_restarts=plot_restarts, fastrun=False, subset_coord2plot=subset_coord2plot) 
+                                        xbox=xbox, plot_restarts=plot_restarts, fastrun=False, subset_coord2plot=subset_coord2plot, seedint=seedint) 
                 estimated_thetas.append((theta_curr, mse_x_list[-1], mse_z_list[-1], mse_x_nonRT_list[-1], mse_z_nonRT_list[-1], \
                                         err_x_list[-1], err_z_list[-1], err_x_nonRT_list[-1], err_z_nonRT_list[-1])) 
                 mse_x_list = []
@@ -1037,7 +1037,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         mse_z_nonRT_list=mse_z_nonRT_list, err_x_list=err_x_list, err_z_list=err_z_list, 
                                         err_x_nonRT_list=err_x_nonRT_list, err_z_nonRT_list=err_z_nonRT_list, per_param_sq_ers=per_param_sq_ers, 
                                         per_param_ers=per_param_ers, per_param_heats=per_param_heats, xbox=xbox, plot_restarts=plot_restarts, 
-                                        fastrun=False, subset_coord2plot=subset_coord2plot)  
+                                        fastrun=False, subset_coord2plot=subset_coord2plot, seedint=seedint)  
     if plot_online and not fastrun:
         fig_posteriors, fig_posteriors_annealed, plotting_thetas = plot_posteriors_during_estimation(Y, total_iter, plotting_thetas, theta_curr.copy(), i, fig_posteriors, 
                                                                                     fig_posteriors_annealed, gamma, param_positions_dict, args, 
@@ -1060,7 +1060,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         prior_loc_sigmae=0, prior_scale_sigmae=1,
         gridpoints_num=10, optimization_method="L-BFGS-B", diff_iter=None, disp=False,
         theta_true=None, percentage_parameter_change=1, min_sigma_e=None, fastrun=False,
-        max_restarts=2, max_partial_restarts=2, max_halving=2, plot_online=False):
+        max_restarts=2, max_partial_restarts=2, max_halving=2, plot_online=False, seedint=1234):
         
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
@@ -1137,7 +1137,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                                 percentage_parameter_change=percentage_parameter_change, fastrun=fastrun,
                                                 data_annealing=False, annealing_prev=None, theta_part_annealing=None,
                                                 max_restarts=max_restarts, max_partial_restarts=max_partial_restarts, 
-                                                max_halving=max_halving)
+                                                max_halving=max_halving, seedint=seedint)
             t_end = time.time()
             monitor.stop()
             wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
@@ -1297,7 +1297,7 @@ if __name__ == "__main__":
         prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae,
         gridpoints_num=gridpoints_num, diff_iter=diff_iter, disp=disp, theta_true=theta_true,
         percentage_parameter_change=percentage_parameter_change, min_sigma_e=min_sigma_e, fastrun=fastrun,
-        max_restarts=max_restarts, max_partial_restarts=max_partial_restarts, max_halving=max_halving, plot_online=plot_online)
+        max_restarts=max_restarts, max_partial_restarts=max_partial_restarts, max_halving=max_halving, plot_online=plot_online, seedint=seed_value)
     
     ## tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=1e-5, upper=max_sigma_e)
     ## x = np.linspace(0, 2*max_sigma_e, 500)
