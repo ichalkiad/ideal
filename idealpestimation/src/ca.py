@@ -22,6 +22,7 @@ from idealpestimation.src.efficiency_monitor import Monitor
 from prince import CA
 from prince import utils as ca_utils
 from prince import svd as ca_svd
+import prince
 import pandas as pd
 from scipy import sparse
 from sklearn.utils import check_array
@@ -113,8 +114,38 @@ class CA_custom(CA):
         )
 
         return self
+    
+    @ca_utils.check_is_dataframe_input
+    @prince.ca.select_active_columns
+    def row_coordinates(self, X):
+        """The row principal coordinates."""
 
+        _, row_names, _, _ = ca_utils.make_labels_and_names(X)
+        index_name = X.index.name
 
+        if isinstance(X, pd.DataFrame):
+            try:
+                X = X.sparse.to_coo().astype(float)
+            except AttributeError:
+                X = X.to_numpy()
+
+        if self.copy:
+            X = X.copy()
+    
+        X_csum = X.sum(axis=1)
+        if 0 in X_csum:
+            X_csum = X_csum.astype(np.float64)
+            X_csum += 10e-12
+        # Normalise the rows so that they sum up to 1
+        if isinstance(X, np.ndarray):
+            X = X / X_csum[:, None]
+        else:
+            X = X / X_csum
+
+        return pd.DataFrame(
+            data=X @ sparse.diags(self.col_masses_.to_numpy() ** -0.5) @ self.svd_.V.T,
+            index=pd.Index(row_names, name=index_name),
+        )
 
 
 
@@ -187,7 +218,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
             ca = CA_custom(
                 n_components=d,
-                n_iter=10,
+                n_iter=2,
                 copy=True,
                 check_input=True,
                 engine='sklearn',
