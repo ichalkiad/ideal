@@ -29,6 +29,57 @@ import pickle
 from prince import svd as ca_svd
 
 
+def get_slurm_experiment_csvs(Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
+
+    ca = {"trial":[], "K":[], "J":[], "sigma_e":[]}
+    mle = {"trial":[], "K":[], "J":[], "sigma_e":[], "batchsize":[], "data_start":[], "data_end":[]}
+    icm_poster = {"trial":[], "K":[], "J":[], "sigma_e":[]}
+    icm_data = {"trial":[], "K":[], "J":[], "sigma_e":[], "batchsize":[], "data_start":[], "data_end":[]}
+    for m in range(M):
+        for K in Ks:
+            for J in Js:
+                for sigma_e in sigma_es:
+                    ca["trial"].append(m)                    
+                    icm_poster["trial"].append(m)                    
+                    ca["K"].append(K)                    
+                    icm_poster["K"].append(K)                    
+                    ca["J"].append(J)                    
+                    icm_poster["J"].append(J)                    
+                    ca["sigma_e"].append(sigma_e)                    
+                    icm_poster["sigma_e"].append(sigma_e)                 
+
+                    # mle, icm_data batches
+                    path = pathlib.Path("{}/data_K{}_J{}_sigmae{}/{}/{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""), m, batchsize))
+                    subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
+                    for dataset_index in range(len(subdatasets_names)):               
+                        mle["trial"].append(m)
+                        icm_data["trial"].append(m)
+                        mle["K"].append(K)
+                        icm_data["K"].append(K)
+                        mle["J"].append(J)
+                        icm_data["J"].append(J)
+                        mle["sigma_e"].append(sigma_e)
+                        icm_data["sigma_e"].append(sigma_e)
+                        mle["batchsize"].append(batchsize)
+                        icm_data["batchsize"].append(batchsize)
+                        subdataset_name = subdatasets_names[dataset_index]                            
+                        start = int(subdataset_name.split("_")[1])
+                        end = int(subdataset_name.split("_")[2])
+                        mle["data_start"].append(start)
+                        icm_data["data_start"].append(start)
+                        mle["data_end"].append(end)
+                        icm_data["data_end"].append(end)
+    caout = pd.DataFrame.from_dict(ca)              
+    caout.to_csv("{}/slurm_experimentI_ca.csv".format(dir_out), header=None, index=False)
+    mleout = pd.DataFrame.from_dict(mle)              
+    mleout.to_csv("{}/slurm_experimentI_mle.csv".format(dir_out), header=None, index=False)
+    icmpout = pd.DataFrame.from_dict(icm_poster)              
+    icmpout.to_csv("{}/slurm_experimentI_icm_poster.csv".format(dir_out), header=None, index=False)
+    icmdout = pd.DataFrame.from_dict(icm_data)              
+    icmdout.to_csv("{}/slurm_experimentI_icm_data.csv".format(dir_out), header=None, index=False)
+
+
+
 def print_threadpool_info():
     print("\n📊 Threadpool Info:")
     for lib in threadpool_info():
