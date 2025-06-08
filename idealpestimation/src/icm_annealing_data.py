@@ -33,11 +33,12 @@ def serial_worker(args):
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true, param_positions_dict_prev,\
-        max_restarts, max_partial_restarts, max_halving, plot_online, seedint = args
+        max_restarts, max_partial_restarts, max_halving, plot_online, seedint, subdataset_name = args
     
-    if np.allclose(s, 1):
-        s = 1
-    DIR_out_icm = "{}/{}/".format(DIR_out, str(s).replace(".", ""))
+    # if np.allclose(s, 1):
+    #     s = 1
+    # DIR_out_icm = "{}/{}/".format(DIR_out, str(s).replace(".", ""))
+    DIR_out_icm = "{}/{}/".format(DIR_out, subdataset_name)
     print(DIR_out_icm)
     pathlib.Path(DIR_out_icm).mkdir(parents=True, exist_ok=True)
    
@@ -109,7 +110,7 @@ class ProcessManagerSyntheticDataAnnealing(ProcessManager):
         
 
 
-def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", 
+def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchsize=None,
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
         parameter_space_dim=None, trialsmin=None, trialsmax=None, penalty_weight_Z=0.0, constant_Z=0.0, retries=10,
         elementwise=True, evaluate_posterior=True, tempering_rate=[0, 1], tempering_steps=[0.1], 
@@ -282,19 +283,27 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
                 t_start = time.time()          
                 try:  
-                    k_prev = 0
+                    # k_prev = 0
                     k_theta_true = 0
                     s = tempering_steps[0]
                     t0 = time.time()
-                    while True:    
-                        while s <= tempering_steps[1]:
-                            y_rows = int(round(s*K))
-                            # ensure min size for well-determined system of eq
-                            if y_rows-k_prev < N:
-                                s += tempering_rate[0]  
-                                continue
+                    while True:  
+                        path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))
+                        subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
+                        for dataset_index in range(len(subdatasets_names)):               
+                            subdataset_name = subdatasets_names[dataset_index]                            
+                            k_prev = int(subdataset_name.split("_")[1])
+                            y_rows = int(subdataset_name.split("_")[2])
+
+                        # more general, allows overlapping and larger batches, keep same setting as MLE for SLURM running
+                        # while s <= tempering_steps[1]:
+                        #     y_rows = int(round(s*K))
+                        #     # ensure min size for well-determined system of eq
+                        #     if y_rows-k_prev < N:
+                        #         s += tempering_rate[0]  
+                        #         continue
                             Y_annealed = Y[k_prev:y_rows, :]
-                            print("Tempering rate: {}, K row range: {} - {}".format(s, k_prev, y_rows))
+                            # print("Tempering rate: {}, K row range: {} - {}".format(s, k_prev, y_rows))
                             k = 0
                             batchrows = y_rows - k_prev
                             parameter_space_dim_theta = (batchrows+J)*d + J + batchrows + 2
@@ -347,7 +356,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
                                             prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
                                             gridpoints_num, diff_iter, disp, min_sigma_e, theta_true_partial_annealing, param_positions_dict_prev,
-                                            max_restarts, max_partial_restarts, max_halving, plot_online, seedint)
+                                            max_restarts, max_partial_restarts, max_halving, plot_online, seedint, subdataset_name)
                             if parallel:
                                 #####  parallelisation with Parallel Manager #####
                                 manager.cleanup_finished_processes()
@@ -376,8 +385,8 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                 #                 print(param, result[param]) 
                                 # except:
                                 #     pass
-                            k_prev = y_rows      
-                            s += tempering_rate[0]  
+                            # k_prev = y_rows      
+                            # s += tempering_rate[0]  
                             print(k_theta_true, k_theta_true+batchrows) 
                             k_theta_true += batchrows  
                             param_positions_dict_prev = param_positions_dict_partial_theta
@@ -507,6 +516,7 @@ if __name__ == "__main__":
     plot_online = False
     fastrun = True
     max_signal2noise_ratio = 25 # in dB   # max snr
+    batchsize = 13
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
     print(min_sigma_e)
@@ -524,7 +534,7 @@ if __name__ == "__main__":
     theta_true = np.zeros((parameter_space_dim,))
     print("Parameter space dimensionality: {}".format(parameter_space_dim))
     main(J=J, K=K, d=d, total_running_processes=total_running_processes, 
-        data_location=data_location, parallel=parallel, 
+        data_location=data_location, batchsize=batchsize, parallel=parallel, 
         parameter_names=parameter_names, optimisation_method=optimisation_method, 
         dst_func=dst_func, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, trialsmax=M, 
         penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, 

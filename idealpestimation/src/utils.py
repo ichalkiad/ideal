@@ -3290,7 +3290,8 @@ def error_polarisation_plots(datain, estimation_folder, M, K, J, d=2):
     
 
 def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_base, 
-                                                theta_true_per_m, param_positions_dict, topdir="/tmp/", seedint=1234):
+                                                theta_true_per_m, param_positions_dict, 
+                                                topdir="/tmp/", seedint=1234):
     
 
     estimation_sq_error_per_trial = dict()
