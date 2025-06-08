@@ -1,0 +1,30 @@
+#!/bin/bash
+#SBATCH --job-name=rssca50k100_01_1
+#SBATCH --output=test.out # create output files indexed with the job array task id
+#SBATCH --partition=prepost
+#SBATCH --time=03:00:00
+##SBATCH --qos=qos_cpu-t3   #qos_cpu-dev
+#SBATCH --hint=nomultithread 
+#SBATCH --nodes=1          
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=2  ############################
+#SBATCH --array=0-0
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=ioannis.chalkiadakis@cnrs.fr
+
+cd ${SLURM_SUBMIT_DIR}
+
+export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
+module purge
+module load singularity
+
+#index in the csv file of each parameter vector
+# slurm_array_task_id=int(os.environ["SLURM_ARRAY_TASK_ID"])
+
+set -x
+
+time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/ca.py"
+
+                                                                                                           
