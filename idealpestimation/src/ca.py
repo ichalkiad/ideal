@@ -17,7 +17,7 @@ import random
 from idealpestimation.src.utils import pickle, optimisation_dict2params,\
                                         time, timedelta, parse_input_arguments, \
                                             rank_and_plot_solutions, print_threadpool_info, \
-                                                get_min_achievable_mse_under_rotation_trnsl
+                                                get_min_achievable_mse_under_rotation_trnsl, clean_up_data_matrix
 from idealpestimation.src.efficiency_monitor import Monitor
 from prince import CA
 from prince import utils as ca_utils
@@ -52,10 +52,10 @@ class CA_custom(CA):
         # Compute row and column masses
         rsum = X.sum(axis=1)
         csum = X.sum(axis=0)
-        if 0 in rsum:
-            rsum += 10e-12
-        if 0 in csum:
-            csum += 10e-12
+        # if 0 in rsum:
+        #     rsum += 10e-12
+        # if 0 in csum:
+        #     csum += 10e-12
         self.row_masses_ = pd.Series(rsum, index=row_names)
         self.col_masses_ = pd.Series(csum, index=col_names)
 
@@ -133,9 +133,9 @@ class CA_custom(CA):
             X = X.copy()
     
         X_csum = X.sum(axis=1)
-        if 0 in X_csum:
-            X_csum = X_csum.astype(np.float64)
-            X_csum += 10e-12
+        # if 0 in X_csum:
+        #     X_csum = X_csum.astype(np.float64)
+        #     X_csum += 10e-12
         # Normalise the rows so that they sum up to 1
         if isinstance(X, np.ndarray):
             X = X / X_csum[:, None]
@@ -157,11 +157,9 @@ def do_correspondence_analysis(ca_runner, Y, param_positions_dict, args, plot_on
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true  = args
 
-    estimated_theta = []
-
-    params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
-    X_true = np.asarray(params_true["X"]) # d x K       
-    Z_true = np.asarray(params_true["Z"]) # d x J          
+    # params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+    # X_true = np.asarray(params_true["X"]) # d x K       
+    # Z_true = np.asarray(params_true["Z"]) # d x J          
 
     df = pd.DataFrame(Y, index=np.arange(0, K, 1), columns=np.arange(0, J, 1))
     ca_out = ca_runner.fit(df)
@@ -178,12 +176,7 @@ def do_correspondence_analysis(ca_runner, Y, param_positions_dict, args, plot_on
             # Note: passing true parameter values for compatibility with rank_and_plot_solutions
             theta_hat[param_positions_dict[param][0]:param_positions_dict[param][1]] = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]].copy()
 
-    _, _, mse_x, mse_x_nonRT, meanrelerror_x, meanrelerror_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=Xhat, seedint=seedint)
-    _, _, mse_z, mse_z_nonRT, meanrelerror_z, meanrelerror_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Zhat, seedint=seedint)
-        
-    estimated_theta.append((theta_hat, mse_x, mse_z, mse_x_nonRT, mse_z_nonRT, meanrelerror_x, meanrelerror_z, meanrelerror_x_nonRT, meanrelerror_z_nonRT))
-
-    return estimated_theta
+    return theta_hat
 
 def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", 
         parallel=False, parameter_names={}, optimisation_method="L-BFGS-B", dst_func=lambda x:x**2, 
@@ -218,7 +211,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
             ca = CA_custom(
                 n_components=d,
-                n_iter=2,
+                n_iter=5,
                 copy=True,
                 check_input=True,
                 engine='sklearn',
@@ -257,19 +250,23 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                 for result in f.iter(type=dict, skip_invalid=True):
                     for param in parameter_names:
                         theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+            
+            Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+            
             args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                     parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
                     prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
                     prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
                     gridpoints_num, diff_iter, disp, min_sigma_e, theta_true)   
             
+
             # start efficiency monitoring - interval in seconds
             print_threadpool_info()
             monitor = Monitor(interval=0.005)
             monitor.start()            
 
             t_start = time.time()            
-            theta = do_correspondence_analysis(ca, Y, param_positions_dict, args, plot_online=plot_online, seedint=seedint)
+            theta_hat = do_correspondence_analysis(ca, Y, param_positions_dict, args, plot_online=plot_online, seedint=seedint)
             t_end = time.time()
             monitor.stop()
             wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
@@ -277,7 +274,10 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             efficiency_measures = (wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
                                         avg_threads, max_threads, avg_processes, max_processes)
             elapsedtime = str(timedelta(seconds=t_end - t_start))   
-            rank_and_plot_solutions(theta, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, param_positions_dict, DIR_out, args)
+        
+            theta = [(theta_hat, None, None, None, None, None, None, None, None)]
+            rank_and_plot_solutions(theta, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, param_positions_dict, 
+                                    DIR_out, args, seedint=seedint, get_RT_error=True)
 
 
 if __name__ == "__main__":

@@ -28,11 +28,11 @@ from threadpoolctl import threadpool_info
 import pickle
 from prince import svd as ca_svd
 
+
 def print_threadpool_info():
     print("\n📊 Threadpool Info:")
     for lib in threadpool_info():
         print(f"- {lib['prefix']} ({lib['internal_api']}) → Threads: {lib['num_threads']}")
-
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=True):
@@ -1883,8 +1883,10 @@ def parse_timedelta_string(time_str):
 
     return tdelta, int(hours), int(minutes), int(seconds), int(microseconds)
 
+
+
 def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, 
-                            param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None):
+                            param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None, seedint=1234, get_RT_error=False):
 
     if efficiency_measures is not None:
         wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
@@ -1917,14 +1919,26 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
         theta = estimated_thetas[i][0]
         theta_list.append(theta)
         best_theta = theta.copy()
-        mse_x_RT = estimated_thetas[i][1]
-        mse_z_RT = estimated_thetas[i][2]
-        mse_x_nonRT = estimated_thetas[i][3]
-        mse_z_nonRT = estimated_thetas[i][4]
-        err_x_RT = estimated_thetas[i][5]
-        err_z_RT = estimated_thetas[i][6]
-        err_x_nonRT = estimated_thetas[i][7]
-        err_z_nonRT = estimated_thetas[i][8]
+        if best2worst.index(i) == 0 and get_RT_error:
+            theta_true = args[-1]
+            # only for best solution compute expensive error:
+            params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+            X_true = np.asarray(params_true["X"]) # d x K    
+            X_hat = np.asarray(params_hat["X"]) # d x K         
+            Z_true = np.asarray(params_true["Z"]) # d x J       
+            Z_hat = np.asarray(params_hat["Z"]) # d x J                           
+            params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+            Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
+            Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
+        else:
+            mse_x_RT = estimated_thetas[i][1]
+            mse_z_RT = estimated_thetas[i][2]
+            mse_x_nonRT = estimated_thetas[i][3]
+            mse_z_nonRT = estimated_thetas[i][4]
+            err_x_RT = estimated_thetas[i][5]
+            err_z_RT = estimated_thetas[i][6]
+            err_x_nonRT = estimated_thetas[i][7]
+            err_z_nonRT = estimated_thetas[i][8]
         logposterior = computed_logfullposterior[i]
         posterior_list.append(logposterior)
         params_out = dict()
@@ -4211,3 +4225,87 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
     return logpsigma_e*gamma
 
 ####################### ICM #############################
+
+
+
+####################### CA #############################
+
+def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict):
+
+    # uninformative users 
+    k_idx = np.argwhere(np.all(Y<1, axis=1))
+    # uninformative lead users
+    j_idx = np.argwhere(np.all(Y<1, axis=0))
+
+    Y_new = Y[:, ~np.all(Y < 1, axis=0)]
+    Y_new = Y_new[~np.all(Y_new < 1, axis=1), :]
+
+    K_new = K - len(k_idx.flatten())
+    J_new = J - len(j_idx.flatten())
+
+    parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
+    param_positions_dict_new = dict()            
+    k = 0
+    for param in parameter_names:
+        if param == "X":
+            param_positions_dict_new[param] = (k, k + K_new*d)                       
+            k += K_new*d    
+        elif param in ["Z"]:
+            param_positions_dict_new[param] = (k, k + J_new*d)                                
+            k += J_new*d
+        elif param in ["Phi"]:            
+            param_positions_dict_new[param] = (k, k + J_new*d)                                
+            k += J_new*d
+        elif param == "beta":
+            param_positions_dict_new[param] = (k, k + K_new)                                   
+            k += K_new
+        elif param == "alpha":
+            param_positions_dict_new[param] = (k, k + J_new)                                       
+            k += J_new
+        elif param == "gamma":
+            param_positions_dict_new[param] = (k, k + 1)                                
+            k += 1
+        elif param == "delta":
+            param_positions_dict_new[param] = (k, k + 1)                                
+            k += 1
+        elif param == "sigma_e":
+            param_positions_dict_new[param] = (k, k + 1)                                
+            k += 1
+
+    theta_true_new = theta_true.tolist().copy()
+    for kidx in k_idx.flatten().tolist():
+        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=kidx, d=d)
+        # assert target_param == "X"
+        del theta_true_new[param_positions_dict["X"][0]+kidx*d:param_positions_dict["X"][0]+(kidx+1)*d]
+        del theta_true_new[param_positions_dict["beta"][0]-d+kidx:param_positions_dict["beta"][0]-d+kidx+1] # due to removal of X vector, shift all indices d positions to the left
+    for jidx in j_idx.flatten().tolist():
+        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=jidx, d=d)
+        # assert target_param == "Z"
+        del theta_true_new[param_positions_dict["Z"][0]+jidx*d:param_positions_dict["Z"][0]+(jidx+1)*d]
+        if "Phi" in parameter_names:
+            del theta_true_new[param_positions_dict["Phi"][0]+jidx*d:param_positions_dict["Phi"][0]+(jidx+1)*d]
+        if "Phi" in parameter_names:            
+            del theta_true_new[param_positions_dict["alpha"][0]-2*d+jidx:param_positions_dict["alpha"][0]-2*d+jidx+1]
+        else:
+            del theta_true_new[param_positions_dict["alpha"][0]-d+jidx:param_positions_dict["alpha"][0]-d+jidx+1]
+
+    print("Dropped {} users, {} lead users, new parameter space size: {}.".format(K-K_new, J-J_new, parameter_space_dim_new))
+
+    i = 0
+    ii = 0
+    theta_true = theta_true.tolist()
+    while i < (K+J)*d + J + K + 2:
+        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
+        if vector_index_in_param_matrix in k_idx.flatten().tolist():
+            i += 1            
+        elif vector_index_in_param_matrix in j_idx.flatten().tolist():
+            i += 1
+        else:
+            assert np.allclose(theta_true[i], theta_true_new[ii])
+            i += 1
+            ii += 1
+       
+
+    return Y_new, K_new, J_new, np.asarray(theta_true_new), param_positions_dict_new, parameter_space_dim_new
+
+####################### CA #############################

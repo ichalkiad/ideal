@@ -18,7 +18,7 @@ import math
 from idealpestimation.src.parallel_manager import jsonlines, ProcessManager
 from idealpestimation.src.icm_annealing_posteriorpower import icm_posterior_power_annealing
 from idealpestimation.src.utils import time, timedelta, parse_input_arguments, rank_and_plot_solutions, \
-                                                            print_threadpool_info, get_data_tempering_variance_combined_solution
+                                                            print_threadpool_info, get_data_tempering_variance_combined_solution, optimisation_dict2params
 from idealpestimation.src.efficiency_monitor import Monitor
 
 
@@ -32,7 +32,7 @@ def serial_worker(args):
         prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
         gridpoints_num, diff_iter, disp, min_sigma_e, theta_true, param_positions_dict_prev,\
-        max_restarts, max_partial_restarts, max_halving, plot_online = args
+        max_restarts, max_partial_restarts, max_halving, plot_online, seedint = args
     
     if np.allclose(s, 1):
         s = 1
@@ -46,7 +46,7 @@ def serial_worker(args):
                         prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
                             gridpoints_num, diff_iter, disp, min_sigma_e, theta_true)
 
-    theta = icm_posterior_power_annealing(Y_annealed, param_positions_dict, icm_args,
+    thetas = icm_posterior_power_annealing(Y_annealed, param_positions_dict, icm_args,
                                 temperature_rate=temperature_rate, temperature_steps=temperature_steps, 
                                 plot_online=plot_online, percentage_parameter_change=percentage_parameter_change, 
                                 fastrun=fastrun, data_annealing=True, annealing_prev=param_positions_dict_prev, 
@@ -55,9 +55,28 @@ def serial_worker(args):
     elapsedtime = str(timedelta(seconds=time.time()-t0))   
     # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration 
     # ensure indices of estimated theta segment are stored - not really needed for when batches are non-overlapping, except for Z, alpha, gamma, sigma_e
-    theta_part_annealing = rank_and_plot_solutions(theta, elapsedtime, None, Y_annealed, J, batchrows, d, parameter_names, 
+    
+    thetas_and_errors = []
+    params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)            
+    for solution in thetas:
+        theta_curr = solution[0]
+        params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)
+        for param in ["X", "Z"]:
+            if param == "X":                        
+                X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
+                X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
+                x_rel_err = (X_true_vec - X_hat_vec)/X_true_vec
+                x_sq_err = x_rel_err**2
+            elif param == "Z":                               
+                Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
+                Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
+                z_rel_err = (Z_true_vec - Z_hat_vec)/Z_true_vec
+                z_sq_err = z_rel_err**2
+        thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err)))
+         
+    theta_part_annealing = rank_and_plot_solutions(thetas_and_errors, elapsedtime, None, Y_annealed, J, batchrows, d, parameter_names, 
                                                 dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
-                                                row_start=k_prev, row_end=k_prev+batchrows)
+                                                row_start=k_prev, row_end=k_prev+batchrows, seedint=seedint, get_RT_error=False)
     out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
     params_out = dict()
     with jsonlines.open(out_file, 'r') as f:         
@@ -320,7 +339,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                             prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
                                             prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
                                             gridpoints_num, diff_iter, disp, min_sigma_e, theta_true_partial_annealing, param_positions_dict_prev,
-                                            max_restarts, max_partial_restarts, max_halving, plot_online)
+                                            max_restarts, max_partial_restarts, max_halving, plot_online, seedint)
                             if parallel:
                                 #####  parallelisation with Parallel Manager #####
                                 manager.cleanup_finished_processes()
