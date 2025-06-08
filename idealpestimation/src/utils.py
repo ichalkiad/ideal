@@ -1142,7 +1142,7 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
         with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_topdir, m), "r") as f:
             for result in f.iter(type=dict, skip_invalid=True):
                 for param in parameter_names:
-                    theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+                    theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param]    ############# UPDATED THETA TRUE!!!
         fig_sq_m_over_databatches = go.Figure()
         fig_sq_m_over_databatches_nonRT = go.Figure()
         fig_m_over_databatches = go.Figure()
@@ -3290,7 +3290,7 @@ def error_polarisation_plots(datain, estimation_folder, M, K, J, d=2):
     
 
 def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_base, 
-                                                theta_true, param_positions_dict, topdir="/tmp/", seedint=1234):
+                                                theta_true_per_m, param_positions_dict, topdir="/tmp/", seedint=1234):
     
 
     estimation_sq_error_per_trial = dict()
@@ -3304,6 +3304,8 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
         estimation_error_per_trial_nonRT[param] = []  
     
     for m in range(M):
+        theta_true = theta_true_per_m[m]
+
         local_mse = dict()
         local_mse_nonrotated = dict()
         local_err = dict()
@@ -3461,7 +3463,7 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
         #         max_threads = result["max_threads"]
         #         avg_processes = result["avg_processes"]
         #         ax_processes = result["max_processes"]
-        ipdb.set_trace()
+        
         out_file = "{}/params_out_global_theta_hat.jsonl".format(DIR_base)
         with open(out_file, 'a') as f:         
             writer = jsonlines.Writer(f)

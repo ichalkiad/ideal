@@ -18,7 +18,8 @@ import math
 from idealpestimation.src.parallel_manager import jsonlines, ProcessManager
 from idealpestimation.src.icm_annealing_posteriorpower import icm_posterior_power_annealing
 from idealpestimation.src.utils import time, timedelta, parse_input_arguments, rank_and_plot_solutions, \
-                                                            print_threadpool_info, get_data_tempering_variance_combined_solution, optimisation_dict2params
+                                                            print_threadpool_info, get_data_tempering_variance_combined_solution, \
+                                                                optimisation_dict2params, clean_up_data_matrix
 from idealpestimation.src.efficiency_monitor import Monitor
 
 
@@ -120,6 +121,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         theta_true=None, percentage_parameter_change=1, min_sigma_e=None, fastrun=False,
         max_restarts=1, max_partial_restarts=1, max_halving=1, plot_online=False, seedint=None):
         
+        theta_true_per_m = [] # in case some rows/columns are removed
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:                    
@@ -178,6 +180,12 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                 for result in f.iter(type=dict, skip_invalid=True):
                     for param in parameter_names:
                         theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]] = result[param] 
+
+
+            Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+            
+
+            theta_true_per_m.append(theta_true)
 
             # min size for well-determined system of eq
             N = math.ceil(parameter_space_dim/J)
@@ -356,17 +364,18 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                 ################################################## 
                             else:
                                 serial_worker(worker_args)
-                                try:
-                                    out_file = "{}/{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out, s, k_prev, k_prev+batchrows)
-                                    with jsonlines.open(out_file, 'r') as f:         
-                                        for result in f.iter(type=dict, skip_invalid=True):
-                                            for param in parameter_names:
-                                                if theta_part_annealing is None:
-                                                    theta_part_annealing = np.zeros((parameter_space_dim_theta,))
-                                                theta_part_annealing[param_positions_dict_partial_theta[param][0]:param_positions_dict_partial_theta[param][1]] = result[param]
-                                                print(param, result[param]) 
-                                except:
-                                    pass
+                                # next is for partial initialisation from previously completed batch
+                                # try:
+                                #     out_file = "{}/{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out, s, k_prev, k_prev+batchrows)
+                                #     with jsonlines.open(out_file, 'r') as f:         
+                                #         for result in f.iter(type=dict, skip_invalid=True):
+                                #             for param in parameter_names:
+                                #                 if theta_part_annealing is None:
+                                #                     theta_part_annealing = np.zeros((parameter_space_dim_theta,))
+                                #                 theta_part_annealing[param_positions_dict_partial_theta[param][0]:param_positions_dict_partial_theta[param][1]] = result[param]
+                                #                 print(param, result[param]) 
+                                # except:
+                                #     pass
                             k_prev = y_rows      
                             s += tempering_rate[0]  
                             print(k_theta_true, k_theta_true+batchrows) 
@@ -409,7 +418,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                 "avg_processes": avg_processes, 
                                 "max_processes": max_processes})
                 elapsedtime = str(timedelta(seconds=t_end - t_start))       
-        get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_out, theta_true, param_positions_dict_init, topdir=data_location, seedint=seedint)
+        get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_out, theta_true_per_m, param_positions_dict_init, topdir=data_location, seedint=seedint)
 
 
 if __name__ == "__main__":

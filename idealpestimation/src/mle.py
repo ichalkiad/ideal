@@ -30,7 +30,7 @@ from idealpestimation.src.utils import params2optimisation_dict, \
                                                                         collect_mle_results_batchsize_analysis, sample_theta_curr_init,\
                                                                         get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta,\
                                                                         negative_loglik_coordwise_parallel, plot_loglik_runtimes, parse_timedelta_string,\
-                                                                        print_threadpool_info
+                                                                        print_threadpool_info, clean_up_data_matrix
 from idealpestimation.src.efficiency_monitor import Monitor
 
 
@@ -216,12 +216,17 @@ def estimate_mle(args):
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e, \
         prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,\
         prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,\
-        prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize = args
+        prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, \
+        param_positions_dict, rng, batchsize, theta_true = args
     
     print(subdataset_name)
     # load data    
     with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f:
         Y = pickle.load(f)
+
+
+    Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+
 
     from_row = int(subdataset_name.split("_")[1])
     to_row = int(subdataset_name.split("_")[2])
@@ -586,6 +591,12 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
             while True:
                 for m in range(trialsmin, trialsmax, 1):
 
+                    theta_true = np.zeros((parameter_space_dim,))    
+                    with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_location, m), "r") as f:
+                        for result in f.iter(type=dict, skip_invalid=True):
+                            for param in parameter_names:
+                                theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+
                     path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize)) 
 
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]                    
@@ -611,7 +622,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                                     constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z, 
                                     prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, 
                                     prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, 
-                                    prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize)    
+                                    prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize, theta_true)    
                                                 
                             #####  parallelisation with Parallel Manager #####
                             manager.cleanup_finished_processes()
@@ -630,6 +641,13 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                     break       
         else:
             for m in range(trialsmin, trialsmax, 1):
+                
+                theta_true = np.zeros((parameter_space_dim,))    
+                with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_location, m), "r") as f:
+                    for result in f.iter(type=dict, skip_invalid=True):
+                        for param in parameter_names:
+                            theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+
                 path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))
                 subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                 for dataset_index in range(len(subdatasets_names)):               
@@ -649,7 +667,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
                         args = (DIR_out, data_location, subdataset_name, dataset_index, optimisation_method, 
                                 parameter_names, J, K, d, N, dst_func, niter, parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e,
                                 prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,
-                                prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize)
+                                prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize, theta_true)
                         estimate_mle(args)                  
 
     except KeyboardInterrupt:
