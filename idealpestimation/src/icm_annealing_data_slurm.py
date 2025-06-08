@@ -218,7 +218,7 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
 
-    dataspace = "/app/workspace/idealdata_slurm_test/"    
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
     parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/app/workspace/slurm_experimentI_icm_data.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
