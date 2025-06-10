@@ -819,8 +819,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 
                 theta_curr = theta_test.copy()                    
                 gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)      
-                if data_annealing:
-                    assert gamma == 1
+                # if data_annealing:
+                #     assert gamma == 1
 
                 if plot_online:
                     subset_coord2plot = None

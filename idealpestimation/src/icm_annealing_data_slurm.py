@@ -201,7 +201,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
                             "avg_processes": avg_processes, 
                             "max_processes": max_processes})
             elapsedtime = str(timedelta(seconds=t_end - t_start))       
-        get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_out, theta_true_per_m, param_positions_dict_init, topdir=data_location, seedint=seedint)
+        # get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, DIR_out, theta_true_per_m, param_positions_dict_init, topdir=data_location, seedint=seedint)
 
 
 if __name__ == "__main__":
