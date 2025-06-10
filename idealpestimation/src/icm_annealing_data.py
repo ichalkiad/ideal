@@ -41,7 +41,6 @@ def serial_worker(args):
     DIR_out_icm = "{}/{}/".format(DIR_out, subdataset_name)
     print(DIR_out_icm)
     pathlib.Path(DIR_out_icm).mkdir(parents=True, exist_ok=True)
-    ipdb.set_trace()
     icm_args = (DIR_out_icm, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
                 parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
                     prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\

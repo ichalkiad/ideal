@@ -1963,6 +1963,9 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
         avg_processes = None
         max_processes = None
 
+    
+    ipdb.set_trace()
+    
     best_theta = None
     computed_logfullposterior = []
     for theta_set in estimated_thetas:
@@ -2021,8 +2024,8 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             params_out[param] = theta[param_positions_dict[param][0]:param_positions_dict[param][1]]
             if isinstance(params_out[param], np.ndarray):
                 params_out[param] = params_out[param].tolist()
+        ipdb.set_trace()
         if data_tempering:
-            ipdb.set_trace()
             out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out, row_start, row_end)
             with open(out_file, 'a') as f:         
                 writer = jsonlines.Writer(f)
