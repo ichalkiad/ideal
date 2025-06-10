@@ -84,7 +84,10 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                 for param in parameter_names:
                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
         
+        
         Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+        
+        
         
         args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                 parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
@@ -110,7 +113,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
     
         theta = [(theta_hat, None, None, None, None, None, None, None, None)]
         rank_and_plot_solutions(theta, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, param_positions_dict, 
-                                DIR_out, args, seedint=seedint, get_RT_error=True)
+                                DIR_out, args, seedint=seedint, get_RT_error=False)
 
 
 if __name__ == "__main__":
@@ -126,14 +129,14 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"    
-    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/app/workspace/slurm_experimentI_ca.csv", header=None)
+    parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_ca_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
-    Mmin = parameter_vector[0]
-    M = Mmin + 1
-    K = parameter_vector[1]
-    J = parameter_vector[2]
+    Mmin = int(parameter_vector[0])
+    M = int(Mmin + 1)
+    K = int(parameter_vector[1])
+    J = int(parameter_vector[2])
     sigma_e_true = parameter_vector[3]
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
