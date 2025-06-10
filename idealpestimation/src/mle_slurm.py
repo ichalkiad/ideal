@@ -12,7 +12,7 @@ import numpy as np
 import math
 import random
 from idealpestimation.src.parallel_manager import jsonlines
-from idealpestimation.src.utils import  time, timedelta, print_threadpool_info
+from idealpestimation.src.utils import  time, timedelta, print_threadpool_info, collect_mle_results
 from idealpestimation.src.efficiency_monitor import Monitor
 from idealpestimation.src.mle import estimate_mle
 import pandas as pd
@@ -49,7 +49,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
     estimate_mle(args)                  
 
    
-    return DIR_out
+    return DIR_out, args
 
 
 if __name__ == "__main__":
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"    
-    parameter_vector_idx = 1 # int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = 0 # int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_mle_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
@@ -153,18 +153,18 @@ if __name__ == "__main__":
     monitor = Monitor(interval=0.5)
     monitor.start()   
     t_start = time.time()  
-    dir_out = main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
-                                                data_location=data_location, parallel=parallel, 
-                                                parameter_names=parameter_names, optimisation_method=optimisation_method, 
-                                                dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
-                                                trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
-                                                prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
-                                                prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
-                                                prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
-                                                prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
-                                                prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
-                                                prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
-                                                rng=rng, batchsize=batchsize, data_start=data_start, data_end=data_end)   
+    dir_out, main_run_args = main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
+                data_location=data_location, parallel=parallel, 
+                parameter_names=parameter_names, optimisation_method=optimisation_method, 
+                dst_func=dst_func, niter=niter, parameter_space_dim=parameter_space_dim, trialsmin=Mmin, 
+                trialsmax=M, penalty_weight_Z=penalty_weight_Z, constant_Z=constant_Z, retries=retries, min_sigma_e=min_sigma_e,
+                prior_loc_x=prior_loc_x, prior_scale_x=prior_scale_x, 
+                prior_loc_z=prior_loc_z, prior_scale_z=prior_scale_z, prior_loc_phi=prior_loc_phi, 
+                prior_scale_phi=prior_scale_phi, prior_loc_beta=prior_loc_beta, prior_scale_beta=prior_scale_beta, 
+                prior_loc_alpha=prior_loc_alpha, prior_scale_alpha=prior_scale_alpha, prior_loc_gamma=prior_loc_gamma, 
+                prior_scale_gamma=prior_scale_gamma, prior_loc_delta=prior_loc_delta, prior_scale_delta=prior_scale_delta, 
+                prior_loc_sigmae=prior_loc_sigmae, prior_scale_sigmae=prior_scale_sigmae, param_positions_dict=param_positions_dict, 
+                rng=rng, batchsize=batchsize, data_start=data_start, data_end=data_end)   
     t_end = time.time()
     monitor.stop()
     wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
@@ -184,5 +184,6 @@ if __name__ == "__main__":
                     "max_threads": max_threads, 
                     "avg_processes": avg_processes, 
                     "max_processes": max_processes})
+    collect_mle_results(efficiency_measures, data_location, M, K, J, sigma_e_true, d, parameter_names, param_positions_dict, batchsize, main_run_args, seedint=seed_value)
     
     

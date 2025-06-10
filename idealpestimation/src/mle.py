@@ -225,7 +225,7 @@ def estimate_mle(args):
         Y = pickle.load(f)
 
 
-    Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+    # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
 
 
     from_row = int(subdataset_name.split("_")[1])
@@ -556,8 +556,6 @@ def estimate_mle(args):
         writer.write(grid_and_optim_outcome)
 
     
-
-            
 class ProcessManagerSynthetic(ProcessManager):
     def __init__(self, max_processes):
         super().__init__(max_processes)

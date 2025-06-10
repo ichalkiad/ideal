@@ -1193,7 +1193,17 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
         with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(data_topdir, m), "r") as f:
             for result in f.iter(type=dict, skip_invalid=True):
                 for param in parameter_names:
-                    theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param]    ############# UPDATED THETA TRUE!!!
+                    theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param]
+
+
+        ############### !!!UPDATED THETA TRUE!!! #################
+        # with open("{}/{}/Y.pickle".format(data_location, m), "rb") as f:
+        #     Y = pickle.load(f)
+        # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, 
+        #                                                                                     theta_true, parameter_names, 
+        #                                                                                     param_positions_dict)
+
+
         fig_sq_m_over_databatches = go.Figure()
         fig_sq_m_over_databatches_nonRT = go.Figure()
         fig_m_over_databatches = go.Figure()
