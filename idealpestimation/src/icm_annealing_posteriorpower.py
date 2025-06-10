@@ -1019,6 +1019,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         while i < parameter_space_dim:     
             target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
             if not (target_param == "gamma" or target_param == "sigma_e"):
+                i += 1
                 continue                   
             theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                         Y, gamma, theta_curr.copy(), param_positions_dict, L, args)                   
