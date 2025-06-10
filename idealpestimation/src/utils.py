@@ -1286,8 +1286,8 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
                 estimation_sq_error_per_trial_nonRT[param].append(mse)
                 estimation_error_per_trial[param].append(rel_err)
                 estimation_error_per_trial_nonRT[param].append(rel_err)      
-                params_out_jsonl["mse_{}".format(param)] = mse
-                params_out_jsonl["rel_err_{}".format(param)] = rel_err
+                params_out_jsonl["mse_{}".format(param)] = mse[0]
+                params_out_jsonl["rel_err_{}".format(param)] = rel_err[0]
             
             fig_sq_m_over_databatches.add_trace(go.Box(
                     y=estimation_sq_error_per_trial_per_batch[m][param], 
