@@ -1,11 +1,11 @@
 import os 
 
-os.environ["OMP_NUM_THREADS"] = "500"
-os.environ["MKL_NUM_THREADS"] = "500"
-os.environ["OPENBLAS_NUM_THREADS"] = "500"
-os.environ["NUMBA_NUM_THREADS"] = "500"
-os.environ["JAX_NUM_THREADS"] = "500"
-os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUMBA_NUM_THREADS"] = "1"
+# os.environ["JAX_NUM_THREADS"] = "500"
+# os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
 
 import sys
 import ipdb
@@ -183,7 +183,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
                         theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]] = result[param] 
 
 
-            Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+            # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
             
 
             theta_true_per_m.append(theta_true)
