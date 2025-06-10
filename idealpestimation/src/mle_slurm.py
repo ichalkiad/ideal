@@ -15,7 +15,7 @@ from idealpestimation.src.parallel_manager import jsonlines
 from idealpestimation.src.utils import  time, timedelta, print_threadpool_info
 from idealpestimation.src.efficiency_monitor import Monitor
 from idealpestimation.src.mle import estimate_mle
-
+import pandas as pd
         
 
 def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/", 
@@ -63,8 +63,8 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"    
-    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/app/workspace/slurm_experimentI_mle.csv", header=None)
+    parameter_vector_idx = 0 # int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_grid = pd.read_csv("{}/slurm_experimentI_mle_test.csv".format(dataspace), header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = parameter_vector[0]

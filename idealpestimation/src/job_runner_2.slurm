@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=rssca50k100_01_1
+#SBATCH --job-name=testjob
 #SBATCH --output=test.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost
 #SBATCH --time=03:00:00
@@ -7,7 +7,7 @@
 #SBATCH --hint=nomultithread 
 #SBATCH --nodes=1          
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=2  ############################
+#SBATCH --cpus-per-task=1  ############################
 #SBATCH --array=0-0
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
@@ -25,6 +25,6 @@ module load singularity
 
 set -x
 
-time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/ca.py"
+time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/mle_slurm.py"
 
                                                                                                            
