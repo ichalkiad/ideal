@@ -1333,6 +1333,7 @@ def collect_mle_results(efficiency_measures, data_topdir, M, K, J, sigma_e_true,
         loglik, _ = log_full_posterior(Y, theta_m, param_positions_dict, args)
         params_out_jsonl["loglik"] = loglik
         out_file = "{}/params_out_global_theta_hat.jsonl".format(data_location)
+        print(params_out_jsonl)
         with open(out_file, 'a') as f:         
             writer = jsonlines.Writer(f)
             writer.write(params_out_jsonl)
