@@ -2022,6 +2022,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             if isinstance(params_out[param], np.ndarray):
                 params_out[param] = params_out[param].tolist()
         if data_tempering:
+            ipdb.set_trace()
             out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out, row_start, row_end)
             with open(out_file, 'a') as f:         
                 writer = jsonlines.Writer(f)

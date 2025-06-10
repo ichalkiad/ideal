@@ -48,7 +48,6 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
             else:
                 raise NotImplementedError("At the moment we only evaluate the posterior with vector parameters - minimising coordinate-wise is more efficient.")
         pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
-        ipdb.set_trace()
         # load data    
         with open("{}/{}/Y.pickle".format(data_location, m), "rb") as f:
             Y = pickle.load(f)
