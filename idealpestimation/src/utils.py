@@ -1714,7 +1714,7 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
             retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
             return np.array(retvallist)
  
-@numba.jit(nopython=True, parallel=True, cache=True)
+@numba.jit(nopython=True, parallel=False, cache=True)
 def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
     
     phi = np.zeros((K, Z.shape[1]), dtype=np.float64)    
