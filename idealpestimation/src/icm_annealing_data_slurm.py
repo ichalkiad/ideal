@@ -220,7 +220,7 @@ if __name__ == "__main__":
     fastrun = True
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
-    parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_data_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 10 #30
+    gridpoints_num = 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -272,10 +272,10 @@ if __name__ == "__main__":
     tempering_steps = [0.1, 1]
     tempering_rate = [0.1]
 
-    niter = 5
-    max_restarts = 1 #2
-    max_partial_restarts = 1 #2
-    max_halving = 1 #2
+    niter = 10
+    max_restarts = 2
+    max_partial_restarts = 2
+    max_halving = 2
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
