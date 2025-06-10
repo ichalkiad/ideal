@@ -220,7 +220,7 @@ if __name__ == "__main__":
     plot_online = False
     fastrun = True
 
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
+    dataspace = "/lustre/fswork/projects/rech/sfe/umi36fq/idealdata_slurm_test/"     
     parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_data_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
