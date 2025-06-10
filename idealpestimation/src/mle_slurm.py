@@ -67,14 +67,14 @@ if __name__ == "__main__":
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_mle_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
-    Mmin = parameter_vector[0]
-    M = Mmin + 1
-    K = parameter_vector[1]
-    J = parameter_vector[2]
+    Mmin = int(parameter_vector[0])
+    M = int(Mmin + 1)
+    K = int(parameter_vector[1])
+    J = int(parameter_vector[2])
     sigma_e_true = parameter_vector[3]
-    batchsize = parameter_vector[4]
-    data_start = parameter_vector[5]
-    data_end = parameter_vector[6]
+    batchsize = int(parameter_vector[4])
+    data_start = int(parameter_vector[5])
+    data_end = int(parameter_vector[6])
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, data_start, data_end)
     
