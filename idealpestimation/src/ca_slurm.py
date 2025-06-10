@@ -112,7 +112,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
     
         theta = [(theta_hat, None, None, None, None, None, None, None, None)]
         rank_and_plot_solutions(theta, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, param_positions_dict, 
-                                DIR_out, args, seedint=seedint, get_RT_error=False)
+                                DIR_out, args, seedint=seedint, get_RT_error=True)
 
 
 if __name__ == "__main__":
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"    
-    parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_ca_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
