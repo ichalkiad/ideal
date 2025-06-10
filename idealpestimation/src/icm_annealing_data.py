@@ -56,7 +56,7 @@ def serial_worker(args):
     elapsedtime = str(timedelta(seconds=time.time()-t0))   
     # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration 
     # ensure indices of estimated theta segment are stored - not really needed for when batches are non-overlapping, except for Z, alpha, gamma, sigma_e
-    
+    print(len(thetas))
     thetas_and_errors = []
     params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)            
     for solution in thetas:
@@ -79,7 +79,6 @@ def serial_worker(args):
                                                 dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
                                                 row_start=k_prev, row_end=k_prev+batchrows, seedint=seedint, get_RT_error=False)
     
-    ipdb.set_trace()
     out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
     params_out = dict()
     with jsonlines.open(out_file, 'r') as f:         

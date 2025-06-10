@@ -272,7 +272,7 @@ if __name__ == "__main__":
     tempering_steps = [0.1, 1]
     tempering_rate = [0.1]
 
-    niter = 1
+    niter = 5
     max_restarts = 1 #2
     max_partial_restarts = 1 #2
     max_halving = 1 #2
