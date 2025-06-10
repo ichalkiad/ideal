@@ -5,15 +5,21 @@ import threading
 
 
 class Monitor:
-    def __init__(self, interval=0.5):
+    def __init__(self, interval=0.5, fastprogram=False):
         self.process = psutil.Process(os.getpid())
         self.interval = interval
         self._running = False
-
+        self.fastprogram = fastprogram
         self.cpu_samples = []
         self.mem_samples = []
         self.thread_counts = []
         self.process_counts = []
+
+        # For fast mode
+        self.start_wall = None
+        self.end_wall = None
+        self.start_cpu = None
+        self.end_cpu = None
 
     def _sample(self):
         while self._running:
@@ -57,13 +63,31 @@ class Monitor:
         return count
 
     def start(self):
-        self._running = True
-        self._thread = threading.Thread(target=self._sample, daemon=True)
-        self._thread.start()
+        if self.fastprogram:
+            self.start_wall = time.perf_counter()
+            self.start_cpu = self._get_total_cpu_time()
+        else:
+            self._running = True
+            self._thread = threading.Thread(target=self._sample, daemon=True)
+            self._thread.start()
 
     def stop(self):
-        self._running = False
-        self._thread.join()
+        if self.fastprogram:
+            self.end_wall = time.perf_counter()
+            self.end_cpu = self._get_total_cpu_time()
+        else:
+            self._running = False
+            self._thread.join()
+
+    def _get_total_cpu_time(self):
+        total = self.process.cpu_times().user + self.process.cpu_times().system
+        for child in self.process.children(recursive=True):
+            try:
+                t = child.cpu_times()
+                total += t.user + t.system
+            except psutil.NoSuchProcess:
+                continue
+        return total
 
     def report(self, wall_duration):
         def avg(lst): return sum(lst) / len(lst) if lst else 0
@@ -78,8 +102,17 @@ class Monitor:
         avg_processes = avg(self.process_counts)
         max_processes = max(self.process_counts)
 
+        if self.fastprogram:
+            wall = self.end_wall - self.start_wall
+            cpu_time = self.end_cpu - self.start_cpu
+            cpu_util = (cpu_time / wall) * 100 if wall > 0 else 0
+            wall_duration = wall
+            avg_total_cpu_util = cpu_util
+            max_total_cpu_util = cpu_util
+            print(f"Fast program - CPU Time:  {cpu_time * 1000:.3f} ms")
+            
         print("\n✅ Execution Summary:")
-        print(f"Wall Time: {wall_duration:.2f} seconds")
+        print(f"Wall Time: {wall_duration:.5f} seconds")
         print(f"CPU Utilization (main + children):")
         print(f"  - Avg: {avg_total_cpu_util:.2f}%")
         print(f"  - Max: {max_total_cpu_util:.2f}%")

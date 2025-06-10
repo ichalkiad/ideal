@@ -85,9 +85,8 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
         
         
-        Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
-        
-        
+        # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+                
         
         args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                 parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
@@ -98,7 +97,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
         # start efficiency monitoring - interval in seconds
         print_threadpool_info()
-        monitor = Monitor(interval=0.000001)
+        monitor = Monitor(interval=0.1, fastprogram=True)
         monitor.start()            
 
         t_start = time.time()            

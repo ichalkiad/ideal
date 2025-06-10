@@ -808,7 +808,7 @@ if __name__ == "__main__":
     
     # start efficiency monitoring - interval in seconds
     print_threadpool_info()
-    monitor = Monitor(interval=0.01)
+    monitor = Monitor(interval=0.5)
     monitor.start()   
     t_start = time.time()  
     par_manager, main_run_args = main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
