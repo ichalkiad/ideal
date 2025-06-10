@@ -48,7 +48,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
             else:
                 raise NotImplementedError("At the moment we only evaluate the posterior with vector parameters - minimising coordinate-wise is more efficient.")
         pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
-        
+        ipdb.set_trace()
         # load data    
         with open("{}/{}/Y.pickle".format(data_location, m), "rb") as f:
             Y = pickle.load(f)
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     plot_online = False
     fastrun = True
 
-    dataspace = "/lustre/fswork/projects/rech/sfe/umi36fq/idealdata_slurm_test/"     
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
     parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_data_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values

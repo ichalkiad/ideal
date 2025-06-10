@@ -41,7 +41,7 @@ def serial_worker(args):
     DIR_out_icm = "{}/{}/".format(DIR_out, subdataset_name)
     print(DIR_out_icm)
     pathlib.Path(DIR_out_icm).mkdir(parents=True, exist_ok=True)
-   
+    ipdb.set_trace()
     icm_args = (DIR_out_icm, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
                 parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
                     prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
@@ -79,6 +79,8 @@ def serial_worker(args):
     theta_part_annealing = rank_and_plot_solutions(thetas_and_errors, elapsedtime, None, Y_annealed, J, batchrows, d, parameter_names, 
                                                 dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
                                                 row_start=k_prev, row_end=k_prev+batchrows, seedint=seedint, get_RT_error=False)
+    
+    ipdb.set_trace()
     out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
     params_out = dict()
     with jsonlines.open(out_file, 'r') as f:         
