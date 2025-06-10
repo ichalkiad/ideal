@@ -217,6 +217,8 @@ if __name__ == "__main__":
     evaluate_posterior = True
     parallel = False
     total_running_processes = 1
+    plot_online = False
+    fastrun = True
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
     parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
@@ -271,12 +273,10 @@ if __name__ == "__main__":
     tempering_steps = [0.1, 1]
     tempering_rate = [0.1]
 
-    niter = 6
+    niter = 1
     max_restarts = 1 #2
     max_partial_restarts = 1 #2
     max_halving = 1 #2
-    plot_online = False
-    fastrun = True
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))

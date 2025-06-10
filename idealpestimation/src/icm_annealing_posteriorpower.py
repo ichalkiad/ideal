@@ -793,6 +793,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                                                     testidx=testidx, testvec=vector_index) 
     converged = False
     random_restart = False  
+    ipdb.set_trace()
     while ((L is not None and l < L)) and (not converged):
         converged = False
         random_restart = False
