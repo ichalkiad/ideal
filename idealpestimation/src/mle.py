@@ -275,7 +275,7 @@ def estimate_mle(args):
                 prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,
                 prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,
                 prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
-                param_positions_dict_theta, rng, batchsize)   
+                param_positions_dict_theta, rng, batchsize, theta_true)   
 
     max_full_restarts = 3
     full_restarts = 0
