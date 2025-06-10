@@ -43,7 +43,7 @@ def optimise_negativeloglik_elementwise(param, idx, vector_index_in_param_matrix
         parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, min_sigma_e, \
         prior_loc_x, prior_scale_x, prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi,\
         prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, prior_loc_gamma,\
-        prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
+        prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize, _ = args
     
     niter_minimize = None
     theta_test_in = theta_curr.copy()
