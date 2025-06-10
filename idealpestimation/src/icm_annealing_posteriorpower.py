@@ -841,9 +841,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 total_iter += 1   
                 i += 1   
                 if i % 10 == 0:
-                    print(i, l) 
-                if i==60:
-                    ipdb.set_trace()                              
+                    print(i, l)                          
             
             # last entry in mse lists in the same, has been stored twice
             if plot_online: # and l==4: ################################################################
