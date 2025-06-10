@@ -1133,7 +1133,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             
             
 
-            Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+            # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
 
             
             
