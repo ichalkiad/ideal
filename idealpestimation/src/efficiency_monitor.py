@@ -93,8 +93,6 @@ class Monitor:
         def avg(lst): return sum(lst) / len(lst) if lst else 0
         def mb(x): return x / (1024 ** 2)
 
-        avg_total_cpu_util = avg(self.cpu_samples)
-        max_total_cpu_util = max(self.cpu_samples)
         avg_total_ram_residentsetsize_MB = mb(avg(self.mem_samples)) # in MB
         max_total_ram_residentsetsize_MB = mb(max(self.mem_samples)) # in MB
         avg_threads = avg(self.thread_counts)
@@ -110,6 +108,9 @@ class Monitor:
             avg_total_cpu_util = cpu_util
             max_total_cpu_util = cpu_util
             print(f"Fast program - CPU Time:  {cpu_time * 1000:.3f} ms")
+        else:
+            avg_total_cpu_util = avg(self.cpu_samples)
+            max_total_cpu_util = max(self.cpu_samples)
             
         print("\n✅ Execution Summary:")
         print(f"Wall Time: {wall_duration:.5f} seconds")
