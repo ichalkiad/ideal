@@ -161,9 +161,6 @@ if __name__ == "__main__":
     K = int(parameter_vector[1])
     J = int(parameter_vector[2])
     sigma_e_true = parameter_vector[3]
-    batchsize = int(parameter_vector[4])
-    data_start = int(parameter_vector[5])
-    data_end = int(parameter_vector[6])
     total_running_processes = 1
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
