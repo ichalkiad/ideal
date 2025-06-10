@@ -38,7 +38,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
         if elementwise:
             if evaluate_posterior:                    
-                DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_allmetrics/".format(data_location, m)                    
+                DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(data_location, m)                    
             else:
                 DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
         else:
@@ -88,7 +88,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         
         
 
-        Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+        # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
 
                     
         args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
@@ -99,7 +99,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         
         # start efficiency monitoring - interval in seconds
         print_threadpool_info()
-        monitor = Monitor(interval=30)
+        monitor = Monitor(interval=2)
         monitor.start()            
 
         t_start = time.time()            
@@ -152,18 +152,18 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
-    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/app/workspace/slurm_experimentI_icm_poster.csv", header=None)
+    parameter_vector_idx = 0 # int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
-    Mmin = parameter_vector[0]
-    M = Mmin + 1
-    K = parameter_vector[1]
-    J = parameter_vector[2]
+    Mmin = int(parameter_vector[0])
+    M = int(Mmin + 1)
+    K = int(parameter_vector[1])
+    J = int(parameter_vector[2])
     sigma_e_true = parameter_vector[3]
-    batchsize = parameter_vector[4]
-    data_start = parameter_vector[5]
-    data_end = parameter_vector[6]
+    batchsize = int(parameter_vector[4])
+    data_start = int(parameter_vector[5])
+    data_end = int(parameter_vector[6])
     total_running_processes = 1
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2  
-    gridpoints_num = 30 #, 15, 30
+    gridpoints_num = 10 #, 15, 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
