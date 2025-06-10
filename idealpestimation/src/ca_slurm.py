@@ -97,7 +97,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
         # start efficiency monitoring - interval in seconds
         print_threadpool_info()
-        monitor = Monitor(interval=0.001, fastprogram=True)
+        monitor = Monitor(interval=0.01, fastprogram=True)
         monitor.start()            
 
         t_start = time.time()            

@@ -66,18 +66,18 @@ class Monitor:
         if self.fastprogram:
             self.start_wall = time.perf_counter()
             self.start_cpu = self._get_total_cpu_time()
-        else:
-            self._running = True
-            self._thread = threading.Thread(target=self._sample, daemon=True)
-            self._thread.start()
+        
+        self._running = True
+        self._thread = threading.Thread(target=self._sample, daemon=True)
+        self._thread.start()
 
     def stop(self):
         if self.fastprogram:
             self.end_wall = time.perf_counter()
             self.end_cpu = self._get_total_cpu_time()
-        else:
-            self._running = False
-            self._thread.join()
+        
+        self._running = False
+        self._thread.join()
 
     def _get_total_cpu_time(self):
         total = self.process.cpu_times().user + self.process.cpu_times().system
