@@ -77,7 +77,7 @@ def serial_worker(args):
          
     theta_part_annealing = rank_and_plot_solutions(thetas_and_errors, elapsedtime, None, Y_annealed, J, batchrows, d, parameter_names, 
                                                 dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
-                                                row_start=k_prev, row_end=k_prev+batchrows, seedint=seedint, get_RT_error=False)
+                                                row_start=k_prev, row_end=k_prev+batchrows, seedint=seedint, get_RT_error=False, plot_solutions=False)
     
     out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
     params_out = dict()

@@ -1713,7 +1713,8 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
         else:                
             retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
             return np.array(retvallist)
- 
+
+# parallel=False for SLURM run
 @numba.jit(nopython=True, parallel=False, cache=True)
 def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
     
@@ -1947,7 +1948,8 @@ def parse_timedelta_string(time_str):
 
 
 def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, 
-                            param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None, seedint=1234, get_RT_error=False):
+                            param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None, 
+                            seedint=1234, get_RT_error=False, plot_solutions=True):
 
     if efficiency_measures is not None:
         wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
@@ -2033,20 +2035,21 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                 writer = jsonlines.Writer(f)
                 writer.write(params_out)
 
-        # plot utilities
-        pathlib.Path("{}/solution_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)   
-        pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
-        fig = go.Figure(data=go.Heatmap(
-            z=pij_arg,
-            x=[str(i) for i in range(pij_arg.shape[1])],
-            y=[str(i) for i in range(pij_arg.shape[0])],
-            colorscale="sunsetdark",
-            showscale=True,   
-            colorbar=dict(thickness=10, title='U'),             
-        )) 
-        fix_plot_layout_and_save(fig, "{}/solution_plots/utilities_solution_index_{}.html".format(DIR_out, sorted_idx_lst.index(i)), 
-                                xaxis_title="Leaders", yaxis_title="Followers", title="Utilities with estimated parameters", 
-                                showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
+        if plot_solutions:
+            # plot utilities
+            pathlib.Path("{}/solution_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)   
+            pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)
+            fig = go.Figure(data=go.Heatmap(
+                z=pij_arg,
+                x=[str(i) for i in range(pij_arg.shape[1])],
+                y=[str(i) for i in range(pij_arg.shape[0])],
+                colorscale="sunsetdark",
+                showscale=True,   
+                colorbar=dict(thickness=10, title='U'),             
+            )) 
+            fix_plot_layout_and_save(fig, "{}/solution_plots/utilities_solution_index_{}.html".format(DIR_out, sorted_idx_lst.index(i)), 
+                                    xaxis_title="Leaders", yaxis_title="Followers", title="Utilities with estimated parameters", 
+                                    showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
       
     if not (efficiency_measures is None):
         out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
@@ -2062,29 +2065,30 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                         "avg_processes": avg_processes, 
                         "max_processes": max_processes})
 
-    # 2D projection of solutions
-    # raw_symbols = SymbolValidator().values    
-    theta_matrix = np.asarray(theta_list)
-    computed_logfullposterior = np.array(posterior_list)    
-    if theta_matrix.shape[0] > 1:
-        # theta_matrix = theta_matrix[sorted_idx, :]
-        pca = PCA(n_components=2)
-        components = pca.fit_transform(theta_matrix)
-        fig = go.Figure()
-        for i in range(components.shape[0]):
-            opacity = (components.shape[0]-i)/(components.shape[0])
-            fig.add_trace(go.Scatter(x=[components[i, 0]], y=[components[i, 1]], marker_color="green",
-                                    marker_symbol="circle", name="Rank {}".format(i+1), marker_opacity=opacity,
-                                    text="pc2/(pc1+pc2) = {:.2f}/({:.2f}+{:.2f}) = {:.2f}"                                                      
-                                    "<br>full posterior = {:.3f}".format(components[i, 1], components[i, 0], components[i, 1],
-                                                                components[i, 1]/(components[i, 0] + components[i, 1]),
-                                                                computed_logfullposterior[i])))
-        fig.update(layout_yaxis_range = [np.min(components[:,1])-1,np.max(components[:,1])+1])
-        fix_plot_layout_and_save(fig, "{}/solution_plots/project_solutions_2D.html".format(DIR_out, 
-                                sorted_idx_lst.index(i)), xaxis_title="PC1", yaxis_title="PC2", 
-                                title="s1 = {:.3f}, s2 = {:.3f}".format(pca.singular_values_[0], pca.singular_values_[1]), 
-                                showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
-        # fig.show()
+    if plot_solutions:
+        # 2D projection of solutions
+        # raw_symbols = SymbolValidator().values    
+        theta_matrix = np.asarray(theta_list)
+        computed_logfullposterior = np.array(posterior_list)    
+        if theta_matrix.shape[0] > 1:
+            # theta_matrix = theta_matrix[sorted_idx, :]
+            pca = PCA(n_components=2)
+            components = pca.fit_transform(theta_matrix)
+            fig = go.Figure()
+            for i in range(components.shape[0]):
+                opacity = (components.shape[0]-i)/(components.shape[0])
+                fig.add_trace(go.Scatter(x=[components[i, 0]], y=[components[i, 1]], marker_color="green",
+                                        marker_symbol="circle", name="Rank {}".format(i+1), marker_opacity=opacity,
+                                        text="pc2/(pc1+pc2) = {:.2f}/({:.2f}+{:.2f}) = {:.2f}"                                                      
+                                        "<br>full posterior = {:.3f}".format(components[i, 1], components[i, 0], components[i, 1],
+                                                                    components[i, 1]/(components[i, 0] + components[i, 1]),
+                                                                    computed_logfullposterior[i])))
+            fig.update(layout_yaxis_range = [np.min(components[:,1])-1,np.max(components[:,1])+1])
+            fix_plot_layout_and_save(fig, "{}/solution_plots/project_solutions_2D.html".format(DIR_out, 
+                                    sorted_idx_lst.index(i)), xaxis_title="PC1", yaxis_title="PC2", 
+                                    title="s1 = {:.3f}, s2 = {:.3f}".format(pca.singular_values_[0], pca.singular_values_[1]), 
+                                    showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
+            # fig.show()
     
     return best_theta
  
