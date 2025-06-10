@@ -3751,7 +3751,7 @@ def log_full_posterior(Y, theta_curr, param_positions_dict, args):
                 constant_Z, retries, parallel, min_sigma_e, prior_loc_x, prior_scale_x, prior_loc_z,\
                     prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha,\
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
-                            prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize = args
+                            prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize, theta_true = args
 
     # if False:
     if K*J <= 10e5:
