@@ -152,15 +152,15 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
-    parameter_vector_idx = 0 # int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
-    Mmin = int(parameter_vector[0])
+    Mmin = 0 #int(parameter_vector[0])
     M = int(Mmin + 1)
-    K = int(parameter_vector[1])
-    J = int(parameter_vector[2])
-    sigma_e_true = parameter_vector[3]
+    K = 50000 #int(parameter_vector[1])
+    J = 100 #int(parameter_vector[2])
+    sigma_e_true = 0.1 #parameter_vector[3]
     total_running_processes = 1
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
@@ -179,7 +179,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2  
-    gridpoints_num = 10 #, 15, 30
+    gridpoints_num = 30 #, 15, 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -201,11 +201,11 @@ if __name__ == "__main__":
     temperature_steps = [0, 1, 2, 5, 10]
     temperature_rate = [1e-3, 1e-2, 1e-1, 1]
 
-    niter = 2
+    niter = 10
     fastrun = True
-    max_restarts = 1
-    max_partial_restarts = 1
-    max_halving = 1
+    max_restarts = 2
+    max_partial_restarts = 2
+    max_halving = 2
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
 
