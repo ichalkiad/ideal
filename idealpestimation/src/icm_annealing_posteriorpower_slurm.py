@@ -152,7 +152,7 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_slurm_test/"     
-    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = 0 # int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster_test.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
