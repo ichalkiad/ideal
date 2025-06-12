@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=testjobicmpostervec
-#SBATCH --output=testmle.out # create output files indexed with the job array task id
+#SBATCH --output=testicmpostvec.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost
-#SBATCH --time=15:00:00
+#SBATCH --time=18:00:00
 ##SBATCH --qos=qos_cpu-t3   #qos_cpu-dev
 #SBATCH --hint=nomultithread 
 #SBATCH --nodes=1          
