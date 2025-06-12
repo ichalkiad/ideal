@@ -146,7 +146,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    elementwise = True
+    elementwise = False   #############################################True
     evaluate_posterior = True
     parallel = False
     total_running_processes = 1

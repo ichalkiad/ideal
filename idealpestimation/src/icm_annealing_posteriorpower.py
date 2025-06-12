@@ -709,11 +709,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     theta_prev = np.zeros((parameter_space_dim,))
 
     if data_annealing:
-        # if parameter_space_dim == 122:  # FIX ###############################
-        #     plot_online = True
-        #     fastrun = False
-        # else:
-        #     plot_online = False
         gamma = 1
         all_gammas = np.ones((10,)).tolist()
         N = len(all_gammas)
@@ -916,7 +911,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                                     target_param=target_param, subset_coord2plot=subset_coord2plot)     
 
                     delta_rate_prev = delta_rate                                                                        
-                    total_iter += 1                         
+                    total_iter += 1    
+                    if total_iter % 20000 == 0:
+                        print(total_iter, l)                  
             
             # last entry in mse lists in the same, has been stored twice
             if plot_online:        
