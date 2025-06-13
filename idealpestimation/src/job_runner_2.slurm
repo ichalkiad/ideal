@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=testjobicmpostervec
-#SBATCH --output=testicmpostvec.out # create output files indexed with the job array task id
+#SBATCH --job-name=testjobicmposter
+#SBATCH --output=testicmposter.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost
 #SBATCH --time=18:00:00
 ##SBATCH --qos=qos_cpu-t3   #qos_cpu-dev
