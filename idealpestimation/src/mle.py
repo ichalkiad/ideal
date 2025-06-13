@@ -277,7 +277,7 @@ def estimate_mle(args):
                 prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
                 param_positions_dict_theta, rng, batchsize, theta_true)   
 
-    max_full_restarts = 3
+    max_full_restarts = 1
     full_restarts = 0
     estimated_thetas = []
     t0 = time.time()
@@ -315,7 +315,21 @@ def estimate_mle(args):
                 if (not coord_converged) or (coord_converged and result["variance_diag"] != 1):
                     # if converged, estimate has not moved, hence Hessian Inv is 1
                     variance_local_vec[i] = result["variance_diag"]
+
+
+                #########################################################
+                if l > 0:
+                    converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
+                                                                            parameter_space_dim=parameter_space_dim_theta, testparam=None, 
+                                                                            testidx=vector_coordinate, p=0.2, tol=tol)     
+                    if converged:
+                        break
+                #########################################################
+
+
                 i += 1  
+                if i % 500 == 0:
+                    print(i, l, L)
             converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
                                                                             parameter_space_dim=parameter_space_dim_theta, testparam=None, 
                                                                             testidx=vector_coordinate, p=1, tol=tol)     

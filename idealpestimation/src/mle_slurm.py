@@ -54,7 +54,9 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-    seed_value = 9125
+    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
+
+    seed_value = 9125 + parameter_vector_idx
     random.seed(seed_value)
     np.random.seed(seed_value)
     rng = np.random.default_rng()
@@ -63,7 +65,6 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"    
-    parameter_vector_idx = 0 # int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_mle.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 200
+    niter = 20
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 30
