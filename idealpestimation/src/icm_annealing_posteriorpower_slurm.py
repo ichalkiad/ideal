@@ -142,17 +142,18 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-    seed_value = 8125
+    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
+
+    seed_value = 8125 + parameter_vector_idx
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    elementwise = False   #############################################True
+    elementwise = True
     evaluate_posterior = True
     parallel = False
     total_running_processes = 1
 
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"     
-    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 

@@ -799,8 +799,19 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 
                 if ((target_param == "gamma" or target_param == "sigma_e") and (l == 0 or not (l % 5 == 0))):     
                     i += 1 
-                    continue                   
+                    continue         
+                          
                 
+                #################################################################
+                if l > 0:
+                    converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, i, 
+                                                                        parameter_space_dim=parameter_space_dim, testparam=testparam, 
+                                                                        testidx=testidx, p=percentage_parameter_change, tol=tol)
+                    if converged:
+                        break
+                #################################################################
+
+
                 # t00 = time.time()
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                             Y, gamma, theta_curr.copy(), param_positions_dict, L, args)    
