@@ -1987,11 +1987,11 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             theta_true = args[-1]
             # only for best solution compute expensive error:
             params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+            params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
             X_true = np.asarray(params_true["X"]) # d x K    
             X_hat = np.asarray(params_hat["X"]) # d x K         
             Z_true = np.asarray(params_true["Z"]) # d x J       
-            Z_hat = np.asarray(params_hat["Z"]) # d x J                           
-            params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
+            Z_hat = np.asarray(params_hat["Z"]) # d x J                                       
             Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
             Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
         else:
