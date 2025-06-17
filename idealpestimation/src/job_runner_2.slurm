@@ -7,7 +7,7 @@
 #SBATCH --hint=nomultithread 
 #SBATCH --nodes=1          
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1  ############################
+#SBATCH --cpus-per-task=2  ############################  2 for CA
 #SBATCH --array=0-0
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
