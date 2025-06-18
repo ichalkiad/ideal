@@ -797,13 +797,23 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if ((target_param == "gamma" or target_param == "sigma_e") and (l == 0 or not (l % 5 == 0))):     
-                    i += 1 
-                    continue         
+                if (target_param == "gamma" or target_param == "sigma_e"):
+                    # in the data annealing setting, update costly sigma_e and gamma every five full iterations and at the end
+                    if (data_annealing and (l == 0 or not (l % 5 == 0))):     
+                        i += 1 
+                        continue         
+                    # in the posterior annealing, after the first full update, including sigma_e/gamma, only update them every five iterations and at the end
+                    elif (not data_annealing and (not (l % 5 == 0))):
+                        i += 1 
+                        continue
+                    else:
+                        print(data_annealing, l, L, "will update {}".format(target_param))
+                    
                           
                 
                 #################################################################
-                if l > 0:
+                # in posterior annealing, after a full update, check for convergence after each iteration - l > 0 to ensure all params will have been updated at least once
+                if not data_annealing and l > 0:
                     converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, i, 
                                                                         parameter_space_dim=parameter_space_dim, testparam=testparam, 
                                                                         testidx=testidx, p=percentage_parameter_change, tol=tol)
