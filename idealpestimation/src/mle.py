@@ -18,23 +18,21 @@ from jax import hessian
 import math
 import random
 from idealpestimation.src.parallel_manager import ProcessManager, jsonlines
-from idealpestimation.src.utils import params2optimisation_dict, \
-                                            optimisation_dict2params, \
-                                                initialise_optimisation_vector_sobol, \
-                                                    visualise_hessian, fix_plot_layout_and_save, \
-                                                        get_hessian_diag_jax, get_jacobian, \
-                                                            combine_estimate_variance_rule, optimisation_dict2paramvectors,\
-                                                            create_constraint_functions, jnp, \
-                                                                time, datetime, timedelta, parse_input_arguments, \
-                                                                    negative_loglik_coordwise, negative_loglik_coordwise_jax, collect_mle_results, \
-                                                                        collect_mle_results_batchsize_analysis, sample_theta_curr_init,\
-                                                                        get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta,\
-                                                                        negative_loglik_coordwise_parallel, plot_loglik_runtimes, parse_timedelta_string,\
-                                                                        print_threadpool_info, clean_up_data_matrix
+from idealpestimation.src.utils import  visualise_hessian, fix_plot_layout_and_save, \
+                                            get_hessian_diag_jax, optimisation_dict2paramvectors,\
+                                                create_constraint_functions, jnp, \
+                                                    time, datetime, timedelta, parse_input_arguments, \
+                                                        negative_loglik_coordwise, negative_loglik_coordwise_jax, collect_mle_results, \
+                                                            collect_mle_results_batchsize_analysis, sample_theta_curr_init,\
+                                                            get_parameter_name_and_vector_coordinate, check_convergence, rank_and_return_best_theta,\
+                                                            negative_loglik_coordwise_parallel, plot_loglik_runtimes, parse_timedelta_string,\
+                                                            print_threadpool_info, negative_loglik_coordwise_xil,\
+                                                            negative_loglik_coordwise_zjl, negative_loglik_coordwise_beta_i,\
+                                                            negative_loglik_coordwise_alpha_j, negative_loglik_coordwise_gamma,\
+                                                            negative_loglik_coordwise_sigma_e
 from idealpestimation.src.efficiency_monitor import Monitor
 
 
-from idealpestimation.src.icm_annealing_posteriorpower import get_evaluation_grid
 
 def optimise_negativeloglik_elementwise(param, idx, vector_index_in_param_matrix, vector_coordinate, Y, theta_curr, 
                                         param_positions_dict, l, args, debug=False, theta_samples_list=None, idx_all=None, base2exponent=10):
@@ -47,14 +45,43 @@ def optimise_negativeloglik_elementwise(param, idx, vector_index_in_param_matrix
     
     niter_minimize = None
     theta_test_in = theta_curr.copy()
-    f = lambda x: negative_loglik_coordwise(x, idx, theta_test_in, Y, J, N, d, 
+    f_jax = None
+    # f = lambda x: negative_loglik_coordwise(x, idx, theta_test_in, Y, J, N, d, 
+    #                                         parameter_names, dst_func, param_positions_dict, 
+    #                                         penalty_weight_Z, constant_Z)
+    # if parallel:
+    #     f_jax = None
+    # else:    
+    #     f_jax = lambda x: negative_loglik_coordwise_jax(x, idx, theta_test_in, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
+    if param == "X":
+        f = lambda x: negative_loglik_coordwise_xil(x, vector_coordinate, vector_index_in_param_matrix, 
+                                            idx, theta_test_in, Y, J, N, d, 
                                             parameter_names, dst_func, param_positions_dict, 
-                                            penalty_weight_Z, constant_Z)
-    if parallel:
-        f_jax = None
-    else:    
-        f_jax = lambda x: negative_loglik_coordwise_jax(x, idx, theta_test_in, Y, J, N, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z)
-    
+                                            penalty_weight_Z, constant_Z, debug=debug)
+    elif param == "Z":
+        f = lambda x: negative_loglik_coordwise_zjl(x, vector_coordinate, vector_index_in_param_matrix, 
+                                            idx, theta_test_in, Y, J, N, d, 
+                                            parameter_names, dst_func, param_positions_dict, 
+                                            penalty_weight_Z, constant_Z, debug=debug)
+    elif param == "beta":
+        f = lambda x: negative_loglik_coordwise_beta_i(x, vector_coordinate, 
+                                            idx, theta_test_in, Y, J, N, d, 
+                                            parameter_names, dst_func, param_positions_dict, 
+                                            penalty_weight_Z, constant_Z, debug=debug)
+    elif param == "alpha":
+        f = lambda x: negative_loglik_coordwise_alpha_j(x, vector_coordinate, 
+                                            idx, theta_test_in, Y, J, N, d, 
+                                            parameter_names, dst_func, param_positions_dict, 
+                                            penalty_weight_Z, constant_Z, debug=debug)
+    elif param == "gamma":
+        f = lambda x: negative_loglik_coordwise_gamma(x, idx, theta_test_in, Y, J, N, d, 
+                                            parameter_names, dst_func, param_positions_dict, 
+                                            penalty_weight_Z, constant_Z, debug=debug)
+    elif param == "sigma_e":
+        f = lambda x: negative_loglik_coordwise_sigma_e(x, idx, theta_test_in, Y, J, N, d, 
+                                            parameter_names, dst_func, param_positions_dict, 
+                                            penalty_weight_Z, constant_Z, debug=debug)
+
     retry = 0
     t0 = time.time()
     while retry < retries:   
@@ -224,10 +251,6 @@ def estimate_mle(args):
     with open("{}/{}/{}/{}/{}.pickle".format(data_location, m, batchsize, subdataset_name, subdataset_name), "rb") as f:
         Y = pickle.load(f)
 
-
-    # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
-
-
     from_row = int(subdataset_name.split("_")[1])
     to_row = int(subdataset_name.split("_")[2])
     # since each batch has N rows    
@@ -293,7 +316,7 @@ def estimate_mle(args):
             while i < parameter_space_dim_theta:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict_theta, i=i, d=d)                    
                 theta_test, elapsedtime, result, retry = optimise_negativeloglik_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
-                                                                    Y, theta_curr.copy(), param_positions_dict_theta, L, args_theta, debug=False,
+                                                                    Y, theta_curr.copy(), param_positions_dict_theta, L, args_theta, debug=True,
                                                                     theta_samples_list=theta_samples_list, idx_all=idx_all, base2exponent=base2exponent)                   
                 theta_curr = theta_test.copy()   
                 estimation_success *= result.success 
@@ -318,18 +341,18 @@ def estimate_mle(args):
 
 
                 #########################################################
-                if l > 0:
-                    converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
-                                                                            parameter_space_dim=parameter_space_dim_theta, testparam=None, 
-                                                                            testidx=vector_coordinate, p=0.2, tol=tol)     
-                    if converged:
-                        break
-                #########################################################
+                # if l > 0:
+                #     converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
+                #                                                             parameter_space_dim=parameter_space_dim_theta, testparam=None, 
+                #                                                             testidx=vector_coordinate, p=0.2, tol=tol)     
+                #     if converged:
+                #         break
+                # #########################################################
 
 
                 i += 1  
-                if i % 500 == 0:
-                    print(i, l, L)
+                if i % 10000 == 0:
+                    print(i, l, L, estimation_success, var_estimation_success)
             converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
                                                                             parameter_space_dim=parameter_space_dim_theta, testparam=None, 
                                                                             testidx=vector_coordinate, p=1, tol=tol)     
@@ -822,7 +845,7 @@ if __name__ == "__main__":
     
     # start efficiency monitoring - interval in seconds
     print_threadpool_info()
-    monitor = Monitor(interval=0.5)
+    monitor = Monitor(interval=0.05)
     monitor.start()   
     t_start = time.time()  
     par_manager, main_run_args = main(J=J, K=K, d=d, N=N, total_running_processes=total_running_processes, 
