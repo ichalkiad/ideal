@@ -811,17 +811,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     
                           
                 
-                #################################################################
-                # in posterior annealing, after a full update, check for convergence after each iteration - l > 0 to ensure all params will have been updated at least once
-                if not data_annealing and l > 0:
-                    converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, i, 
-                                                                        parameter_space_dim=parameter_space_dim, testparam=testparam, 
-                                                                        testidx=testidx, p=percentage_parameter_change, tol=tol)
-                    if converged:
-                        break
-                #################################################################
-
-
                 # t00 = time.time()
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                             Y, gamma, theta_curr.copy(), param_positions_dict, L, args)    
@@ -837,6 +826,17 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)      
                 # if data_annealing:
                 #     assert gamma == 1
+                
+                #################################################################
+                # in posterior annealing, after a full update, check for convergence after each iteration - l > 0 to ensure all params will have been updated at least once
+                if not data_annealing and l > 0:
+                    converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, i, 
+                                                                        parameter_space_dim=parameter_space_dim, testparam=testparam, 
+                                                                        testidx=testidx, p=percentage_parameter_change, tol=tol)
+                    if converged:
+                        break
+                #################################################################
+
 
                 if plot_online:
                     subset_coord2plot = None
