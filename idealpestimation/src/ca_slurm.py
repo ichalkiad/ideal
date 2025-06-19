@@ -44,7 +44,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
         ca = CA_custom(
             n_components=d,
-            n_iter=5,
+            n_iter=2,
             copy=True,
             check_input=True,
             engine='sklearn',
