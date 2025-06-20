@@ -317,7 +317,7 @@ def estimate_mle(args):
         theta_prev = np.zeros((parameter_space_dim_theta,))
         variance_local_vec = np.zeros((parameter_space_dim_theta,))
         converged = False
-        
+        partial_restart_cnt = 0        
         i = 0 
         while i < parameter_space_dim_theta:                                            
             target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict_theta, i=i, d=d)                    
