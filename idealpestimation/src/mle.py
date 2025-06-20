@@ -305,63 +305,54 @@ def estimate_mle(args):
     estimated_thetas = []
     t0 = time.time()
     while full_restarts < max_full_restarts:
+        
         l = 0
         estimation_success = True
         var_estimation_success = True
         theta_prev = np.zeros((parameter_space_dim_theta,))
         variance_local_vec = np.zeros((parameter_space_dim_theta,))
         converged = False
-        while ((L is not None and l < L)) and (not converged):
-            i = 0 
-            while i < parameter_space_dim_theta:                                            
-                target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict_theta, i=i, d=d)                    
-                theta_test, elapsedtime, result, retry = optimise_negativeloglik_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
-                                                                    Y, theta_curr.copy(), param_positions_dict_theta, L, args_theta, debug=True,
-                                                                    theta_samples_list=theta_samples_list, idx_all=idx_all, base2exponent=base2exponent)                   
-                theta_curr = theta_test.copy()   
-                estimation_success *= result.success 
-                var_estimation_success *= result["variance_status"] 
-                if target_param in ["alpha", "beta"]:
-                    vector_index = vector_coordinate
+        
+        i = 0 
+        while i < parameter_space_dim_theta:                                            
+            target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict_theta, i=i, d=d)                    
+            theta_test, elapsedtime, result, retry = optimise_negativeloglik_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
+                                                                Y, theta_curr.copy(), param_positions_dict_theta, L, args_theta, debug=True,
+                                                                theta_samples_list=theta_samples_list, idx_all=idx_all, base2exponent=base2exponent)                   
+            theta_curr = theta_test.copy()   
+            estimation_success *= result.success 
+            var_estimation_success *= result["variance_status"] 
+            if target_param in ["alpha", "beta"]:
+                vector_index = vector_coordinate
+            else:
+                vector_index = vector_index_in_param_matrix
+            if vector_coordinate is not None:
+                if target_param in ["X", "Z", "Phi"]:
+                    testidx = vector_index*d + vector_coordinate
                 else:
-                    vector_index = vector_index_in_param_matrix
-                if vector_coordinate is not None:
-                    if target_param in ["X", "Z", "Phi"]:
-                        testidx = vector_index*d + vector_coordinate
-                    else:
-                        testidx = vector_coordinate
-                else:
-                    testidx = vector_index
-                coord_converged, _, _ = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
-                                                        parameter_space_dim=parameter_space_dim_theta, testparam=target_param, 
-                                                        testidx=testidx, p=1, tol=tol)   
-                if (not coord_converged) or (coord_converged and result["variance_diag"] != 1):
-                    # if converged, estimate has not moved, hence Hessian Inv is 1
-                    variance_local_vec[i] = result["variance_diag"]
+                    testidx = vector_coordinate
+            else:
+                testidx = vector_index
+            coord_converged, _, _ = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
+                                                    parameter_space_dim=parameter_space_dim_theta, testparam=target_param, 
+                                                    testidx=testidx, p=1, tol=tol)   
+            if (not coord_converged) or (coord_converged and result["variance_diag"] != 1):
+                # if converged, estimate has not moved, hence Hessian Inv is 1
+                variance_local_vec[i] = result["variance_diag"]
 
+            i += 1  
+            if i % 10000 == 0:
+                print(i, l, L, estimation_success, var_estimation_success)
 
-                #########################################################
-                # if l > 0:
-                #     converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
-                #                                                             parameter_space_dim=parameter_space_dim_theta, testparam=None, 
-                #                                                             testidx=vector_coordinate, p=0.2, tol=tol)     
-                #     if converged:
-                #         break
-                # #########################################################
-
-
-                i += 1  
-                if i % 10000 == 0:
-                    print(i, l, L, estimation_success, var_estimation_success)
-            converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
-                                                                            parameter_space_dim=parameter_space_dim_theta, testparam=None, 
-                                                                            testidx=vector_coordinate, p=1, tol=tol)     
-            theta_prev = theta_curr.copy() 
-            l += 1
-            print("Total full scans of Theta: {}".format(l))
-            print("Convergence: {}".format(converged)) 
-            print("Random restart: {}".format(random_restart))  
-            
+        converged, delta_theta, random_restart = check_convergence(True, theta_curr, theta_prev, param_positions_dict_theta, i, 
+                                                                        parameter_space_dim=parameter_space_dim_theta, testparam=None, 
+                                                                        testidx=vector_coordinate, p=1, tol=tol)     
+        theta_prev = theta_curr.copy() 
+        l += 1
+        print("Total full scans of Theta: {}".format(l))
+        print("Convergence: {}".format(converged)) 
+        print("Random restart: {}".format(random_restart))  
+        
             
         if (not converged) or (full_restarts < max_full_restarts):           
             # print(theta_curr)                                                              
