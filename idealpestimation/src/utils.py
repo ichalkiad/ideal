@@ -27,6 +27,9 @@ import pandas as pd
 from threadpoolctl import threadpool_info
 import pickle
 from prince import svd as ca_svd
+import sqlite3
+from sqlite3 import Error
+from scipy import sparse
 
 
 def get_slurm_experiment_csvs(Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
@@ -4624,32 +4627,8 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
 
 ####################### DB #############################
 
-import sqlite3
-from sqlite3 import Error
 
-database = "{}/toots_db_{}_{}.db".format(DIR_out, timestamp.strftime("%Y-%m-%d"), upperend.strftime("%Y-%m-%d"))
-
-dbconnection = connectTo_weekly_toots_db(database)
-
-def get_table_columns(cursor, table_name):
-    """
-    Get column names and types for a given table.
-    """
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    
-    return {row[1]: row[2] for row in cursor.fetchall()}
-
-def get_row_count(cursor, table_name):
-    """
-    Get the total number of rows in a table.
-    """
-    
-    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-    
-    return cursor.fetchone()[0]
-
-
-def connectTo_weekly_toots_db(dbfile):
+def connect_to_epo_db(dbfile):
     
     conn = None
     try:
@@ -4660,6 +4639,108 @@ def connectTo_weekly_toots_db(dbfile):
     
     return conn
 
+
+def check_sqlite_database(dbconn, db_path, sample_rows=3):
+    
+    try:
+        cursor = dbconn.cursor()
+        
+        # Get all table names
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()       
+        if not tables:
+            print("No tables found in the database.")
+            return
+        print(f"Database: {db_path}")
+        print("=" * 70)
+        
+        for table_tuple in tables:
+            table_name = table_tuple[0]
+            print(f"\nTable: {table_name}")
+            print("-" * 50)
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = cursor.fetchall()
+            
+            if columns:
+                print("Columns:")
+                column_names = []
+                for col in columns:
+                    col_id, col_name, col_type, not_null, default_val, primary_key = col
+                    column_names.append(col_name)
+                    pk_indicator = " (PRIMARY KEY)" if primary_key else ""
+                    null_indicator = " NOT NULL" if not_null else ""
+                    default_indicator = f" DEFAULT {default_val}" if default_val is not None else ""
+                    
+                    print(f"  - {col_name}: {col_type}{pk_indicator}{null_indicator}{default_indicator}")
+            else:
+                print("  No columns found.")
+            
+            # cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
+            # row_count = cursor.fetchone()[0]
+            # print(f"  Rows: {row_count}")
+            row_count = 2*sample_rows
+
+            if row_count > 0:
+                print(f"\n  Sample Data (first {min(sample_rows, row_count)} rows):")
+                cursor.execute(f"SELECT * FROM {table_name} LIMIT {sample_rows};")
+                sample_data = cursor.fetchall()
+                
+                if sample_data:
+                    # Print column headers
+                    header = " | ".join(f"{name:>12}" for name in column_names)
+                    print(f"    {header}")
+                    print(f"    {'-' * len(header)}")
+                    
+                    # Print sample rows
+                    for row in sample_data:
+                        formatted_row = []
+                        for value in row:
+                            if value is None:
+                                formatted_row.append("NULL")
+                            elif isinstance(value, str) and len(str(value)) > 12:
+                                # Truncate long strings
+                                formatted_row.append(f"{str(value)[:9]}...")
+                            else:
+                                formatted_row.append(str(value))
+                        
+                        row_str = " | ".join(f"{val:>12}" for val in formatted_row)
+                        print(f"    {row_str}")
+                else:
+                    print("    No sample data available.")
+            else:
+                print("    Table is empty.")
+            
+            print()
+        
+    except sqlite3.Error as e:
+        print(f"SQLite error: {e}")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        if dbconn:
+            dbconn.close()
+
+
+
+def get_table_columns(dbconn, table_name="mp_follower_graph"):
+    """
+    Get column names and types for a given table.
+    """
+    cursor = dbconn.cursor()
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    
+    return {row[1]: row[2] for row in cursor.fetchall()}
+
+def get_row_count(dbconn, table_name):
+    """
+    Get the total number of rows in a table.
+    """
+    cursor = dbconn.cursor()
+    # cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+    cursor.execute(f"SELECT stat FROM sqlite_stat1 WHERE tbl='{table_name}';")
+    return cursor.fetchone()[0]
+
+
 def execute_create_sql(dbconnection, command):
     
     try:
@@ -4667,3 +4748,198 @@ def execute_create_sql(dbconnection, command):
         c.execute(command)
     except Error as e:
         print(e)
+
+
+def build_sparse_adjacency_matrix(dbconn, table_name, start_col, end_col, 
+                                    weighted=False, weight_col=None, directed=True):
+    """
+    Build sparse adjacency matrix directly from edge table.
+    
+    Args:
+        table_name (str): Name of the table containing edges
+        start_col (str): Column name for start/source nodes
+        end_col (str): Column name for end/destination nodes
+        weighted (bool): Whether the graph is weighted
+        weight_col (str): Column name for edge weights (if weighted)
+        directed (bool): Whether the graph is directed
+    
+    Returns:
+        scipy.sparse matrix: Sparse adjacency matrix in CSR format
+    """
+    cursor = dbconn.cursor()
+    
+    # Collect all unique nodes
+    print("Collecting unique nodes...")
+    query = f"SELECT DISTINCT {start_col} FROM {table_name}"
+    cursor.execute(query)
+    
+    unique_nodes_start = sorted([row[0] for row in cursor.fetchall()])
+    num_nodes_start = len(unique_nodes_start)
+    
+    # Create node mappings
+    node_to_index_start = {}
+    index_to_node_start = {}
+    node_to_index_start = {node: i for i, node in enumerate(unique_nodes_start)}
+    index_to_node_start = {i: node for i, node in enumerate(unique_nodes_start)}
+    print(f"Found {num_nodes_start} unique start nodes")
+
+    query = f"SELECT DISTINCT {end_col} FROM {table_name}"
+    cursor.execute(query)
+    
+    unique_nodes_end = sorted([row[0] for row in cursor.fetchall()])
+    num_nodes_end = len(unique_nodes_end)
+    
+    node_to_index_end = {}
+    index_to_node_end = {}
+    node_to_index_end = {node: i for i, node in enumerate(unique_nodes_end)}
+    index_to_node_end = {i: node for i, node in enumerate(unique_nodes_end)}
+    print(f"Found {num_nodes_end} unique end nodes")
+    
+
+
+    # Collect edges for sparse matrix construction
+    print("Collecting edges for sparse matrix...")
+    
+    if weighted and weight_col:
+        query = f"SELECT {start_col}, {end_col}, {weight_col} FROM {table_name}"
+    else:
+        query = f"SELECT {start_col}, {end_col} FROM {table_name}"
+    
+    cursor.execute(query)
+    
+    # Lists for COO (coordinate) format construction
+    row_indices = []
+    col_indices = []
+    data = []
+    
+    edge_count = 0
+    for row in cursor.fetchall():
+        start_node = row[0]
+        end_node = row[1]
+        weight = row[2] if weighted and weight_col else 1
+        
+        start_idx = node_to_index_start[start_node]
+        end_idx = node_to_index_end[end_node]
+        
+        # Add edge
+        row_indices.append(start_idx)
+        col_indices.append(end_idx)
+        data.append(weight)
+        
+        # If undirected, add symmetric edge
+        if not directed and start_idx != end_idx:  # no duplicate self-loops
+            row_indices.append(end_idx)
+            col_indices.append(start_idx)
+            data.append(weight)
+        
+        edge_count += 1
+    
+    print(f"Processed {edge_count} edges")
+    
+    # Create sparse matrix in COO format, then convert to CSR for efficiency
+    print("Building sparse adjacency matrix...")
+    dtype = float if weighted else int
+    
+    coo_matrix = sparse.coo_matrix(
+        (data, (row_indices, col_indices)), 
+        shape=(num_nodes_start, num_nodes_end),
+        dtype=dtype
+    )
+    
+    # Convert to CSR format for efficient operations
+    adjacency_matrix = coo_matrix.tocsr()
+    
+    # Handle duplicate edges by summing them (in case of multiple edges between same nodes)
+    adjacency_matrix.sum_duplicates()
+    
+    print(f"Sparse matrix constructed successfully")
+    return adjacency_matrix, node_to_index_start, index_to_node_start, node_to_index_end, index_to_node_end
+
+
+
+def print_matrix_info(adjacency_matrix):
+    
+    print(f"\nSparse Adjacency Matrix Info:")
+    print(f"Shape: {adjacency_matrix.shape}")
+    print(f"Format: {adjacency_matrix.format}")
+    print(f"Non-zero entries: {adjacency_matrix.nnz}")
+    print(f"Density: {adjacency_matrix.nnz / (adjacency_matrix.shape[0] ** 2):.6f}")
+    print(f"Sparsity: {1 - (adjacency_matrix.nnz / (adjacency_matrix.shape[0] ** 2)):.6f}")
+    print(f"Memory usage: {adjacency_matrix.data.nbytes / 1024 / 1024:.2f} MB")
+    
+    # Compare with equivalent dense matrix memory usage
+    dense_memory = (adjacency_matrix.shape[0] ** 2) * 8 / 1024 / 1024  # 8 bytes per float64
+    print(f"Equivalent dense matrix would use: {dense_memory:.2f} MB")
+    print(f"Memory savings: {(1 - adjacency_matrix.data.nbytes / (dense_memory * 1024 * 1024)) * 100:.1f}%")
+
+def save_matrix(adjacency_matrix, node_to_index, index_to_node, filename):
+    """Save sparse adjacency matrix to file."""
+    if adjacency_matrix is None:
+        print("No matrix to save.")
+        return
+    
+    # Save in npz format (preserves sparsity)
+    sparse.save_npz(f"{filename}.npz", adjacency_matrix)
+    print(f"Sparse matrix saved to {filename}.npz")
+    
+    # Also save node mappings
+    np.savez(f"{filename}_mappings.npz", 
+            node_to_index=node_to_index,
+            index_to_node=index_to_node)
+    print(f"Node mappings saved to {filename}_mappings.npz")
+
+def load_matrix(self, filename):
+    """Load sparse adjacency matrix from file."""
+    try:
+        self.adjacency_matrix = sparse.load_npz(f"{filename}.npz")
+        # Load node mappings
+        mappings = np.load(f"{filename}_mappings.npz", allow_pickle=True)
+        self.node_to_index = mappings['node_to_index'].item()
+        self.index_to_node = mappings['index_to_node'].item()
+        print(f"Matrix and mappings loaded from {filename}")
+        return True
+    except Exception as e:
+        print(f"Error loading matrix: {e}")
+        return False
+
+def get_neighbors(node_to_index, index_to_node, adjacency_matrix, node):
+    """Get neighbors of a specific node."""
+    if node not in node_to_index:
+        print(f"Node {node} not found in graph.")
+        return []
+    
+    node_idx = node_to_index[node]
+    # Get non-zero elements in the row (outgoing edges)
+    _, neighbor_indices = adjacency_matrix[node_idx].nonzero()
+    neighbors = [index_to_node[idx] for idx in neighbor_indices]
+    return neighbors
+
+def get_edge_weight(node_to_index, index_to_node, adjacency_matrix, node1, node2):
+    """Get weight of edge between two nodes."""
+    if node1 not in node_to_index or node2 not in node_to_index:
+        return 0
+    
+    idx1 = node_to_index[node1]
+    idx2 = node_to_index[node2]
+    
+    return adjacency_matrix[idx1, idx2]
+
+def to_dense(adjacency_matrix):
+    """Convert sparse matrix to dense (use with caution for large matrices)."""
+    if adjacency_matrix is None:
+        print("No matrix to convert.")
+        return None
+    
+    return adjacency_matrix.toarray()
+
+def get_submatrix(node_to_index, index_to_node, adjacency_matrix, nodes):
+    """Get submatrix for a subset of nodes."""
+    if not nodes:
+        return None
+    
+    indices = [node_to_index[node] for node in nodes if node in node_to_index]
+    if not indices:
+        print("No valid nodes found.")
+        return None
+    
+    return adjacency_matrix[np.ix_(indices, indices)]
