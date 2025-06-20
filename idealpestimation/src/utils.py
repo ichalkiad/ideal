@@ -4872,7 +4872,7 @@ def print_matrix_info(adjacency_matrix):
     print(f"Equivalent dense matrix would use: {dense_memory:.2f} MB")
     print(f"Memory savings: {(1 - adjacency_matrix.data.nbytes / (dense_memory * 1024 * 1024)) * 100:.1f}%")
 
-def save_matrix(adjacency_matrix, node_to_index, index_to_node, filename):
+def save_matrix(adjacency_matrix, node_to_index_start, index_to_node_start, node_to_index_end, index_to_node_end, filename):
     """Save sparse adjacency matrix to file."""
     if adjacency_matrix is None:
         print("No matrix to save.")
@@ -4883,9 +4883,11 @@ def save_matrix(adjacency_matrix, node_to_index, index_to_node, filename):
     print(f"Sparse matrix saved to {filename}.npz")
     
     # Also save node mappings
-    np.savez(f"{filename}_mappings.npz", 
-            node_to_index=node_to_index,
-            index_to_node=index_to_node)
+    np.savez(f"{filename}_K{adjacency_matrix.shape[0]}_J{adjacency_matrix.shape[1]}_mappings.npz", 
+            node_to_index_start=node_to_index_start,
+            index_to_node_start=index_to_node_start,
+            node_to_index_end=node_to_index_end,
+            index_to_node_end=index_to_node_end)
     print(f"Node mappings saved to {filename}_mappings.npz")
 
 def load_matrix(self, filename):

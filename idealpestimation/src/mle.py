@@ -363,7 +363,7 @@ def estimate_mle(args):
             var_estimation_success *= result["variance_status"]            
 
             i += 1  
-            if i % 10000 == 0:
+            if i % 100 == 0:
                 print(i, l, L, estimation_success, var_estimation_success)
 
          
