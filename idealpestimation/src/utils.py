@@ -2227,7 +2227,10 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             X_true = np.asarray(params_true["X"]) # d x K    
             X_hat = np.asarray(params_hat["X"]) # d x K         
             Z_true = np.asarray(params_true["Z"]) # d x J       
-            Z_hat = np.asarray(params_hat["Z"]) # d x J                                       
+            Z_hat = np.asarray(params_hat["Z"]) # d x J       
+            
+            print("Starting RT/nonRT compute")                                
+            
             Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
             Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
         else:
@@ -4614,3 +4617,53 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
     return Y_new, K_new, J_new, np.asarray(theta_true_new), param_positions_dict_new, parameter_space_dim_new
 
 ####################### CA #############################
+
+
+
+
+
+####################### DB #############################
+
+import sqlite3
+from sqlite3 import Error
+
+database = "{}/toots_db_{}_{}.db".format(DIR_out, timestamp.strftime("%Y-%m-%d"), upperend.strftime("%Y-%m-%d"))
+
+dbconnection = connectTo_weekly_toots_db(database)
+
+def get_table_columns(cursor, table_name):
+    """
+    Get column names and types for a given table.
+    """
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    
+    return {row[1]: row[2] for row in cursor.fetchall()}
+
+def get_row_count(cursor, table_name):
+    """
+    Get the total number of rows in a table.
+    """
+    
+    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+    
+    return cursor.fetchone()[0]
+
+
+def connectTo_weekly_toots_db(dbfile):
+    
+    conn = None
+    try:
+        conn = sqlite3.connect(dbfile)
+        print(sqlite3.version)
+    except Error as e:
+        print(e)
+    
+    return conn
+
+def execute_create_sql(dbconnection, command):
+    
+    try:
+        c = dbconnection.cursor()
+        c.execute(command)
+    except Error as e:
+        print(e)
