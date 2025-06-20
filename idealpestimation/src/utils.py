@@ -491,7 +491,7 @@ def create_constraint_functions(n, param_positions_dict=None, sum_z_constant=0, 
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, param_positions_dict, rng, batchsize, _ = args
         
-        grid_width_std = 5
+        grid_width_std = 6
         bounds = []
         if target_param is not None:
             if target_param == "X":
