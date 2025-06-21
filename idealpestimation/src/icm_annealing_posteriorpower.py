@@ -829,7 +829,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 
                 #################################################################
                 # in posterior annealing, after a full update, check for convergence after each iteration - l > 0 to ensure all params will have been updated at least once
-                if (not data_annealing and l > 0 and l > int(percentage_parameter_change*parameter_space_dim)):
+                if (not data_annealing and l > int(percentage_parameter_change*parameter_space_dim)):
                     converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, i, 
                                                                         parameter_space_dim=parameter_space_dim, testparam=testparam, 
                                                                         testidx=testidx, p=percentage_parameter_change, tol=tol)
@@ -856,8 +856,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 delta_rate_prev = delta_rate                                                                    
                 total_iter += 1   
                 i += 1   
-                if i % 20000 == 0:
-                    print(i, l)                          
+                if i % 10000 == 0:
+                    print(i, l, target_param)                          
             
             # last entry in mse lists in the same, has been stored twice
             if plot_online: # and l==4: ################################################################
