@@ -300,8 +300,8 @@ def estimate_mle(args):
                 prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae, 
                 param_positions_dict_theta, rng, batchsize, theta_true)   
 
-    max_full_restarts = 1
-    max_partial_restarts = 1
+    max_full_restarts = 2
+    max_partial_restarts = 3
     full_restarts = 0
     estimated_thetas = []
     estimation_success = False
@@ -363,7 +363,7 @@ def estimate_mle(args):
             var_estimation_success *= result["variance_status"]            
 
             i += 1  
-            if i % 100 == 0:
+            if i % 10000 == 0:
                 print(i, l, L, estimation_success, var_estimation_success)
 
          
