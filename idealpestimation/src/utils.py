@@ -4389,7 +4389,9 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
 def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_names, dst_func, 
                             param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1, 
                             debug=False, numbafast=True):
-        
+    
+    print(idx)
+    
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
