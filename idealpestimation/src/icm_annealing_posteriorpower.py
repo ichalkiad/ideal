@@ -856,7 +856,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 delta_rate_prev = delta_rate                                                                    
                 total_iter += 1   
                 i += 1   
-                if i % 10000 == 0:
+                if i % 10000 == 0 or (i % 1000==0 and target_param=="beta"):
                     print(i, l, target_param)                          
             
             # last entry in mse lists in the same, has been stored twice

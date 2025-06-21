@@ -4407,8 +4407,6 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
             _logpbeta_k += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta)
 
     if numbafast:
-        print(idx, beta)
-
         params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
