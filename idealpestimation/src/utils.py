@@ -2207,13 +2207,13 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
   
     best_theta = None
     computed_logfullposterior = []
-    # for theta_set in estimated_thetas:
-    #     theta = theta_set[0]
-    #     _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
-    #     computed_logfullposterior.append(posterior[0])
+    for theta_set in estimated_thetas:
+        theta = theta_set[0]
+        _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
+        computed_logfullposterior.append(posterior[0])
     # sort in increasing order, i.e. from worst to best solution
-    # sorted_idx = np.argsort(np.asarray(computed_logfullposterior))
-    sorted_idx_lst = [0] #sorted_idx.tolist()  
+    sorted_idx = np.argsort(np.asarray(computed_logfullposterior))
+    sorted_idx_lst = sorted_idx.tolist()  
     # save in the order of best to worst solution
     best2worst = list(reversed(sorted_idx_lst))    
     theta_list = []
@@ -2242,7 +2242,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             err_z_RT = estimated_thetas[i][6]
             err_x_nonRT = estimated_thetas[i][7]
             err_z_nonRT = estimated_thetas[i][8]
-        logposterior = 0 #computed_logfullposterior[i] ##################
+        logposterior = computed_logfullposterior[i]
         posterior_list.append(logposterior)
         
         params_out = dict()
