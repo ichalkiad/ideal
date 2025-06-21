@@ -804,7 +804,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                         i += 1 
                         continue         
                     # in the posterior annealing, after the first full update, including sigma_e/gamma, only update them every five iterations and at the end
-                    elif (not data_annealing and (l>0 and not (l % 5 == 0))):  ########################## remove l>0
+                    elif (not data_annealing and (l > 0 and not (l % 5 == 0))): 
                         i += 1 
                         continue
                     else:
