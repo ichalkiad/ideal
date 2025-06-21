@@ -794,6 +794,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         random_restart = False
         if elementwise:
             i = 100300 ########################################## 0
+            t00 = time.time()
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
@@ -857,6 +858,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 total_iter += 1   
                 i += 1   
                 if i % 10000 == 0 or (i % 1000==0 and target_param=="beta"):
+                    milliseconds = (time.time()-t00)*1000  
+                    print(milliseconds)
                     print(i, l, target_param)                          
             
             # last entry in mse lists in the same, has been stored twice
