@@ -2244,6 +2244,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             err_z_nonRT = estimated_thetas[i][8]
         logposterior = computed_logfullposterior[i]
         posterior_list.append(logposterior)
+        print("OKOKOKOK")
         params_out = dict()
         params_out["logfullposterior"] = logposterior
         params_out["mse_x_RT"] = mse_x_RT
@@ -2274,6 +2275,8 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                 writer = jsonlines.Writer(f)
                 writer.write(params_out)
 
+        print("OKOKOKOK")
+
         if plot_solutions:
             # plot utilities
             pathlib.Path("{}/solution_plots/".format(DIR_out)).mkdir(parents=True, exist_ok=True)   
@@ -2290,6 +2293,9 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                                     xaxis_title="Leaders", yaxis_title="Followers", title="Utilities with estimated parameters", 
                                     showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
       
+    
+    print("OKOKOKOK")
+
     if not (efficiency_measures is None):
         out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
         with open(out_file, 'a') as f:         
@@ -2303,6 +2309,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                         "max_threads": max_threads, 
                         "avg_processes": avg_processes, 
                         "max_processes": max_processes})
+    print("OKOKOKOK")
 
     if plot_solutions:
         # 2D projection of solutions
@@ -2328,7 +2335,8 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                                     title="s1 = {:.3f}, s2 = {:.3f}".format(pca.singular_values_[0], pca.singular_values_[1]), 
                                     showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
             # fig.show()
-    
+    print("OKOKOKOK")
+
     return best_theta
  
 
