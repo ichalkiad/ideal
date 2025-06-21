@@ -2473,7 +2473,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     H = X_centered.T @ Y_centered
     
     # SVD
-    if param_true.shape[0] <= 10000:
+    if param_true.shape[1] <= 10000:
         try:
             U, S, Vt = np.linalg.svd(H)
         except:
