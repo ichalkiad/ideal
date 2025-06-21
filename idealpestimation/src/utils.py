@@ -2500,7 +2500,6 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
             )
         U, S, Vt = svd_out.U, svd_out.s, svd_out.V
 
-    ipdb.set_trace()
     # Construct the rotation matrix
     # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
     vu = Vt.T @ U.T
@@ -2516,7 +2515,6 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     M[-1, -1] = d
     R = Vt.T @ M @ U.T
     
-    ipdb.set_trace()
     # Step 5: Compute the optimal translation
     t = Y_mean - X_mean @ R
     
@@ -2537,13 +2535,14 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     sq_err_nonRT = rel_err_nonRT**2
     meanrelerror_nonRT = np.mean(rel_err_nonRT)
     meansquarederror_nonRT = np.mean(sq_err_nonRT)
-        
-    orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
-    det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
-    t_shape_correct = t.shape == (param_hat.shape[1],)
-    if not (orthogonality_error < 1e-10 and det_is_one and t_shape_correct):
-        print("Orthogonality error: {}".format(orthogonality_error))
-        # raise AttributeError("Error in solving projection problem?")
+
+    if param_true.shape[1] <= 10000:   
+        orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
+        det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
+        t_shape_correct = t.shape == (param_hat.shape[1],)
+        if not (orthogonality_error < 1e-10 and det_is_one and t_shape_correct):
+            print("Orthogonality error: {}".format(orthogonality_error))
+            # raise AttributeError("Error in solving projection problem?")
 
     return R, t, meansquarederror, meansquarederror_nonRT, meanrelerror, meanrelerror_nonRT
 
