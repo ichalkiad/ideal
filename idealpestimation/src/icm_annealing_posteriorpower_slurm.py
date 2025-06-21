@@ -137,7 +137,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
         # to be run on prepost with 2 cpus per task due to memory requirements for RT error
         rank_and_plot_solutions(thetas_and_errors, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, 
-                                dst_func, param_positions_dict, DIR_out, args, seedint=seedint, get_RT_error=False)
+                                dst_func, param_positions_dict, DIR_out, args, seedint=seedint, get_RT_error=True)
 
 
 if __name__ == "__main__":
