@@ -810,9 +810,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     else:
                         print(data_annealing, l, L, "will update {}".format(target_param))
 
-                if target_param == "beta":
-                    ipdb.set_trace()   
-                          
                 
                 # t00 = time.time()
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 

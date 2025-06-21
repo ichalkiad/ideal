@@ -3088,7 +3088,10 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
     if gridpoints_num_plot is not None:
         gridpoints_num = gridpoints_num_plot
     
-    gridpoints_num_alpha_beta = gridpoints_num**2
+    if not elementwise:
+        gridpoints_num_alpha_beta = gridpoints_num**2
+    else:
+        gridpoints_num_alpha_beta = gridpoints_num*2
     xx_ = None
 
     if param == "alpha":
