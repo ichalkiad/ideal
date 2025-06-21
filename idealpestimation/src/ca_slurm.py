@@ -126,7 +126,7 @@ if __name__ == "__main__":
     evaluate_posterior = True
     parallel = False
     total_running_processes = 1
-
+    
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"    
     parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_ca.csv", header=None)
