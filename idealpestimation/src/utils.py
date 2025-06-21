@@ -2484,7 +2484,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
         except:
             svd_out = ca_svd.compute_svd(
                 X=H,
-                n_iter=1,
+                n_iter=2,
                 n_components=param_true.shape[0],
                 random_state=seedint,
                 engine='sklearn',
@@ -2493,7 +2493,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     else:
         svd_out = ca_svd.compute_svd(
                 X=H,
-                n_iter=1,
+                n_iter=2,
                 n_components=param_true.shape[0],
                 random_state=seedint,
                 engine='sklearn',
