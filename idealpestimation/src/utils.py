@@ -4109,7 +4109,7 @@ def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_name
                                 param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, 
                                 debug=False, numbafast=True):
     # l denotes the coordinate of vector x_i
-    print(i)
+    # print(i)
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                         
@@ -4391,8 +4391,6 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
                             param_positions_dict, prior_loc_beta=0, prior_scale_beta=1, gamma=1, 
                             debug=False, numbafast=True):
     
-    print(idx)
-
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
@@ -4409,6 +4407,8 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
             _logpbeta_k += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(beta, loc=prior_loc_beta, scale=prior_scale_beta)
 
     if numbafast:
+        print(idx, beta)
+
         params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
         X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
         Z = np.asarray(params_hat["Z"]).reshape((d, J), order="F")     
