@@ -4109,6 +4109,7 @@ def log_conditional_posterior_x_il(x_il, l, i, Y, theta, J, K, d, parameter_name
                                 param_positions_dict, prior_loc_x=0, prior_scale_x=1, gamma=1, 
                                 debug=False, numbafast=True):
     # l denotes the coordinate of vector x_i
+    print(i)
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     X = np.asarray(params_hat["X"]).reshape((d, K), order="F")                         
@@ -4391,7 +4392,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
                             debug=False, numbafast=True):
     
     print(idx)
-    
+
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
     sigma_e = params_hat["sigma_e"]
