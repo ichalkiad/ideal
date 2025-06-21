@@ -2510,7 +2510,8 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
         except:            
             d = np.exp(np.linalg.slogdet(vu))
     else:
-        d = np.exp(np.linalg.slogdet(vu))
+        # approximate det as product of extracted eigenvalues
+        d = np.prod(S)
     M = np.eye(U.shape[1])
     M[-1, -1] = d
     R = Vt.T @ M @ U.T
