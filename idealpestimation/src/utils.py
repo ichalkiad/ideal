@@ -2485,7 +2485,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
             svd_out = ca_svd.compute_svd(
                 X=H,
                 n_iter=1,
-                n_components=5,
+                n_components=param_true.shape[0],
                 random_state=seedint,
                 engine='sklearn',
             )
@@ -2494,7 +2494,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
         svd_out = ca_svd.compute_svd(
                 X=H,
                 n_iter=1,
-                n_components=5,
+                n_components=param_true.shape[0],
                 random_state=seedint,
                 engine='sklearn',
             )
@@ -2504,10 +2504,12 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     # Construct the rotation matrix
     # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
     vu = Vt.T @ U.T
-    try:
-        d = np.linalg.det(vu)
-    except:
-        ipdb.set_trace()
+    if param_true.shape[1] <= 10000:
+        try:
+            d = np.linalg.det(vu)
+        except:            
+            d = np.exp(np.linalg.slogdet(vu))
+    else:
         d = np.exp(np.linalg.slogdet(vu))
     M = np.eye(U.shape[1])
     M[-1, -1] = d
