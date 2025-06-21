@@ -2207,13 +2207,13 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
   
     best_theta = None
     computed_logfullposterior = []
-    for theta_set in estimated_thetas:
-        theta = theta_set[0]
-        _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
-        computed_logfullposterior.append(posterior[0])
+    # for theta_set in estimated_thetas:
+    #     theta = theta_set[0]
+    #     _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
+    #     computed_logfullposterior.append(posterior[0])
     # sort in increasing order, i.e. from worst to best solution
-    sorted_idx = np.argsort(np.asarray(computed_logfullposterior))
-    sorted_idx_lst = sorted_idx.tolist()  
+    # sorted_idx = np.argsort(np.asarray(computed_logfullposterior))
+    sorted_idx_lst = [0] #sorted_idx.tolist()  
     # save in the order of best to worst solution
     best2worst = list(reversed(sorted_idx_lst))    
     theta_list = []
@@ -2242,9 +2242,9 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             err_z_RT = estimated_thetas[i][6]
             err_x_nonRT = estimated_thetas[i][7]
             err_z_nonRT = estimated_thetas[i][8]
-        logposterior = computed_logfullposterior[i]
+        logposterior = 0 #computed_logfullposterior[i] ##################
         posterior_list.append(logposterior)
-        print("OKOKOKOK")
+        
         params_out = dict()
         params_out["logfullposterior"] = logposterior
         params_out["mse_x_RT"] = mse_x_RT
@@ -2275,7 +2275,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                 writer = jsonlines.Writer(f)
                 writer.write(params_out)
 
-        print("OKOKOKOK")
+        
 
         if plot_solutions:
             # plot utilities
@@ -2294,7 +2294,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                                     showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
       
     
-    print("OKOKOKOK")
+    
 
     if not (efficiency_measures is None):
         out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
@@ -2309,7 +2309,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                         "max_threads": max_threads, 
                         "avg_processes": avg_processes, 
                         "max_processes": max_processes})
-    print("OKOKOKOK")
+    
 
     if plot_solutions:
         # 2D projection of solutions
@@ -2335,7 +2335,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                                     title="s1 = {:.3f}, s2 = {:.3f}".format(pca.singular_values_[0], pca.singular_values_[1]), 
                                     showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
             # fig.show()
-    print("OKOKOKOK")
+    
 
     return best_theta
  
@@ -2484,8 +2484,8 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
         except:
             svd_out = ca_svd.compute_svd(
                 X=H,
-                n_iter=2,
-                n_components=10,
+                n_iter=1,
+                n_components=5,
                 random_state=seedint,
                 engine='sklearn',
             )
@@ -2493,20 +2493,27 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     else:
         svd_out = ca_svd.compute_svd(
                 X=H,
-                n_iter=2,
-                n_components=10,
+                n_iter=1,
+                n_components=5,
                 random_state=seedint,
                 engine='sklearn',
             )
         U, S, Vt = svd_out.U, svd_out.s, svd_out.V
 
+    ipdb.set_trace()
     # Construct the rotation matrix
     # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
-    d = np.linalg.det(Vt.T @ U.T)
+    vu = Vt.T @ U.T
+    try:
+        d = np.linalg.det(vu)
+    except:
+        ipdb.set_trace()
+        d = np.exp(np.linalg.slogdet(vu))
     M = np.eye(U.shape[1])
     M[-1, -1] = d
     R = Vt.T @ M @ U.T
     
+    ipdb.set_trace()
     # Step 5: Compute the optimal translation
     t = Y_mean - X_mean @ R
     
