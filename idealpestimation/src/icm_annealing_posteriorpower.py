@@ -798,19 +798,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if (target_param == "gamma" or target_param == "sigma_e"):
-                    # in the data annealing setting, update costly sigma_e and gamma every five full iterations and at the end
-                    if (data_annealing and (l == 0 or not (l % 5 == 0))):     
+                if ((target_param == "gamma" or target_param == "sigma_e") and (not (l % 5 == 0))):
                         i += 1 
-                        continue         
-                    # in the posterior annealing, after the first full update, including sigma_e/gamma, only update them every five iterations and at the end
-                    elif (not data_annealing and (l > 0 and not (l % 5 == 0))): 
-                        i += 1 
-                        continue
-                    else:
-                        print(data_annealing, l, L, "will update {}".format(target_param))
-
-                
+                        continue                         
                 # t00 = time.time()
                 theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
                                                             Y, gamma, theta_curr.copy(), param_positions_dict, L, args)    
