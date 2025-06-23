@@ -180,7 +180,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2  
-    gridpoints_num = 30 #, 15, 30
+    gridpoints_num = 50 #, 15, 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -202,10 +202,10 @@ if __name__ == "__main__":
     temperature_steps = [0, 1, 2, 5, 10]
     temperature_rate = [1e-3, 1e-2, 1e-1, 1]
 
-    niter = 10
+    niter = 15 # 10
     fastrun = True
     max_restarts = 2
-    max_partial_restarts = 2
+    max_partial_restarts = 4 #2
     max_halving = 2
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr

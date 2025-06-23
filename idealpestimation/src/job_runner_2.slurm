@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=testicmd50gpiter100
-#SBATCH --output=finalicmd50gpiter100.out # create output files indexed with the job array task id
+#SBATCH --job-name=testicmp50gpiter15partrestart4
+#SBATCH --output=finalicmp50gpiter15partrestart4.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost
-#SBATCH --time=04:00:00   # DMLE: 2h
+#SBATCH --time=16:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P:
 ##SBATCH --qos=qos_cpu-t3   #qos_cpu-dev
 #SBATCH --hint=nomultithread 
 #SBATCH --nodes=1          
@@ -25,8 +25,8 @@ module load singularity
 
 set -x
 
-# time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/icm_annealing_posteriorpower_slurm.py"
-time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/icm_annealing_data_slurm.py"
+time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/icm_annealing_posteriorpower_slurm.py"
+# time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/icm_annealing_data_slurm.py"
 # time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/mle_slurm.py"
 # time singularity exec --bind $WORK:/linkhome/rech/genpuz01/umi36fq,$WORK/ideal/:/app/repo $SINGULARITY_ALLOWED_DIR/ideal_symblink.sif bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ideal && python /app/repo/idealpestimation/src/ca_slurm.py"
 
