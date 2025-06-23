@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=testicmd30gpiter100
-#SBATCH --output=finalicmd30gpiter100.out # create output files indexed with the job array task id
+#SBATCH --job-name=testicmd50gpiter100
+#SBATCH --output=finalicmd50gpiter100.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost
 #SBATCH --time=04:00:00   # DMLE: 2h
 ##SBATCH --qos=qos_cpu-t3   #qos_cpu-dev
