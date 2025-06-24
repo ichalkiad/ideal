@@ -132,11 +132,11 @@ if __name__ == "__main__":
     parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_ca.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
-    Mmin = 0 #int(parameter_vector[0])
+    Mmin = int(parameter_vector[0])
     M = int(Mmin + 1)
-    K = 50000 #int(parameter_vector[1])
-    J = 100 # int(parameter_vector[2])
-    sigma_e_true = 0.1 #parameter_vector[3]
+    K = int(parameter_vector[1])
+    J = int(parameter_vector[2])
+    sigma_e_true = parameter_vector[3]
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
     

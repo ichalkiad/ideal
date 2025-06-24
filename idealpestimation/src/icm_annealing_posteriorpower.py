@@ -1017,12 +1017,12 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
         else:
             theta_prev = theta_curr.copy() 
-            l += 1
+
         print("Annealing schedule repeat no.: {}".format(l))
         print("Total conditional posterior evaluations: {}".format(total_iter))
         print("Convergence: {}".format(converged))
         print("Random restart: {}".format(random_restart))
-
+        l += 1
     # last update of gamma, sigma_e
     if elementwise:
         i = 0                 
