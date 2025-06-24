@@ -4581,8 +4581,6 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
 
     K_new = K - len(k_idx.flatten())
     J_new = J - len(j_idx.flatten())
-
-    ipdb.set_trace()
     
     parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
     param_positions_dict_new = dict()            
