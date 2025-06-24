@@ -4583,63 +4583,64 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
     J_new = J - len(j_idx.flatten())
     
     parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
-    param_positions_dict_new = dict()            
+    param_positions_dict_new = dict()     
+    theta_true_new = []    
+    params_out_init = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
     k = 0
     for param in parameter_names:
         if param == "X":
-            param_positions_dict_new[param] = (k, k + K_new*d)                       
-            k += K_new*d    
+            param_positions_dict_new[param] = (k, k + K_new*d)                                       
+            X_new = np.delete(params_out_init["X"], k_idx, 1)
+            Xvec = X_new.reshape((d*K_new,), order="F").tolist()        
+            theta_true_new.extend(Xvec)            
+            k += K_new*d
         elif param in ["Z"]:
-            param_positions_dict_new[param] = (k, k + J_new*d)                                
+            param_positions_dict_new[param] = (k, k + J_new*d)                                            
+            Z_new = np.delete(params_out_init["Z"], j_idx, 1)
+            Zvec = Z_new.reshape((d*J_new,), order="F").tolist()        
+            theta_true_new.extend(Zvec)            
             k += J_new*d
         elif param in ["Phi"]:            
-            param_positions_dict_new[param] = (k, k + J_new*d)                                
+            param_positions_dict_new[param] = (k, k + J_new*d)                                            
+            Phi_new = np.delete(params_out_init["Phi"], j_idx, 1)
+            Phivec = Phi_new.reshape((d*J_new,), order="F").tolist()        
+            theta_true_new.extend(Phivec)            
             k += J_new*d
         elif param == "beta":
-            param_positions_dict_new[param] = (k, k + K_new)                                   
+            param_positions_dict_new[param] = (k, k + K_new)                                               
+            beta_new = np.delete(params_out_init["beta"], k_idx, 0)            
+            theta_true_new.extend(beta_new.tolist())            
             k += K_new
         elif param == "alpha":
-            param_positions_dict_new[param] = (k, k + J_new)                                       
+            param_positions_dict_new[param] = (k, k + J_new)                                                   
+            alpha_new = np.delete(params_out_init["alpha"], j_idx, 0)            
+            theta_true_new.extend(alpha_new.tolist())            
             k += J_new
         elif param == "gamma":
             param_positions_dict_new[param] = (k, k + 1)                                
+            theta_true_new.append(params_out_init["gamma"][0])            
             k += 1
         elif param == "delta":
-            param_positions_dict_new[param] = (k, k + 1)                                
+            param_positions_dict_new[param] = (k, k + 1)                  
+            theta_true_new.append(params_out_init["delta"][0])                          
             k += 1
         elif param == "sigma_e":
-            param_positions_dict_new[param] = (k, k + 1)                                
+            param_positions_dict_new[param] = (k, k + 1)
+            theta_true_new.append(params_out_init["sigma_e"][0])                                            
             k += 1
-
-    theta_true_new = theta_true.tolist().copy()
-    for kidx in k_idx.flatten().tolist():
-        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=kidx, d=d)
-        # assert target_param == "X"
-        del theta_true_new[param_positions_dict["X"][0]+kidx*d:param_positions_dict["X"][0]+(kidx+1)*d]
-        del theta_true_new[param_positions_dict["beta"][0]-kidx*d+kidx:param_positions_dict["beta"][0]-kidx*d+kidx+1] # due to removal of X vector, shift all indices d positions to the left
-    for jidx in j_idx.flatten().tolist():
-        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=jidx, d=d)
-        # assert target_param == "Z"
-        del theta_true_new[param_positions_dict["Z"][0]+jidx*d:param_positions_dict["Z"][0]+(jidx+1)*d]
-        if "Phi" in parameter_names:
-            del theta_true_new[param_positions_dict["Phi"][0]+jidx*d:param_positions_dict["Phi"][0]+(jidx+1)*d]
-        if "Phi" in parameter_names:            
-            del theta_true_new[param_positions_dict["alpha"][0]-2*jidx*d+jidx:param_positions_dict["alpha"][0]-2*jidx*d+jidx+1]
-        else:
-            del theta_true_new[param_positions_dict["alpha"][0]-jidx*d+jidx:param_positions_dict["alpha"][0]-jidx*d+jidx+1]
 
     print("Dropped {} users, {} lead users, new parameter space size: {}.".format(K-K_new, J-J_new, parameter_space_dim_new))
 
     i = 0
     ii = 0
     theta_true = theta_true.tolist()
-    while i < (K+J)*d + J + K + 2:
+    while i < len(theta_true):
         target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
-        if vector_index_in_param_matrix in k_idx.flatten().tolist():
+        if vector_index_in_param_matrix in k_idx.flatten().tolist():            
             i += 1            
         elif vector_index_in_param_matrix in j_idx.flatten().tolist():
             i += 1
-        else:
+        else:            
             assert np.allclose(theta_true[i], theta_true_new[ii])
             i += 1
             ii += 1
