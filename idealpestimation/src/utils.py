@@ -4582,6 +4582,8 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
     K_new = K - len(k_idx.flatten())
     J_new = J - len(j_idx.flatten())
 
+    ipdb.set_trace()
+    
     parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
     param_positions_dict_new = dict()            
     k = 0
@@ -4616,7 +4618,7 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
         target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=kidx, d=d)
         # assert target_param == "X"
         del theta_true_new[param_positions_dict["X"][0]+kidx*d:param_positions_dict["X"][0]+(kidx+1)*d]
-        del theta_true_new[param_positions_dict["beta"][0]-d+kidx:param_positions_dict["beta"][0]-d+kidx+1] # due to removal of X vector, shift all indices d positions to the left
+        del theta_true_new[param_positions_dict["beta"][0]-kidx*d+kidx:param_positions_dict["beta"][0]-kidx*d+kidx+1] # due to removal of X vector, shift all indices d positions to the left
     for jidx in j_idx.flatten().tolist():
         target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=jidx, d=d)
         # assert target_param == "Z"
@@ -4624,9 +4626,9 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
         if "Phi" in parameter_names:
             del theta_true_new[param_positions_dict["Phi"][0]+jidx*d:param_positions_dict["Phi"][0]+(jidx+1)*d]
         if "Phi" in parameter_names:            
-            del theta_true_new[param_positions_dict["alpha"][0]-2*d+jidx:param_positions_dict["alpha"][0]-2*d+jidx+1]
+            del theta_true_new[param_positions_dict["alpha"][0]-2*jidx*d+jidx:param_positions_dict["alpha"][0]-2*jidx*d+jidx+1]
         else:
-            del theta_true_new[param_positions_dict["alpha"][0]-d+jidx:param_positions_dict["alpha"][0]-d+jidx+1]
+            del theta_true_new[param_positions_dict["alpha"][0]-jidx*d+jidx:param_positions_dict["alpha"][0]-jidx*d+jidx+1]
 
     print("Dropped {} users, {} lead users, new parameter space size: {}.".format(K-K_new, J-J_new, parameter_space_dim_new))
 
