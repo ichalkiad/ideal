@@ -142,9 +142,9 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-    # parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
 
-    seed_value = 8125 #+ parameter_vector_idx
+    seed_value = 8125 + parameter_vector_idx
     random.seed(seed_value)
     np.random.seed(seed_value)
 
@@ -153,24 +153,16 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
 
-    # dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
-    # parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster.csv", header=None)
-    # parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster.csv", header=None)
+    parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
-    # Mmin = int(parameter_vector[0])
-    # M = int(Mmin + 1)
-    # K = int(parameter_vector[1])
-    # J = int(parameter_vector[2])
-    # sigma_e_true = parameter_vector[3]
-    # total_running_processes = 1
-
-    dataspace = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
-    Mmin = 0
-    M = 1
-    K = 50000
-    J = 100
-    sigma_e_true = 0.1
-    total_running_processes = 1
+    Mmin = int(parameter_vector[0])
+    M = int(Mmin + 1)
+    K = int(parameter_vector[1])
+    J = int(parameter_vector[2])
+    sigma_e_true = parameter_vector[3]
+    total_running_processes = 1    
 
     print(parallel, Mmin, M, K, J, sigma_e_true, total_running_processes, elementwise, evaluate_posterior)
     # before halving annealing rate
