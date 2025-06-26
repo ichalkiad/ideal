@@ -32,7 +32,7 @@ from sqlite3 import Error
 from scipy import sparse
 
 
-def get_slurm_experiment_csvs(Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
+def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
 
     ca = {"trial":[], "K":[], "J":[], "sigma_e":[]}
     mle = {"trial":[], "K":[], "J":[], "sigma_e":[], "batchsize":[], "data_start":[], "data_end":[]}
@@ -73,13 +73,13 @@ def get_slurm_experiment_csvs(Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
                         mle["data_end"].append(end)
                         icm_data["data_end"].append(end)
     caout = pd.DataFrame.from_dict(ca)              
-    caout.to_csv("{}/slurm_experimentI_ca.csv".format(dir_out), header=None, index=False)
+    caout.to_csv("{}/slurm_experiment{}_ca.csv".format(dir_out, exper), header=None, index=False)
     mleout = pd.DataFrame.from_dict(mle)              
-    mleout.to_csv("{}/slurm_experimentI_mle.csv".format(dir_out), header=None, index=False)
+    mleout.to_csv("{}/slurm_experiment{}_mle.csv".format(dir_out, exper), header=None, index=False)
     icmpout = pd.DataFrame.from_dict(icm_poster)              
-    icmpout.to_csv("{}/slurm_experimentI_icm_poster.csv".format(dir_out), header=None, index=False)
+    icmpout.to_csv("{}/slurm_experiment{}_icm_poster.csv".format(dir_out, exper), header=None, index=False)
     icmdout = pd.DataFrame.from_dict(icm_data)              
-    icmdout.to_csv("{}/slurm_experimentI_icm_data.csv".format(dir_out), header=None, index=False)
+    icmdout.to_csv("{}/slurm_experiment{}_icm_data.csv".format(dir_out, exper), header=None, index=False)
 
 
 
