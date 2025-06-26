@@ -708,6 +708,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     i = 0    
     theta_prev = np.zeros((parameter_space_dim,))
 
+    print("OKOKOKOKOKOKOKOKOK")
+
+
     if data_annealing:
         gamma = 1
         all_gammas = np.ones((10,)).tolist()
