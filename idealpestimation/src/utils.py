@@ -2364,7 +2364,7 @@ def sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_d
         if d > 2:
             raise NotImplementedError("In {}-dimensional space for the ideal points, find a way to generate random initial solutions.")
         sampler = qmc.Sobol(d=21201, scramble=False)    
-        base2exponent = 15
+        base2exponent = 8  # 15
         samples = sampler.random_base2(m=base2exponent)
         samplesreshape = samples[1:,:].reshape((-1,1))
         samplesselect = rng.choice(samplesreshape, 15*parameter_space_dim, replace=False)
