@@ -274,7 +274,7 @@ if __name__ == "__main__":
 
     niter = 100
     max_restarts = 2
-    max_partial_restarts = 2
+    max_partial_restarts = 4 #2
     max_halving = 2
     max_signal2noise_ratio = 25 # in dB   # max snr
 
