@@ -7,7 +7,7 @@
 #SBATCH --hint=nomultithread 
 #SBATCH --nodes=1          
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1  ############################  2 for CA, 3 for ICM-P on cpu_p1
+#SBATCH --cpus-per-task=1  ############################  2 for CA, 3 for ICM-P on cpu_p1, 1 on prepost
 #SBATCH --array=0-0 #49  # expI ca, icm-p  # 0-1649 expI icm-d, mle
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
