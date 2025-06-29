@@ -291,7 +291,7 @@ if __name__ == "__main__":
     batchsize = 1504
     dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
     dir_out = "/mnt/hdd2/ioannischalkiadakis/"
-    get_slurm_experiment_csvs(Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
+    get_slurm_experiment_csvs("I", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
     sys.exit()
 
     # python idealpestimation/src/ca.py --trials 1 --K 30 --J 10 --sigmae 001

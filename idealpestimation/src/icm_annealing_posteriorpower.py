@@ -1017,6 +1017,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
         else:
             theta_prev = theta_curr.copy() 
+            if restarts >= max_partial_restarts + max_restarts:
+                random_restart = False
 
         print("Annealing schedule repeat no.: {}".format(l))
         print("Total conditional posterior evaluations: {}".format(total_iter))
