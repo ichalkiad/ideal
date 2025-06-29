@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=expI_icmp
+#SBATCH --job-name=expI_icmp_testnumba
 #SBATCH --output=%x_%A_%a.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost #cpu_p1
-#SBATCH --time=18:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
+#SBATCH --time=15:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
 ##SBATCH --qos=qos_cpu-t3   #qos_cpu-dev
 #SBATCH --hint=nomultithread 
 #SBATCH --nodes=1          
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1  ############################  2 for CA, 3 for ICM-P on cpu_p1, 1 on prepost
-#SBATCH --array=0-0 #49  # expI ca, icm-p  # 0-1649 expI icm-d, mle
+#SBATCH --cpus-per-task=3  ############################  2 for CA, 3 for ICM-P on cpu_p1, 1 on prepost
+#SBATCH --array=1-1 #49  # expI ca, icm-p  # 0-1649 expI icm-d, mle
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL

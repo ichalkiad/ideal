@@ -1,9 +1,9 @@
 import os 
 
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["NUMBA_NUM_THREADS"] = "1"
+# os.environ["OMP_NUM_THREADS"] = "1"
+# os.environ["MKL_NUM_THREADS"] = "1"
+# os.environ["OPENBLAS_NUM_THREADS"] = "1"
+# os.environ["NUMBA_NUM_THREADS"] = "1"
 # os.environ["JAX_NUM_THREADS"] = "500"
 # os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
 
@@ -1142,12 +1142,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                 for result in f.iter(type=dict, skip_invalid=True):
                     for param in parameter_names:
                         theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
-            
-            
-
-            # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
-
-            
+                     
             
             args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                     parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 

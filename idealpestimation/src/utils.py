@@ -1106,7 +1106,7 @@ def negative_loglik_coordwise_sigma_e(theta_coordval, theta_idx, full_theta, Y, 
 
 
 def process_blocks_parallel(Y, X, Z, alpha, beta, gamma, K, J, errloc, errscale, row_blocks, col_blocks,
-                            block_size_rows, block_size_cols, njobs=20, prior=None):
+                            block_size_rows, block_size_cols, njobs=3, prior=None):
     
     nll = 0.0
     blocks = []
@@ -1232,7 +1232,7 @@ def negative_loglik_coordwise_parallel(theta_coordval, theta_idx, full_theta, Y,
 
 
 def negative_loglik_parallel(theta, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, 
-                            constant_Z, debug=False, numbafast=True, block_size_rows=2000, block_size_cols=100):
+                            constant_Z, debug=False, numbafast=True, block_size_rows=600, block_size_cols=100):
 
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)    
     mu_e = 0
@@ -1945,7 +1945,7 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
             return np.array(retvallist)
 
 # parallel=False for SLURM run
-@numba.jit(nopython=True, parallel=False, cache=True)
+@numba.jit(nopython=True, parallel=True, cache=True)
 def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
     
     phi = np.zeros((K, Z.shape[1]), dtype=np.float64)    
@@ -4028,7 +4028,7 @@ def log_full_posterior(Y, theta_curr, param_positions_dict, args):
                         prior_scale_alpha, prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta,\
                             prior_loc_sigmae, prior_scale_sigmae, _, rng, batchsize, theta_true = args
 
-    if True:
+    if False:
     # if K*J <= 10e5:
         loglik = -negative_loglik(theta_curr, Y, J, K, d, parameter_names, dst_func, param_positions_dict, penalty_weight_Z, constant_Z, debug=False)
     else:
@@ -4257,7 +4257,7 @@ def log_conditional_posterior_z_vec(zj, j, Y, theta, J, K, d, parameter_names, d
 
 def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, prior_loc_z=0, 
                                    prior_scale_z=1, gamma=1, constant_Z=0, penalty_weight_Z=100, 
-                                   debug=False, numbafast=True, block_size_rows=500):
+                                   debug=False, numbafast=True, block_size_rows=600):
     # l denotes the coordinate of vector z_j
     
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
@@ -4275,7 +4275,7 @@ def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_name
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpz_jl += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(z_jl, loc=prior_loc_z, scale=prior_scale_z)
 
-    if True:
+    if False:
     # if K*J <= 10e5:
         if numbafast:
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
@@ -4323,7 +4323,7 @@ def log_conditional_posterior_z_jl(z_jl, l, j, Y, theta, J, K, d, parameter_name
 
 def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_names, dst_func, 
                                     param_positions_dict, prior_loc_alpha=0, prior_scale_alpha=1, gamma=1, 
-                                    debug=False, numbafast=True, block_size_rows=500):    
+                                    debug=False, numbafast=True, block_size_rows=600):    
     
     # Assuming independent, Gaussian alphas.
     # Hence, even when evaluating with vector parameters, we use the uni-dimensional posterior for alpha.
@@ -4344,7 +4344,7 @@ def log_conditional_posterior_alpha_j(alpha, idx, Y, theta, J, K, d, parameter_n
             log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
             _logpalpha_j += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(alpha, loc=prior_loc_alpha, scale=prior_scale_alpha)
 
-    if True:
+    if False:
     # if K*J <= 10e5:
         if numbafast:
             params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
@@ -4426,7 +4426,7 @@ def log_conditional_posterior_beta_i(beta, idx, Y, theta, J, K, d, parameter_nam
     return logpbeta_k*gamma
 
 def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma_annealing=1, prior_loc_gamma=0, 
-                                    prior_scale_gamma=1, debug=False, numbafast=True, block_size_rows=500, block_size_cols=100):    
+                                    prior_scale_gamma=1, debug=False, numbafast=True, block_size_rows=600, block_size_cols=100):    
         
     params_hat = optimisation_dict2params(theta, param_positions_dict, J, K, d, parameter_names)
     mu_e = 0
@@ -4442,7 +4442,7 @@ def log_conditional_posterior_gamma(gamma, Y, theta, J, K, d, parameter_names, d
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpgamma += Y[i, j]*philogcdf + (1-Y[i, j])*log_one_minus_cdf + norm.logpdf(gamma, loc=prior_loc_gamma, scale=prior_scale_gamma)
 
-    if True:
+    if False:
     # if K*J <= 10e5:
         if numbafast:            
             X = np.asarray(params_hat["X"]).reshape((d, K), order="F")     
@@ -4502,7 +4502,7 @@ def log_conditional_posterior_delta(delta, Y, theta, J, K, d, parameter_names, d
 
 def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_names, dst_func, param_positions_dict, gamma=1, 
                                     prior_loc_sigmae=0, prior_scale_sigmae=1, min_sigma_e=0.0001, 
-                                    debug=False, numbafast=True, block_size_rows=500, block_size_cols=100):    
+                                    debug=False, numbafast=True, block_size_rows=600, block_size_cols=100):    
     
     tig = TruncatedInverseGamma(alpha=prior_loc_sigmae, beta=prior_scale_sigmae, lower=min_sigma_e, upper=10*np.sqrt(prior_scale_sigmae)+prior_scale_sigmae)    
     mu_e = 0
@@ -4517,7 +4517,7 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
                 log_one_minus_cdf = log_complement_from_log_cdf(philogcdf, pij, mean=mu_e, variance=sigma_e)
                 _logpsigma_e += Y[i, j]*philogcdf  + (1-Y[i, j])*log_one_minus_cdf + tig.logpdf(sigma_e)
     
-    if True:
+    if False:
     # if K*J <= 10e5:
         if numbafast:
             params_hat = optimisation_dict2params(theta_test, param_positions_dict, J, K, d, parameter_names)
