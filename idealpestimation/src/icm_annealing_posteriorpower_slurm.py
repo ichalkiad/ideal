@@ -201,7 +201,7 @@ if __name__ == "__main__":
     temperature_steps = [0, 1, 2, 5, 10]
     temperature_rate = [1e-3, 1e-2, 1e-1, 1]
 
-    niter = 15 # 10
+    niter = 1 # 15
     fastrun = True
     max_restarts = 2
     max_partial_restarts = 2 #2
