@@ -136,7 +136,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err)))
 
         rank_and_plot_solutions(thetas_and_errors, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, 
-                                dst_func, param_positions_dict, DIR_out, args, seedint=seedint, get_RT_error=True)
+                                dst_func, param_positions_dict, DIR_out, args, seedint=seedint, get_RT_error=False)
 
 
 if __name__ == "__main__":
