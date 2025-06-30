@@ -196,11 +196,11 @@ if __name__ == "__main__":
     temperature_steps = [0, 1, 2, 5, 10]
     temperature_rate = [1e-3, 1e-2, 1e-1, 1]
 
-    niter = 1 # 15
+    niter = 15 # 15
     fastrun = True
     max_restarts = 2
     max_partial_restarts = 2 #2
-    max_halving = 2
+    max_halving = 1
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
 

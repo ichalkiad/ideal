@@ -52,7 +52,7 @@ def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir
                     icm_poster["sigma_e"].append(sigma_e)                 
 
                     # mle, icm_data batches
-                    path = pathlib.Path("{}/data_K{}_J{}_sigmae{}/{}/{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""), m, batchsize))
+                    path = pathlib.Path("{}/data_K{}_J{}_sigmae{}/{}/{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""), m, batchsize[K]))
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                     for dataset_index in range(len(subdatasets_names)):               
                         mle["trial"].append(m)
@@ -63,8 +63,8 @@ def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir
                         icm_data["J"].append(J)
                         mle["sigma_e"].append(sigma_e)
                         icm_data["sigma_e"].append(sigma_e)
-                        mle["batchsize"].append(batchsize)
-                        icm_data["batchsize"].append(batchsize)
+                        mle["batchsize"].append(batchsize[K])
+                        icm_data["batchsize"].append(batchsize[K])
                         subdataset_name = subdatasets_names[dataset_index]                            
                         start = int(subdataset_name.split("_")[1])
                         end = int(subdataset_name.split("_")[2])

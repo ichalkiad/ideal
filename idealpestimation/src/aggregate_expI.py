@@ -80,7 +80,7 @@ if __name__ == "__main__":
                         elif algo == "icmp":
                             trial_path = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(res_path, trial)
                         
-                        if algo == "ca" or algo == "icmp":
+                        if algo == "ca":
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
                                     dataloglik.append(result["logfullposterior"])
@@ -109,6 +109,53 @@ if __name__ == "__main__":
                                             sq_err = rel_err**2            
                                             theta_err[param].append(float(np.mean(rel_err)))    
                                             theta_sqerr[param].append(float(np.mean(sq_err)))
+                            with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
+                                for result in f.iter(type=dict, skip_invalid=True):     
+                                    runtimes.append(result["wall_duration"]) # in seconds
+                                    cpu_util["avg"].append(result["avg_total_cpu_util"])
+                                    cpu_util["max"].append(result["max_total_cpu_util"])
+                                    ram["avg"].append(result["avg_total_ram_residentsetsize_MB"])
+                                    ram["max"].append(result["max_total_ram_residentsetsize_MB"])
+                        elif algo == "icmp":                            
+                            with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
+                                for result in f.iter(type=dict, skip_invalid=True):                                    
+                                    dataloglik.append(result["logfullposterior"])                                    
+                                    param_positions_dict = result["param_positions_dict"] 
+                                    for param in parameter_names:                                        
+                                        param_true = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                                        param_hat = result[param]
+                                        for param in parameter_names:
+                                            if param == "X":                                                                
+                                                X_true = np.asarray(param_true).reshape((d, K), order="F")
+                                                X_hat = np.asarray(param_hat).reshape((d, K), order="F")
+                                                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
+                                                                                                                                            param_hat=X_hat, 
+                                                                                                                                            seedint=seed_value)
+                                                theta_err_RT[param].append(err_x)
+                                                theta_err[param].append(err_x_nonRT)
+                                                theta_sqerr_RT[param].append(mse_x)
+                                                theta_sqerr[param].append(mse_x_nonRT)
+                                            elif param == "Z":                                                
+                                                Z_true = np.asarray(param_true).reshape((d, J), order="F")
+                                                Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
+                                                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
+                                                                                                                                            param_hat=Z_hat, 
+                                                                                                                                            seedint=seed_value)
+                                                theta_err_RT[param].append(err_z)
+                                                theta_err[param].append(err_z_nonRT)
+                                                theta_sqerr_RT[param].append(mse_z)
+                                                theta_sqerr[param].append(mse_z_nonRT)                                          
+                                            elif param in ["gamma", "delta", "sigma_e"]:
+                                                # scalars
+                                                rel_err = (param_true - param_hat)/param_true
+                                                rel_se = rel_err**2
+                                                theta_err[param].append(float(rel_err))
+                                                theta_sqerr[param].append(float(rel_se))
+                                            else:
+                                                rel_err = (np.asarray(param_true) - np.asarray(param_hat))/np.asarray(param_true)
+                                                sq_err = rel_err**2            
+                                                theta_err[param].append(float(np.mean(rel_err)))    
+                                                theta_sqerr[param].append(float(np.mean(sq_err)))
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
                                     runtimes.append(result["wall_duration"]) # in seconds

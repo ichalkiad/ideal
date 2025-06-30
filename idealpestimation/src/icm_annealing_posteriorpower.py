@@ -798,7 +798,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if ((target_param == "gamma" or target_param == "sigma_e") and ( l == 0 or not (l % 5 == 0))):
+                if ((target_param == "gamma" or target_param == "sigma_e") and ( l == 0 or not (l % 6 == 0))):
                         i += 1 
                         continue                         
                 # t00 = time.time()
@@ -1070,14 +1070,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         else:
             estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None))
     
-    ######################################################################################################################
-    ######################################################################################################################
-    ######################################################################################################################
-    estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None))
-    ######################################################################################################################
-    ######################################################################################################################
-    ######################################################################################################################
-
+    
     return estimated_thetas
 
 def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", 
