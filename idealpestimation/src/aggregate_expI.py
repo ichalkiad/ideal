@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     ipdb.set_trace() 
 
-    algorithms = ["mle", "ca", "icmd"] #, "icmp"]
+    algorithms = ["mle"]#, "ca", "icmd"] #, "icmp"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -204,8 +204,6 @@ if __name__ == "__main__":
                                 estimation_sq_error_per_trial_per_batch_nonRT[m][param] = []
                                 estimation_error_per_trial_per_batch[m][param] = []
                                 estimation_error_per_trial_per_batch_nonRT[m][param] = []
-
-                            ipdb.set_trace()
                             data_location = trial_path
                             params_out, estimation_sq_error_per_trial_per_batch[m], estimation_sq_error_per_trial_per_batch_nonRT[m],\
                                 estimation_error_per_trial_per_batch[m], estimation_error_per_trial_per_batch_nonRT[m] = \
@@ -415,6 +413,7 @@ if __name__ == "__main__":
                                 y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
+                ipdb.set_trace()
                 # save figures per K, J, sigma_e
                 savename = "{}/time_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
                 fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in seconds)", title="", 
