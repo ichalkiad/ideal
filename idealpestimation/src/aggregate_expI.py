@@ -37,6 +37,33 @@ if __name__ == "__main__":
     for K in Ks:
         for J in Js:
             parameter_space_dim = (K+J)*d + J + K + 2
+            param_positions_dict = dict()            
+            k = 0
+            for param in parameter_names:
+                if param == "X":
+                    param_positions_dict[param] = (k, k + K*d)                       
+                    k += K*d    
+                elif param in ["Z"]:
+                    param_positions_dict[param] = (k, k + J*d)                                
+                    k += J*d
+                elif param in ["Phi"]:            
+                    param_positions_dict[param] = (k, k + J*d)                                
+                    k += J*d
+                elif param == "beta":
+                    param_positions_dict[param] = (k, k + K)                                   
+                    k += K    
+                elif param == "alpha":
+                    param_positions_dict[param] = (k, k + J)                                       
+                    k += J    
+                elif param == "gamma":
+                    param_positions_dict[param] = (k, k + 1)                                
+                    k += 1
+                elif param == "delta":
+                    param_positions_dict[param] = (k, k + 1)                                
+                    k += 1
+                elif param == "sigma_e":
+                    param_positions_dict[param] = (k, k + 1)                                
+                    k += 1    
             for sigma_e in sigma_es:
                 param_err_fig = {}
                 param_sqerr_fig = {}
@@ -70,6 +97,7 @@ if __name__ == "__main__":
                         # load true param vector - same over all trials but store in each trial folder for convenience
                         with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(res_path, trial), "r") as f:
                             for result in f.iter(type=dict, skip_invalid=True):
+
                                 for param in parameter_names:
                                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
                         
