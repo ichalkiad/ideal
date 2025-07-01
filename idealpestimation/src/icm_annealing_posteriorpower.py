@@ -798,7 +798,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if ((target_param == "gamma" or target_param == "sigma_e") and ( l == 0 or not (l % 4 == 0))):
+                if ((target_param == "gamma" or target_param == "sigma_e") and ( l < 10 or not (l % 5 == 0))):
                         i += 1 
                         continue                         
                 # t00 = time.time()
@@ -816,17 +816,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 gamma, delta_rate = update_annealing_temperature(gamma, total_iter, temperature_rate, temperature_steps, all_gammas)      
                 # if data_annealing:
                 #     assert gamma == 1
-                
-                #################################################################
-                # in posterior annealing, after a full update, check for convergence after each iteration - l > 0 to ensure all params will have been updated at least once
-                # if (not data_annealing and l > int(percentage_parameter_change*parameter_space_dim)):
-                #     converged, delta_theta, random_restart = check_convergence(elementwise, theta_curr, theta_prev, param_positions_dict, i, 
-                #                                                         parameter_space_dim=parameter_space_dim, testparam=testparam, 
-                #                                                         testidx=testidx, p=percentage_parameter_change, tol=tol)
-                #     if converged:
-                #         break
-                #################################################################
-
 
                 if plot_online:
                     subset_coord2plot = None
@@ -1026,23 +1015,23 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         print("Random restart: {}".format(random_restart))
         l += 1
     # last update of gamma, sigma_e
-    if elementwise:
-        i = 0                 
-        while i < parameter_space_dim:     
-            target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
-            if not (target_param == "gamma" or target_param == "sigma_e"):
-                i += 1
-                continue                   
-            theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
-                                                        Y, gamma, theta_curr.copy(), param_positions_dict, L, args)                   
-            theta_curr = theta_test.copy()
-            i += 1
-    else:
-        for target_param in ["gamma", "sigma_e"]:              
-            idx = 0
-            theta_test, _ = optimise_posterior_vector(target_param, idx, Y, gamma, theta_curr.copy(), 
-                                                    param_positions_dict, L, args)     
-            theta_curr = theta_test.copy()
+    # if elementwise:
+    #     i = 0                 
+    #     while i < parameter_space_dim:     
+    #         target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
+    #         if not (target_param == "gamma" or target_param == "sigma_e"):
+    #             i += 1
+    #             continue                   
+    #         theta_test, _ = optimise_posterior_elementwise(target_param, i, vector_index_in_param_matrix, vector_coordinate, 
+    #                                                     Y, gamma, theta_curr.copy(), param_positions_dict, L, args)                   
+    #         theta_curr = theta_test.copy()
+    #         i += 1
+    # else:
+    #     for target_param in ["gamma", "sigma_e"]:              
+    #         idx = 0
+    #         theta_test, _ = optimise_posterior_vector(target_param, idx, Y, gamma, theta_curr.copy(), 
+    #                                                 param_positions_dict, L, args)     
+    #         theta_curr = theta_test.copy()
 
     subset_coord2plot = None
     # subset_coord2plot = [10, 75, 82, 115, 120, 121]
@@ -1070,7 +1059,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         else:
             estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None))
     
-    
     return estimated_thetas
 
 def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", 
@@ -1088,7 +1076,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         for m in range(trialsmin, trialsmax, 1):
             if elementwise:
                 if evaluate_posterior:                    
-                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_allmetrics_June2025/".format(data_location, m)
+                    DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_icmptest/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_gamma1_perturb/".format(data_location, m)
                     # DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_annealing/".format(data_location, m)

@@ -136,7 +136,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
 
     seed_value = 8125 + parameter_vector_idx
     random.seed(seed_value)
@@ -147,8 +147,10 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
 
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster.csv", header=None)
+    # dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
+    # parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster.csv", header=None)
+    dataspace = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
+    parameter_grid = pd.read_csv("/mnt/hdd2/ioannischalkiadakis/slurm_experimentI_icm_poster.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])
@@ -199,7 +201,7 @@ if __name__ == "__main__":
     niter = 20 # 15
     fastrun = True
     max_restarts = 2
-    max_partial_restarts = 4 #2
+    max_partial_restarts = 2 #2
     max_halving = 2
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
