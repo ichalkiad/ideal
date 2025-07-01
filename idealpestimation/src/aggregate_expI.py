@@ -115,7 +115,7 @@ if __name__ == "__main__":
                             with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
                                 Y = pickle.load(f)
                             Y = Y.astype(np.int8).reshape((K, J), order="F")   
-                            _, _, _, theta_true, param_positions_dict, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+                            _, _, _, theta_true_ca, param_positions_dict_ca, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
                                     dataloglik.append(result["logfullposterior"])
@@ -131,14 +131,14 @@ if __name__ == "__main__":
                                     for param in parameter_names:
                                         if param in ["X", "Z"]:
                                             continue
-                                        param_true = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                                        param_true = theta_true_ca[param_positions_dict_ca[param][0]:param_positions_dict_ca[param][1]]
                                         param_hat = result[param]
                                         if param in ["gamma", "delta", "sigma_e"]:
                                             # scalars
                                             rel_err = (param_true - param_hat)/param_true
                                             rel_se = rel_err**2
-                                            theta_err[param].append(float(rel_err))
-                                            theta_sqerr[param].append(float(rel_se))
+                                            theta_err[param].append(float(rel_err[0]))
+                                            theta_sqerr[param].append(float(rel_se[0]))
                                         else:
                                             rel_err = (param_true - param_hat)/param_true
                                             sq_err = rel_err**2            
@@ -151,7 +151,6 @@ if __name__ == "__main__":
                                     cpu_util["max"].append(result["max_total_cpu_util"])
                                     ram["avg"].append(result["avg_total_ram_residentsetsize_MB"])
                                     ram["max"].append(result["max_total_ram_residentsetsize_MB"])
-                            ipdb.set_trace()
                         elif algo == "icmp":                            
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
@@ -371,7 +370,7 @@ if __name__ == "__main__":
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max)) 
-                    
+                    ipdb.set_trace()
                     # add plots per algorithm
                     if algo == "ca":
                         plotname = "CA"
