@@ -93,7 +93,6 @@ if __name__ == "__main__":
                     estimation_error_per_trial_per_batch = dict()
                     estimation_error_per_trial_per_batch_nonRT = dict()
                     for trial in range(M):              
-                        print(parameter_space_dim)          
                         theta_true = np.zeros((parameter_space_dim,))
                         # load true param vector - same over all trials but store in each trial folder for convenience
                         with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(res_path, trial), "r") as f:
@@ -115,7 +114,8 @@ if __name__ == "__main__":
                             with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
                                 Y = pickle.load(f)
                             Y = Y.astype(np.int8).reshape((K, J), order="F")   
-                            _, _, _, theta_true_ca, param_positions_dict_ca, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+                            _, _, _, theta_true_ca, _, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
                                     dataloglik.append(result["logfullposterior"])
@@ -127,7 +127,7 @@ if __name__ == "__main__":
                                     theta_sqerr["Z"].append(result["mse_z_nonRT"])
                                     theta_sqerr_RT["X"].append(result["mse_x_RT"])
                                     theta_sqerr_RT["Z"].append(result["mse_z_RT"])                                    
-                                    param_positions_dict = result["param_positions_dict"] 
+                                    param_positions_dict_ca = result["param_positions_dict"] 
                                     for param in parameter_names:
                                         if param in ["X", "Z"]:
                                             continue
