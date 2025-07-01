@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     ipdb.set_trace() 
 
-    algorithms = ["mle"]#, "ca", "icmd"] #, "icmp"]
+    algorithms = ["ca"] #"mle", "icmd"] #, "icmp"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -110,7 +110,12 @@ if __name__ == "__main__":
                         elif algo == "icmp":
                             trial_path = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(res_path, trial)
                         
-                        if algo == "ca":
+                        if algo == "ca":                            
+                            # load data    
+                            with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
+                                Y = pickle.load(f)
+                            Y = Y.astype(np.int8).reshape((K, J), order="F")   
+                            _, _, _, theta_true, param_positions_dict, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
                                     dataloglik.append(result["logfullposterior"])
@@ -146,6 +151,7 @@ if __name__ == "__main__":
                                     cpu_util["max"].append(result["max_total_cpu_util"])
                                     ram["avg"].append(result["avg_total_ram_residentsetsize_MB"])
                                     ram["max"].append(result["max_total_ram_residentsetsize_MB"])
+                            ipdb.set_trace()
                         elif algo == "icmp":                            
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
@@ -246,8 +252,8 @@ if __name__ == "__main__":
                                     param_hat = params_out[param]
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                     mse = rel_err**2                                    
-                                    theta_err[param].append(float(rel_err))
-                                    theta_sqerr[param].append(float(mse))
+                                    theta_err[param].append(rel_err[0])
+                                    theta_sqerr[param].append(mse[0])
                             # for efficiency in dmle: provide averages/max over all batches and make remark in paper   
                             subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file() and "dataset_" in file.name]      
                             batch_runtimes = []
