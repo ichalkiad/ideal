@@ -194,6 +194,7 @@ if __name__ == "__main__":
                                     ram["avg"].append(result["avg_total_ram_residentsetsize_MB"])
                                     ram["max"].append(result["max_total_ram_residentsetsize_MB"])
                         elif algo == "mle":
+                            m = trial
                             estimation_sq_error_per_trial_per_batch[m] = dict()
                             estimation_sq_error_per_trial_per_batch_nonRT[m] = dict()
                             estimation_error_per_trial_per_batch[m] = dict()
@@ -205,7 +206,6 @@ if __name__ == "__main__":
                                 estimation_error_per_trial_per_batch_nonRT[m][param] = []
 
                             data_location = trial_path
-                            m = trial
                             params_out, estimation_sq_error_per_trial_per_batch[m], estimation_sq_error_per_trial_per_batch_nonRT[m],\
                                 estimation_error_per_trial_per_batch[m], estimation_error_per_trial_per_batch_nonRT[m] = \
                                         combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
