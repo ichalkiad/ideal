@@ -244,7 +244,7 @@ if __name__ == "__main__":
                                     theta_sqerr[param].append(float(mse))
                                 else:
                                     param_hat = params_out[param]
-                                    rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
+                                    rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                     mse = rel_err**2                                    
                                     theta_err[param].append(float(rel_err))
                                     theta_sqerr[param].append(float(mse))
