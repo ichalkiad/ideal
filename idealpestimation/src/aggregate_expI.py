@@ -205,6 +205,7 @@ if __name__ == "__main__":
                                 estimation_error_per_trial_per_batch[m][param] = []
                                 estimation_error_per_trial_per_batch_nonRT[m][param] = []
 
+                            ipdb.set_trace()
                             data_location = trial_path
                             params_out, estimation_sq_error_per_trial_per_batch[m], estimation_sq_error_per_trial_per_batch_nonRT[m],\
                                 estimation_error_per_trial_per_batch[m], estimation_error_per_trial_per_batch_nonRT[m] = \
