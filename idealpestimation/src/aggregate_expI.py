@@ -92,12 +92,12 @@ if __name__ == "__main__":
                     estimation_sq_error_per_trial_per_batch_nonRT = dict()
                     estimation_error_per_trial_per_batch = dict()
                     estimation_error_per_trial_per_batch_nonRT = dict()
-                    for trial in range(M):                        
+                    for trial in range(M):              
+                        print(parameter_space_dim)          
                         theta_true = np.zeros((parameter_space_dim,))
                         # load true param vector - same over all trials but store in each trial folder for convenience
                         with jsonlines.open("{}/{}/synthetic_gen_parameters.jsonl".format(res_path, trial), "r") as f:
                             for result in f.iter(type=dict, skip_invalid=True):
-
                                 for param in parameter_names:
                                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
                         
