@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=expI_icmp_3restartsfull2partial
+#SBATCH --job-name=expI_icmp_4restartspartial
 #SBATCH --output=%x_%A_%a.out # create output files indexed with the job array task id
 #SBATCH --partition=cpu_p1 #prepost #
 #SBATCH --time=18:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
