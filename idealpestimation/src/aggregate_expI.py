@@ -284,12 +284,13 @@ if __name__ == "__main__":
                                 theta = None
                                 all_estimates = []
                                 path = pathlib.Path(DIR_base)  
+                                ipdb.set_trace()
                                 subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                 for dataset_index in range(len(subdatasets_names)):                    
                                     subdataset_name = subdatasets_names[dataset_index]                        
                                     DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
                                     path = pathlib.Path(DIR_read)  
-                                    estimates_names = [file.name for file in pathlib.Path(trial_path).iterdir() if file.is_file() and "_best" in file.name]
+                                    estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
                                     if len(estimates_names) > 1:
                                         raise AttributeError("Should have 1 output estimation file.")
                                     for estim in estimates_names:
@@ -325,7 +326,7 @@ if __name__ == "__main__":
                                     weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
                                     params_out[param] = weighted_estimate.tolist()
                             ipdb.set_trace()
-                            
+
                             for param in parameter_names:
                                 if param == "X":                 
                                     X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
