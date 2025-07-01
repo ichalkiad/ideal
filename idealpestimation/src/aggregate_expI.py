@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     ipdb.set_trace() 
 
-    algorithms = ["ca"] #"mle", "icmd"] #, "icmp"]
+    algorithms = ["icmd"] #"mle", "ca"] #, "icmp"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -324,6 +324,7 @@ if __name__ == "__main__":
                                     # element-wise multiplication
                                     weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
                                     params_out[param] = weighted_estimate.tolist()
+                            ipdb.set_trace()
                             
                             for param in parameter_names:
                                 if param == "X":                 
