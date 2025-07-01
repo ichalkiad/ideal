@@ -20,16 +20,19 @@ if __name__ == "__main__":
 
     Ks = [50000]
     Js = [100]
-    sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]
-    M = 10
+    sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]
+    M = 2
     batchsize = 1504
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
-    dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
-    dir_out = "/mnt/hdd2/ioannischalkiadakis/rsspaper_expI/"
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/" # /mnt/hdd2/ioannischalkiadakis/       
+    dir_in = "{}/idealdata_rsspaper/".format(dataspace)
+    dir_out = "{}/ioannischalkiadakis/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["mle", "ca", "icmd", "icmp"]
+    ipdb.set_trace() 
+
+    algorithms = ["mle", "ca", "icmd"] #, "icmp"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -44,7 +47,6 @@ if __name__ == "__main__":
                 ram_fig = go.Figure()
                 cpu_fig = go.Figure()
                 for algo in algorithms:
-
                     res_path = "{}/data_K{}_J{}_sigmae{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""))
                     theta_err = {}
                     theta_sqerr = {}
