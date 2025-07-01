@@ -249,7 +249,7 @@ if __name__ == "__main__":
                                     theta_err[param].append(float(rel_err))
                                     theta_sqerr[param].append(float(mse))
                             # for efficiency in dmle: provide averages/max over all batches and make remark in paper   
-                            subdatasets_names = [file.name for file in trial_path.iterdir() if not file.is_file() and "dataset_" in file.name]      
+                            subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file() and "dataset_" in file.name]      
                             batch_runtimes = []
                             batch_cpu_util_avg = []
                             batch_cpu_util_max = []
@@ -279,12 +279,12 @@ if __name__ == "__main__":
                                 theta = None
                                 all_estimates = []
                                 path = pathlib.Path(DIR_base)  
-                                subdatasets_names = [file.name for file in path.iterdir() if not file.is_file()]                    
+                                subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                 for dataset_index in range(len(subdatasets_names)):                    
                                     subdataset_name = subdatasets_names[dataset_index]                        
                                     DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
                                     path = pathlib.Path(DIR_read)  
-                                    estimates_names = [file.name for file in path.iterdir() if file.is_file() and "_best" in file.name]
+                                    estimates_names = [file.name for file in pathlib.Path(trial_path).iterdir() if file.is_file() and "_best" in file.name]
                                     if len(estimates_names) > 1:
                                         raise AttributeError("Should have 1 output estimation file.")
                                     for estim in estimates_names:
