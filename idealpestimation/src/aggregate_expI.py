@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     ipdb.set_trace() 
 
-    algorithms = ["icmp"] #"mle", "ca", "icmd"]
+    algorithms = ["icmp", "mle", "ca", "icmd"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                                             rel_err = (param_true - param_hat)/param_true
                                             sq_err = rel_err**2            
                                             theta_err[param].append(float(np.mean(rel_err)))    
-                                            theta_sqerr[param].append(float(np.mean(sq_err)))
+                                            theta_sqerr[param].append(float(np.mean(sq_err)))                                                                        
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
                                     runtimes.append(result["wall_duration"]) # in seconds
@@ -272,6 +272,7 @@ if __name__ == "__main__":
                                         batch_cpu_util_max.append(result["max_total_cpu_util"])
                                         batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"])
                                         batch_ram_max.append(result["max_total_ram_residentsetsize_MB"])
+                                        break
                             runtimes.append(np.mean(batch_runtimes)) # in seconds
                             cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
@@ -286,7 +287,9 @@ if __name__ == "__main__":
                                 theta = None
                                 all_estimates = []
                                 path = pathlib.Path(DIR_base)  
+                                
                                 ipdb.set_trace()
+                                
                                 subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                 for dataset_index in range(len(subdatasets_names)):                    
                                     subdataset_name = subdatasets_names[dataset_index]                        
@@ -370,6 +373,7 @@ if __name__ == "__main__":
                                     batch_cpu_util_max.append(result["max_total_cpu_util"])
                                     batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"])
                                     batch_ram_max.append(result["max_total_ram_residentsetsize_MB"])
+                                    break
                             runtimes.append(np.mean(batch_runtimes)) # in seconds
                             cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
