@@ -700,6 +700,21 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     theta_samples_list = None
     base2exponent = 5
     idx_all = None
+
+    # # try loading icm data annealing solution and init from there, else random
+    # try:
+    #     theta_curr = np.zeros((parameter_space_dim,))
+    #     init_solution_dir = "{}/{}/estimation_ICM_data_annealing_evaluate_posterior_elementwise/".format(data_location, m)
+    #     init_file = "{}/params_out_global_theta_hat_test.jsonl".format(init_solution_dir)
+    #     with jsonlines.open(init_file, "r") as f:
+    #         for result in f.iter(type=dict, skip_invalid=True):
+    #             for param in parameter_names:
+    #                 theta_curr[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+    #     print("Loaded starting point from ICM data tempering solution.")
+    #     theta_samples_list = []
+    #     idx_all = []
+    #     loaded_icm_data_tempering = True
+    # except:
     theta_curr, theta_samples_list, idx_all = sample_theta_curr_init(parameter_space_dim, base2exponent, param_positions_dict, 
                                                                 args, samples_list=theta_samples_list, idx_all=idx_all, rng=rng)
        
@@ -798,7 +813,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if ((target_param == "gamma" or target_param == "sigma_e") and ( l < 10 or not (l % 5 == 0))):
+                if ( ( target_param == "gamma" or target_param == "sigma_e" ) and ( l > 10  and not (l % 5 == 0) ) ):  
                         i += 1 
                         continue                         
                 # t00 = time.time()
@@ -975,13 +990,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 err_x_nonRT_list = []
                 err_z_nonRT_list = []
             converged = False
-            halved = False
-            if (halving_rate < max_halving) and not data_annealing:              
-                gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
-                                                                        delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
-                                                                        testparam=testparam)                    
-                halving_rate += 1 
-                halved = True
+            halved = False            
             theta_prev = theta_curr.copy()                   
             if restarts <= max_partial_restarts:                        
                 # random restart, only for unconverged coordinates
@@ -1005,6 +1014,14 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 theta_prev = np.zeros((parameter_space_dim,))  
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
         else:
+            halved = False
+            if ((halving_rate < max_halving) and (not data_annealing) and (l >= 10)):              
+                gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
+                                                                        delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
+                                                                        testparam=testparam)                    
+                halving_rate += 1 
+                halved = True
+            
             theta_prev = theta_curr.copy() 
             if restarts >= max_partial_restarts + max_restarts:
                 random_restart = False
@@ -1013,7 +1030,8 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         print("Total conditional posterior evaluations: {}".format(total_iter))
         print("Convergence: {}".format(converged))
         print("Random restart: {}".format(random_restart))
-        l += 1
+        l += 1           
+
     # last update of gamma, sigma_e
     # if elementwise:
     #     i = 0                 
@@ -1058,6 +1076,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                 err_x_list[-1], err_z_list[-1], err_x_nonRT_list[-1], err_z_nonRT_list[-1]))
         else:
             estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None))
+    
     
     return estimated_thetas
 

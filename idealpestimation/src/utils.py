@@ -1944,8 +1944,8 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
             retvallist = list(map(get_one_minus_logcdf, zip(log_cdfx, x)))        
             return np.array(retvallist)
 
-# parallel=False for SLURM run
-@numba.jit(nopython=True, parallel=False, cache=True)
+# parallel=False for SLURM run, except for ICM-D #########################################################
+@numba.jit(nopython=True, parallel=True, cache=True)
 def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
     
     phi = np.zeros((K, Z.shape[1]), dtype=np.float64)    
@@ -2279,14 +2279,12 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                 colorscale="sunsetdark",
                 showscale=True,   
                 colorbar=dict(thickness=10, title='U'),             
-            )) 
-            fix_plot_layout_and_save(fig, "{}/solution_plots/utilities_solution_index_{}.html".format(DIR_out, sorted_idx_lst.index(i)), 
+            ))             
+            fix_plot_layout_and_save(fig, "{}/solution_plots/utilities_solution_index_{}.html".format(DIR_out, best2worst.index(i)), 
                                     xaxis_title="Leaders", yaxis_title="Followers", title="Utilities with estimated parameters", 
                                     showgrid=False, showlegend=False, print_png=True, print_html=True, print_pdf=False)
       
     
-    
-
     if not (efficiency_measures is None):
         out_file = "{}/efficiency_metrics.jsonl".format(DIR_out)
         with open(out_file, 'a') as f:         
@@ -2321,8 +2319,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                                                                     components[i, 1]/(components[i, 0] + components[i, 1]),
                                                                     computed_logfullposterior[i])))
             fig.update(layout_yaxis_range = [np.min(components[:,1])-1,np.max(components[:,1])+1])
-            fix_plot_layout_and_save(fig, "{}/solution_plots/project_solutions_2D.html".format(DIR_out, 
-                                    sorted_idx_lst.index(i)), xaxis_title="PC1", yaxis_title="PC2", 
+            fix_plot_layout_and_save(fig, "{}/solution_plots/project_solutions_2D.html".format(DIR_out), xaxis_title="PC1", yaxis_title="PC2", 
                                     title="s1 = {:.3f}, s2 = {:.3f}".format(pca.singular_values_[0], pca.singular_values_[1]), 
                                     showgrid=False, showlegend=True, print_png=True, print_html=True, print_pdf=False)
             # fig.show()
