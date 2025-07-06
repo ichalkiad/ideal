@@ -813,7 +813,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if ( ( target_param == "gamma" or target_param == "sigma_e" ) and ( l > 10  and not (l % 5 == 0) ) ):  
+                if ( ( target_param == "gamma" or target_param == "sigma_e" ) and (l > 10 and not (l in [14, 19, 24])) ): #( l > 10  and not (l % 5 == 0) ) ):  
                         i += 1 
                         continue                         
                 # t00 = time.time()
@@ -1015,7 +1015,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
         else:
             halved = False
-            if ((halving_rate < max_halving) and (not data_annealing) and (l >= 10)):              
+            if ((halving_rate < max_halving) and (not data_annealing) and (l >= 15)):              
                 gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
                                                                         delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
                                                                         testparam=testparam)                    

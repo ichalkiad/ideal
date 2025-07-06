@@ -1945,7 +1945,7 @@ def log_complement_from_log_cdf(log_cdfx, x, mean, variance, use_jax=False):
             return np.array(retvallist)
 
 # parallel=False for SLURM run, except for ICM-D #########################################################
-@numba.jit(nopython=True, parallel=True, cache=True)
+@numba.jit(nopython=True, parallel=False, cache=True)
 def p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K):
     
     phi = np.zeros((K, Z.shape[1]), dtype=np.float64)    

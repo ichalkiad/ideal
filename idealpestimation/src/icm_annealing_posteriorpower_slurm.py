@@ -38,7 +38,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
         if elementwise:
             if evaluate_posterior:                    
-                DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise_updateall10iter_firstrestarts_thenhalvinggamma_35gp/".format(data_location, m)                    
+                DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(data_location, m)                    
             else:
                 DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
         else:
@@ -131,12 +131,12 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err)))
 
         rank_and_plot_solutions(thetas_and_errors, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, 
-                                dst_func, param_positions_dict, DIR_out, args, seedint=seedint, get_RT_error=True)
+                                dst_func, param_positions_dict, DIR_out, args, seedint=seedint, get_RT_error=False)
 
 
 if __name__ == "__main__":
 
-    parameter_vector_idx = 0 #int(os.environ["SLURM_ARRAY_TASK_ID"])    
+    parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
 
     seed_value = 8125 + parameter_vector_idx
     random.seed(seed_value)
@@ -147,10 +147,10 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
 
-    # dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
-    # parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster.csv", header=None)
-    dataspace = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
-    parameter_grid = pd.read_csv("/mnt/hdd2/ioannischalkiadakis/slurm_experimentI_icm_poster.csv", header=None)
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster.csv", header=None)
+    # dataspace = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
+    # parameter_grid = pd.read_csv("/mnt/hdd2/ioannischalkiadakis/slurm_experimentI_icm_poster.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2  
-    gridpoints_num = 35 # 15, 30
+    gridpoints_num = 30 # 15, 30
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -198,10 +198,10 @@ if __name__ == "__main__":
     temperature_steps = [0, 1, 2, 5, 10]
     temperature_rate = [1e-3, 1e-2, 1e-1, 1]
 
-    niter = 20 # 15
+    niter = 25 # 15
     fastrun = True
     max_restarts = 2
-    max_partial_restarts = 3 
+    max_partial_restarts = 2 
     max_halving = 2
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
