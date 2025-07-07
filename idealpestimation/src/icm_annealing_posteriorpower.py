@@ -1015,7 +1015,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
         else:
             halved = False
-            if ((halving_rate < max_halving) and (not data_annealing) and (l >= 15)):              
+            if ((halving_rate < max_halving) and (not data_annealing) and (l >= 10)):              
                 gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
                                                                         delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
                                                                         testparam=testparam)                    

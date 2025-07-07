@@ -38,7 +38,10 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
         if elementwise:
             if evaluate_posterior:                    
-                DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(data_location, m)                    
+                DIR_out = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(data_location, m)      
+                if pathlib.Path("{}params_out_global_theta_hat.jsonl".format(DIR_out)).exists():
+                    print("{}params_out_global_theta_hat.jsonl".format(DIR_out))              
+                    return
             else:
                 DIR_out = "{}/{}/estimation_ICM_differentiate_posterior_elementwise/".format(data_location, m)
         else:
@@ -198,7 +201,7 @@ if __name__ == "__main__":
     temperature_steps = [0, 1, 2, 5, 10]
     temperature_rate = [1e-3, 1e-2, 1e-1, 1]
 
-    niter = 25 # 15
+    niter = 20 # 15
     fastrun = True
     max_restarts = 2
     max_partial_restarts = 2 
