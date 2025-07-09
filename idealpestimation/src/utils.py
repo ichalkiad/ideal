@@ -3080,6 +3080,8 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
         gridpoints_num_alpha_beta = gridpoints_num**2
     else:
         gridpoints_num_alpha_beta = gridpoints_num*2
+        if param in ["gamma", "sigma_e"]:
+            gridpoints_num_alpha_beta = gridpoints_num*3
     xx_ = None
 
     if param == "alpha":
