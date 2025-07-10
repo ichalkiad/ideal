@@ -813,7 +813,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
             while i < parameter_space_dim:                                            
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
-                if ( ( target_param == "gamma" or target_param == "sigma_e" ) and (l > 10 and not (l in [13, 15])) ): #( l > 10  and not (l % 5 == 0) ) ):  
+                if ( ( target_param == "gamma" or target_param == "sigma_e" ) and (l > 5 and not (l % 3 == 0)) ): #( l > 10  and not (l % 5 == 0) ) ):  
                         i += 1 
                         continue                         
                 # t00 = time.time()
@@ -1013,15 +1013,16 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                     gamma = 0.1
                 theta_prev = np.zeros((parameter_space_dim,))  
                 plot_restarts.append((l, total_iter, halved, "fullrestart"))
-        else:
+        elif random_restart:
             halved = False
-            if ((halving_rate < max_halving) and (not data_annealing) and (l >= 5)):              
+            if ((halving_rate < max_halving) and (not data_annealing)):              
                 gamma, delta_rate_prev, temperature_rate, all_gammas, N = halve_annealing_rate_upd_schedule(N, gamma, 
                                                                         delta_rate_prev, temperature_rate, temperature_steps, all_gammas,  
                                                                         testparam=testparam)                    
                 halving_rate += 1 
                 halved = True
-            
+            theta_prev = theta_curr.copy() 
+        else:
             theta_prev = theta_curr.copy() 
             if restarts >= max_partial_restarts + max_restarts:
                 random_restart = False
