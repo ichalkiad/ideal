@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=expI_icmp_gammasens
+#SBATCH --job-name=expI_icmp
 #SBATCH --output=%x_%A_%a.out # create output files indexed with the job array task id
 #SBATCH --partition=cpu_p1  # prepost
 #SBATCH --time=20:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
@@ -8,7 +8,7 @@
 #SBATCH --nodes=1          
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=3  ############################  2 for CA, 3 for ICM-P on cpu_p1, 1 on prepost
-#SBATCH --array=0-0  # expI ca, icm-p  # 0-1649 expI icm-d, mle
+#SBATCH --array=1-1  # expI ca, icm-p  # 0-1649 expI icm-d, mle
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL
