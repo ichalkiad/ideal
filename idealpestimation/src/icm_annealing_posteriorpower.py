@@ -963,7 +963,7 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
         if random_restart and restarts < max_partial_restarts + max_restarts:   
             restarts += 1  
             if not plot_online:
-                estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None))
+                estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None, converged))
             else:
                 subset_coord2plot = None
                 # subset_coord2plot = [10, 75, 82, 115, 120, 121]
@@ -978,9 +978,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                                         xbox=xbox, plot_restarts=plot_restarts, fastrun=fastrun, subset_coord2plot=subset_coord2plot, seedint=seedint) 
                 if fastrun is False:
                     estimated_thetas.append((theta_curr, mse_x_list[-1], mse_z_list[-1], mse_x_nonRT_list[-1], mse_z_nonRT_list[-1], \
-                                        err_x_list[-1], err_z_list[-1], err_x_nonRT_list[-1], err_z_nonRT_list[-1])) 
+                                        err_x_list[-1], err_z_list[-1], err_x_nonRT_list[-1], err_z_nonRT_list[-1], converged)) 
                 else:
-                    estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None))
+                    estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None, converged))
                 mse_x_list = []
                 mse_z_list = []
                 mse_x_nonRT_list = []
@@ -1076,9 +1076,9 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
     if converged and (len(estimated_thetas)==0 or (not np.all(np.isclose(theta_curr, estimated_thetas[-1][0])))):
         if fastrun is False:
             estimated_thetas.append((theta_curr, mse_x_list[-1], mse_z_list[-1], mse_x_nonRT_list[-1], mse_z_nonRT_list[-1],\
-                                err_x_list[-1], err_z_list[-1], err_x_nonRT_list[-1], err_z_nonRT_list[-1]))
+                                err_x_list[-1], err_z_list[-1], err_x_nonRT_list[-1], err_z_nonRT_list[-1], converged))
         else:
-            estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None))
+            estimated_thetas.append((theta_curr, None, None, None, None, None, None, None, None, converged))
     
     
     return estimated_thetas

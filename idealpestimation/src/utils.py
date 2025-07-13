@@ -2199,6 +2199,8 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
     best_theta = None
     computed_logfullposterior = []
     for theta_set in estimated_thetas:
+        if len(theta_set) == 10:
+            print("Convergence status: {}".format(theta_set[-1]))
         theta = theta_set[0]
         _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
         computed_logfullposterior.append(posterior[0])
