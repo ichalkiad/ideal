@@ -3083,7 +3083,7 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
     else:
         gridpoints_num_alpha_beta = gridpoints_num*2
         if param in ["gamma"]:
-            gridpoints_num_alpha_beta = gridpoints_num*3
+            gridpoints_num_alpha_beta = gridpoints_num*4 # *3 enough for most to converge
     xx_ = None
 
     if param == "alpha":
