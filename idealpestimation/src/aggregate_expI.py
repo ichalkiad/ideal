@@ -321,6 +321,7 @@ if __name__ == "__main__":
                                     theta_err[param].append(rel_err[0])
                                     theta_sqerr[param].append(mse[0])
                             if not precomputed_errors:
+                                ipdb.set_trace()
                                 # save updated file
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                                 with open(out_file, 'a') as f:         
