@@ -21,7 +21,7 @@ if __name__ == "__main__":
     Ks = [50000]
     Js = [100]
     sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]
-    M = 2
+    M = 5
     batchsize = 1504
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["mle"]#, "icmd", "icmp", "ca"]
+    algorithms = ["mle", "icmd", "icmp", "ca"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -242,7 +242,6 @@ if __name__ == "__main__":
                                 estimation_error_per_trial_per_batch_nonRT[m][param] = []
                             data_location = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
-                            ipdb.set_trace()
                             precomputed_errors = False
                             if pathlib.Path(readinfile).exists():
                                 precomputed_errors = True
@@ -322,7 +321,6 @@ if __name__ == "__main__":
                                     theta_err[param].append(rel_err[0])
                                     theta_sqerr[param].append(mse[0])
                             if not precomputed_errors:
-                                ipdb.set_trace()
                                 # save updated file
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                                 with open(out_file, 'a') as f:         
