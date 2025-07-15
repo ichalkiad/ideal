@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     ipdb.set_trace() 
 
-    algorithms = ["icmp", "mle", "ca", "icmd"]
+    algorithms = ["icmd"] #, "mle", "ca", "icmp"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -151,34 +151,59 @@ if __name__ == "__main__":
                                     cpu_util["max"].append(result["max_total_cpu_util"])
                                     ram["avg"].append(result["avg_total_ram_residentsetsize_MB"])
                                     ram["max"].append(result["max_total_ram_residentsetsize_MB"])
-                        elif algo == "icmp":                             
-                            with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
+                        elif algo == "icmp":         
+                            readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
+                            precomputed_errors = False
+                            if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
+                                precomputed_errors = True
+                                readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)             
+                            with jsonlines.open(readinfile, mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
                                     dataloglik.append(result["logfullposterior"])                                    
-                                    param_positions_dict = result["param_positions_dict"] 
+                                    param_positions_dict = result["param_positions_dict"]                                         
                                     for param in parameter_names:                                        
                                         param_true = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                         param_hat = result[param]                                        
                                         if param == "X":                                                                
-                                            X_true = np.asarray(param_true).reshape((d, K), order="F")
-                                            X_hat = np.asarray(param_hat).reshape((d, K), order="F")
-                                            Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
-                                                                                                                                        param_hat=X_hat, 
-                                                                                                                                        seedint=seed_value)
+                                            if not precomputed_errors:
+                                                X_true = np.asarray(param_true).reshape((d, K), order="F")
+                                                X_hat = np.asarray(param_hat).reshape((d, K), order="F")
+                                                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
+                                                                                                                                            param_hat=X_hat, 
+                                                                                                                                            seedint=seed_value)
+                                                result["err_x_nonRT"] = err_x_nonRT
+                                                result["err_x_RT"] = err_x
+                                                result["mse_x_nonRT"] = mse_x_nonRT
+                                                result["mse_x_RT"] = mse_x
+                                            else:
+                                                err_x_nonRT = result["err_x_nonRT"]
+                                                err_x = result["err_x_RT"]
+                                                mse_x_nonRT = result["mse_x_nonRT"]
+                                                mse_x = result["mse_x_RT"]
                                             theta_err_RT[param].append(err_x)
                                             theta_err[param].append(err_x_nonRT)
                                             theta_sqerr_RT[param].append(mse_x)
                                             theta_sqerr[param].append(mse_x_nonRT)
-                                        elif param == "Z":                                                
-                                            Z_true = np.asarray(param_true).reshape((d, J), order="F")
-                                            Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
-                                            Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
-                                                                                                                                        param_hat=Z_hat, 
-                                                                                                                                        seedint=seed_value)
+                                        elif param == "Z":      
+                                            if not precomputed_errors:                                       
+                                                Z_true = np.asarray(param_true).reshape((d, J), order="F")
+                                                Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
+                                                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
+                                                                                                                                            param_hat=Z_hat, 
+                                                                                                                                            seedint=seed_value)
+                                                result["err_z_nonRT"] = err_z_nonRT
+                                                result["err_z_RT"] = err_z
+                                                result["mse_z_nonRT"] = mse_z_nonRT
+                                                result["mse_z_RT"] = mse_z        
+                                            else:        
+                                                err_z_nonRT = result["err_z_nonRT"]
+                                                err_z = result["err_z_RT"]
+                                                mse_z_nonRT = result["mse_z_nonRT"]
+                                                mse_z = result["mse_z_RT"]                 
                                             theta_err_RT[param].append(err_z)
                                             theta_err[param].append(err_z_nonRT)
                                             theta_sqerr_RT[param].append(mse_z)
-                                            theta_sqerr[param].append(mse_z_nonRT)                                          
+                                            theta_sqerr[param].append(mse_z_nonRT)    
                                         elif param in ["gamma", "delta", "sigma_e"]:
                                             # scalars
                                             rel_err = (param_true - param_hat)/param_true
@@ -190,6 +215,12 @@ if __name__ == "__main__":
                                             sq_err = rel_err**2            
                                             theta_err[param].append(float(np.mean(rel_err)))    
                                             theta_sqerr[param].append(float(np.mean(sq_err)))
+                                    if not precomputed_errors:
+                                        # save updated file
+                                        out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
+                                        with open(out_file, 'a') as f:         
+                                            writer = jsonlines.Writer(f)
+                                            writer.write(result)
                                     # only consider the best solution
                                     break
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
@@ -212,7 +243,17 @@ if __name__ == "__main__":
                                 estimation_error_per_trial_per_batch[m][param] = []
                                 estimation_error_per_trial_per_batch_nonRT[m][param] = []
                             data_location = trial_path
-                            params_out, estimation_sq_error_per_trial_per_batch[m], estimation_sq_error_per_trial_per_batch_nonRT[m],\
+                            readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
+                            precomputed_errors = False
+                            if pathlib.Path(readinfile).exists():
+                                precomputed_errors = True
+                                ffop = open(readinfile, mode="r")
+                                reader = jsonlines.Reader(ffop)
+                                for item in reader:
+                                    print("DMLE - loaded precomputed data.")
+                                params_out = item 
+                            else:    
+                                params_out, estimation_sq_error_per_trial_per_batch[m], estimation_sq_error_per_trial_per_batch_nonRT[m],\
                                 estimation_error_per_trial_per_batch[m], estimation_error_per_trial_per_batch_nonRT[m] = \
                                         combine_estimate_variance_rule(data_location, J, K, d, parameter_names, 
                                                                     estimation_sq_error_per_trial_per_batch[m], 
@@ -221,28 +262,48 @@ if __name__ == "__main__":
                                                                     estimation_error_per_trial_per_batch_nonRT[m],
                                                                     theta_true, param_positions_dict, seedint=seed_value)    
                             for param in parameter_names:
-                                if param == "X":                
-                                    param_hat = params_out[param].reshape((d*K,), order="F").tolist()     
-                                    X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
-                                    X_hat = np.asarray(param_hat).reshape((d, K), order="F")
-                                    Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
-                                                                                                                                param_hat=X_hat, 
-                                                                                                                                seedint=seed_value)
+                                if param == "X":   
+                                    if not precomputed_errors:      
+                                        param_hat = params_out[param].reshape((d*K,), order="F").tolist()     
+                                        X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
+                                        X_hat = np.asarray(param_hat).reshape((d, K), order="F")
+                                        Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
+                                                                                                                                    param_hat=X_hat, 
+                                                                                                                                    seedint=seed_value)
+                                        params_out["err_x_nonRT"] = err_x_nonRT
+                                        params_out["err_x_RT"] = err_x
+                                        params_out["mse_x_nonRT"] = mse_x_nonRT
+                                        params_out["mse_x_RT"] = mse_x      
+                                    else:
+                                        err_x_nonRT = params_out["err_x_nonRT"]
+                                        err_x = params_out["err_x_RT"]
+                                        mse_x_nonRT = params_out["mse_x_nonRT"]
+                                        mse_x = params_out["mse_x_RT"]
                                     theta_err_RT[param].append(err_x)
                                     theta_err[param].append(err_x_nonRT)
                                     theta_sqerr_RT[param].append(mse_x)
                                     theta_sqerr[param].append(mse_x_nonRT)
                                 elif param == "Z":
-                                    param_hat = params_out[param].reshape((d*J,), order="F").tolist()     
-                                    Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
-                                    Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
-                                    Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
-                                                                                                                                param_hat=Z_hat, 
-                                                                                                                                seedint=seed_value)
+                                    if not precomputed_errors:     
+                                        param_hat = params_out[param].reshape((d*J,), order="F").tolist()     
+                                        Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                                        Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
+                                        Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
+                                                                                                                                    param_hat=Z_hat, 
+                                                                                                                                    seedint=seed_value)  
+                                        params_out["err_z_nonRT"] = err_z_nonRT
+                                        params_out["err_z_RT"] = err_z
+                                        params_out["mse_z_nonRT"] = mse_z_nonRT
+                                        params_out["mse_z_RT"] = mse_z      
+                                    else:
+                                        err_z_nonRT = params_out["err_z_nonRT"]
+                                        err_z = params_out["err_z_RT"]
+                                        mse_z_nonRT = params_out["mse_z_nonRT"]
+                                        mse_z = params_out["mse_z_RT"]                 
                                     theta_err_RT[param].append(err_z)
                                     theta_err[param].append(err_z_nonRT)
                                     theta_sqerr_RT[param].append(mse_z)
-                                    theta_sqerr[param].append(mse_z_nonRT)             
+                                    theta_sqerr[param].append(mse_z_nonRT)    
                                 elif param in ["beta", "alpha"]:
                                     param_hat = params_out[param].tolist()
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
@@ -255,7 +316,17 @@ if __name__ == "__main__":
                                     mse = rel_err**2                                    
                                     theta_err[param].append(rel_err[0])
                                     theta_sqerr[param].append(mse[0])
-                            # for efficiency in dmle: provide averages/max over all batches and make remark in paper   
+                            if not precomputed_errors:
+                                # save updated file
+                                out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
+                                with open(out_file, 'a') as f:         
+                                    writer = jsonlines.Writer(f)
+                                    writer.write(params_out)
+                            else:
+                                reader.close()
+                                ffop.close()
+                                
+                            # for efficiency metrics in dmle: provide averages/max over all batches and make remark in paper   
                             subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file() and "dataset_" in file.name]      
                             batch_runtimes = []
                             batch_cpu_util_avg = []
@@ -280,72 +351,106 @@ if __name__ == "__main__":
                             ram["max"].append(np.mean(batch_ram_max))
                         elif algo == "icmd":
                             DIR_base = trial_path
-                            params_out = dict()
-                            params_out["X"] = np.zeros((d*K,))
-                            params_out["beta"] = np.zeros((K,))    
-                            for param in parameter_names:       
-                                theta = None
-                                all_estimates = []
-                                path = pathlib.Path(DIR_base)  
-                                
+                            readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
+                            precomputed_errors = False
+                            if pathlib.Path(readinfile).exists():
+                                precomputed_errors = True
+                                ffop = open(readinfile, mode="r")
+                                reader = jsonlines.Reader(ffop)
+                                for item in reader:
+                                    print("ICM-D - loaded precomputed data.")
+                                    ipdb.set_trace()
+                                    break
+                                params_out = item 
+                            else:                                
+                                params_out = dict()
+                                params_out["X"] = np.zeros((d*K,))
+                                params_out["beta"] = np.zeros((K,))    
+                                for param in parameter_names:       
+                                    theta = None
+                                    all_estimates = []
+                                    path = pathlib.Path(DIR_base)  
+                                    
+                                    ipdb.set_trace()
+                                    
+                                    subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
+                                    for dataset_index in range(len(subdatasets_names)):                    
+                                        subdataset_name = subdatasets_names[dataset_index]                        
+                                        DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
+                                        path = pathlib.Path(DIR_read)  
+                                        estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
+                                        if len(estimates_names) > 1:
+                                            raise AttributeError("Should have 1 output estimation file.")
+                                        for estim in estimates_names:
+                                            with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
+                                                for result in f.iter(type=dict, skip_invalid=True):
+                                                    if param in ["X", "beta"]:
+                                                        # single estimate per data split
+                                                        theta = result[param]
+                                                        namesplit = estim.split("_")
+                                                        start = int(namesplit[5])
+                                                        end   = int(namesplit[6].replace(".jsonl", ""))
+                                                        if param == "X":
+                                                            params_out[param][start*d:end*d] = theta
+                                                        else:
+                                                            params_out[param][start:end] = theta 
+                                                    else:                                                        
+                                                        theta = result[param]
+                                                        all_estimates.append(theta)
+                                                    # only consider best solution
+                                                    break
+                                    if param in ["X", "beta"]:
+                                        params_out[param] = params_out[param].tolist()       
+                                    else:             
+                                        all_estimates = np.stack(all_estimates)
+                                        if param not in ["Z", "Phi", "alpha"]:
+                                            all_estimates = all_estimates.flatten()
+                                        # compute variance over columns
+                                        column_variances = np.var(all_estimates, axis=0)
+                                        # sum acrocs each coordinate's weight
+                                        all_weights_sum = np.sum(column_variances, axis=0)
+                                        all_weights_norm = column_variances/all_weights_sum
+                                        assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
+                                        # element-wise multiplication
+                                        weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
+                                        params_out[param] = weighted_estimate.tolist()
                                 ipdb.set_trace()
-                                
-                                subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
-                                for dataset_index in range(len(subdatasets_names)):                    
-                                    subdataset_name = subdatasets_names[dataset_index]                        
-                                    DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
-                                    path = pathlib.Path(DIR_read)  
-                                    estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
-                                    if len(estimates_names) > 1:
-                                        raise AttributeError("Should have 1 output estimation file.")
-                                    for estim in estimates_names:
-                                        with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
-                                            for result in f.iter(type=dict, skip_invalid=True):
-                                                if param in ["X", "beta"]:
-                                                    # single estimate per data split
-                                                    theta = result[param]
-                                                    namesplit = estim.split("_")
-                                                    start = int(namesplit[5])
-                                                    end   = int(namesplit[6].replace(".jsonl", ""))
-                                                    if param == "X":
-                                                        params_out[param][start*d:end*d] = theta
-                                                    else:
-                                                        params_out[param][start:end] = theta 
-                                                else:                                                        
-                                                    theta = result[param]
-                                                    all_estimates.append(theta)
-                                                # only consider best solution
-                                                break
-                                if param in ["X", "beta"]:
-                                    params_out[param] = params_out[param].tolist()       
-                                else:             
-                                    all_estimates = np.stack(all_estimates)
-                                    if param not in ["Z", "Phi", "alpha"]:
-                                        all_estimates = all_estimates.flatten()
-                                    # compute variance over columns
-                                    column_variances = np.var(all_estimates, axis=0)
-                                    # sum acrocs each coordinate's weight
-                                    all_weights_sum = np.sum(column_variances, axis=0)
-                                    all_weights_norm = column_variances/all_weights_sum
-                                    assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
-                                    # element-wise multiplication
-                                    weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
-                                    params_out[param] = weighted_estimate.tolist()
-                            ipdb.set_trace()
-
+                            
                             for param in parameter_names:
-                                if param == "X":                 
-                                    X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
-                                    X_hat = np.asarray(params_out[param]).reshape((d, K), order="F")
-                                    Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seed_value)
+                                if param == "X":       
+                                    if not precomputed_errors:          
+                                        X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
+                                        X_hat = np.asarray(params_out[param]).reshape((d, K), order="F")
+                                        Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, 
+                                                                                                                                    seedint=seed_value)
+                                        params_out["err_x_nonRT"] = err_x_nonRT
+                                        params_out["err_x_RT"] = err_x
+                                        params_out["mse_x_nonRT"] = mse_x_nonRT
+                                        params_out["mse_x_RT"] = mse_x      
+                                    else:
+                                        err_x_nonRT = params_out["err_x_nonRT"]
+                                        err_x = params_out["err_x_RT"]
+                                        mse_x_nonRT = params_out["mse_x_nonRT"]
+                                        mse_x = params_out["mse_x_RT"]
                                     theta_err_RT[param].append(err_x)
                                     theta_err[param].append(err_x_nonRT)
                                     theta_sqerr_RT[param].append(mse_x)
                                     theta_sqerr[param].append(mse_x_nonRT)
                                 elif param == "Z":
-                                    Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
-                                    Z_hat = np.asarray(params_out[param]).reshape((d, J), order="F")
-                                    Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seed_value)
+                                    if not precomputed_errors:  
+                                        Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
+                                        Z_hat = np.asarray(params_out[param]).reshape((d, J), order="F")
+                                        Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, 
+                                                                                                                                    seedint=seed_value)
+                                        params_out["err_z_nonRT"] = err_z_nonRT
+                                        params_out["err_z_RT"] = err_z
+                                        params_out["mse_z_nonRT"] = mse_z_nonRT
+                                        params_out["mse_z_RT"] = mse_z      
+                                    else:
+                                        err_z_nonRT = params_out["err_z_nonRT"]
+                                        err_z = params_out["err_z_RT"]
+                                        mse_z_nonRT = params_out["mse_z_nonRT"]
+                                        mse_z = params_out["mse_z_RT"]                                   
                                     theta_err_RT[param].append(err_z)
                                     theta_err[param].append(err_z_nonRT)
                                     theta_sqerr_RT[param].append(mse_z)
@@ -360,6 +465,17 @@ if __name__ == "__main__":
                                     mse = rel_err**2
                                     theta_err[param].append(float(rel_err))
                                     theta_sqerr[param].append(float(mse))      
+                            
+                            if not precomputed_errors:
+                                # save updated file
+                                out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
+                                with open(out_file, 'a') as f:         
+                                    writer = jsonlines.Writer(f)
+                                    writer.write(params_out)
+                            else:
+                                reader.close()
+                                ffop.close()
+
                             # for efficiency in icmd: provide averages/max over all batches and make remark in paper   
                             batch_runtimes = []
                             batch_cpu_util_avg = []
