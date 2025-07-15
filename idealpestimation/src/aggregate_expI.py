@@ -319,7 +319,10 @@ if __name__ == "__main__":
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                                 with open(out_file, 'a') as f:         
                                     writer = jsonlines.Writer(f)
-                                    writer.write(params_out)
+                                    try:
+                                        writer.write(params_out)
+                                    except:
+                                        ipdb.set_trace()
                             else:
                                 reader.close()
                                 ffop.close()
