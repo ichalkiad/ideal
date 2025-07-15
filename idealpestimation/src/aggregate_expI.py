@@ -30,9 +30,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    ipdb.set_trace() 
-
-    algorithms = ["icmd"] #, "mle", "ca", "icmp"]
+    algorithms = ["icmd", "mle", "ca", "icmp"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -359,7 +357,6 @@ if __name__ == "__main__":
                                 reader = jsonlines.Reader(ffop)
                                 for item in reader:
                                     print("ICM-D - loaded precomputed data.")
-                                    ipdb.set_trace()
                                     break
                                 params_out = item 
                             else:                                
@@ -370,9 +367,6 @@ if __name__ == "__main__":
                                     theta = None
                                     all_estimates = []
                                     path = pathlib.Path(DIR_base)  
-                                    
-                                    ipdb.set_trace()
-                                    
                                     subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                     for dataset_index in range(len(subdatasets_names)):                    
                                         subdataset_name = subdatasets_names[dataset_index]                        
@@ -414,13 +408,10 @@ if __name__ == "__main__":
                                             assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
                                         else:
                                             # same estimate, set uniform weighting
-                                            ipdb.set_trace()
                                             all_weights_norm = 1/len(all_estimates)
                                         # element-wise multiplication
                                         weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
-                                        params_out[param] = weighted_estimate.tolist()
-                                ipdb.set_trace()
-                            
+                                        params_out[param] = weighted_estimate.tolist()                            
                             for param in parameter_names:
                                 if param == "X":       
                                     if not precomputed_errors:          
@@ -468,8 +459,8 @@ if __name__ == "__main__":
                                 else:
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                     mse = rel_err**2
-                                    theta_err[param].append(float(rel_err))
-                                    theta_sqerr[param].append(float(mse))      
+                                    theta_err[param].append(float(rel_err[0]))
+                                    theta_sqerr[param].append(float(mse[0]))      
                             
                             if not precomputed_errors:
                                 # save updated file
@@ -500,7 +491,7 @@ if __name__ == "__main__":
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max)) 
-                    ipdb.set_trace()
+                    
                     # add plots per algorithm
                     if algo == "ca":
                         plotname = "CA"
@@ -548,7 +539,7 @@ if __name__ == "__main__":
                                 y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
-                ipdb.set_trace()
+                
                 # save figures per K, J, sigma_e
                 savename = "{}/time_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
                 fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in seconds)", title="", 
