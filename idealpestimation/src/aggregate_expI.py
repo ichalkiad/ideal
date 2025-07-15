@@ -357,6 +357,7 @@ if __name__ == "__main__":
                         elif algo == "icmd":
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
+                            ipdb.set_trace()
                             precomputed_errors = False
                             if pathlib.Path(readinfile).exists():
                                 precomputed_errors = True
@@ -468,7 +469,7 @@ if __name__ == "__main__":
                                     mse = rel_err**2
                                     theta_err[param].append(float(rel_err[0]))
                                     theta_sqerr[param].append(float(mse[0]))      
-                            
+                            ipdb.set_trace()
                             if not precomputed_errors:
                                 # save updated file
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
