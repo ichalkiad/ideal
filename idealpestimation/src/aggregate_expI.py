@@ -303,7 +303,10 @@ if __name__ == "__main__":
                                     theta_sqerr_RT[param].append(mse_z)
                                     theta_sqerr[param].append(mse_z_nonRT)    
                                 elif param in ["beta", "alpha"]:
-                                    param_hat = params_out[param].tolist()
+                                    if not isinstance(params_out[param], list):
+                                        param_hat = params_out[param].tolist()
+                                    else:
+                                        param_hat = params_out[param]
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
                                     mse = np.mean(rel_err**2)  
                                     theta_err[param].append(float(np.mean(rel_err)))    
