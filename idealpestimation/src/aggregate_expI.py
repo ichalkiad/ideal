@@ -270,8 +270,8 @@ if __name__ == "__main__":
                                                                                                                                     seedint=seed_value)
                                         params_out["err_x_nonRT"] = err_x_nonRT
                                         params_out["err_x_RT"] = err_x
-                                        params_out["mse_x_nonRT"] = mse_x_nonRT[0]
-                                        params_out["mse_x_RT"] = mse_x[0]  
+                                        params_out["mse_x_nonRT"] = mse_x_nonRT
+                                        params_out["mse_x_RT"] = mse_x
                                     else:
                                         err_x_nonRT = params_out["err_x_nonRT"]
                                         err_x = params_out["err_x_RT"]
@@ -291,8 +291,8 @@ if __name__ == "__main__":
                                                                                                                                     seedint=seed_value)  
                                         params_out["err_z_nonRT"] = err_z_nonRT
                                         params_out["err_z_RT"] = err_z
-                                        params_out["mse_z_nonRT"] = mse_z_nonRT[0]
-                                        params_out["mse_z_RT"] = mse_z[0]   
+                                        params_out["mse_z_nonRT"] = mse_z_nonRT
+                                        params_out["mse_z_RT"] = mse_z 
                                     else:
                                         err_z_nonRT = params_out["err_z_nonRT"]
                                         err_z = params_out["err_z_RT"]
