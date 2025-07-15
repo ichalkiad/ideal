@@ -268,10 +268,10 @@ if __name__ == "__main__":
                                         Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
                                                                                                                                     param_hat=X_hat, 
                                                                                                                                     seedint=seed_value)
-                                        params_out["err_x_nonRT"] = err_x_nonRT[0]
-                                        params_out["err_x_RT"] = err_x[0]
+                                        params_out["err_x_nonRT"] = err_x_nonRT
+                                        params_out["err_x_RT"] = err_x
                                         params_out["mse_x_nonRT"] = mse_x_nonRT[0]
-                                        params_out["mse_x_RT"] = mse_x[0]      
+                                        params_out["mse_x_RT"] = mse_x[0]  
                                     else:
                                         err_x_nonRT = params_out["err_x_nonRT"]
                                         err_x = params_out["err_x_RT"]
@@ -289,8 +289,8 @@ if __name__ == "__main__":
                                         Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
                                                                                                                                     param_hat=Z_hat, 
                                                                                                                                     seedint=seed_value)  
-                                        params_out["err_z_nonRT"] = err_z_nonRT[0]
-                                        params_out["err_z_RT"] = err_z[0]
+                                        params_out["err_z_nonRT"] = err_z_nonRT
+                                        params_out["err_z_RT"] = err_z
                                         params_out["mse_z_nonRT"] = mse_z_nonRT[0]
                                         params_out["mse_z_RT"] = mse_z[0]   
                                     else:
