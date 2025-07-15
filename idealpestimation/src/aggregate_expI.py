@@ -21,7 +21,7 @@ if __name__ == "__main__":
     Ks = [50000]
     Js = [100]
     sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]
-    M = 3
+    M = 2
     batchsize = 1504
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
@@ -272,6 +272,7 @@ if __name__ == "__main__":
                                         params_out["err_x_RT"] = err_x
                                         params_out["mse_x_nonRT"] = mse_x_nonRT
                                         params_out["mse_x_RT"] = mse_x
+                                        params_out[param] = params_out[param].reshape((d*K,), order="F").tolist()
                                     else:
                                         err_x_nonRT = params_out["err_x_nonRT"]
                                         err_x = params_out["err_x_RT"]
@@ -293,6 +294,7 @@ if __name__ == "__main__":
                                         params_out["err_z_RT"] = err_z
                                         params_out["mse_z_nonRT"] = mse_z_nonRT
                                         params_out["mse_z_RT"] = mse_z 
+                                        params_out[param] = params_out[param].reshape((d*J,), order="F").tolist() 
                                     else:
                                         err_z_nonRT = params_out["err_z_nonRT"]
                                         err_z = params_out["err_z_RT"]
@@ -311,6 +313,7 @@ if __name__ == "__main__":
                                     mse = np.mean(rel_err**2)  
                                     theta_err[param].append(float(np.mean(rel_err)))    
                                     theta_sqerr[param].append(float(mse))
+                                    params_out[param] = params_out[param].tolist()
                                 else:
                                     param_hat = params_out[param]
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
@@ -322,10 +325,7 @@ if __name__ == "__main__":
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                                 with open(out_file, 'a') as f:         
                                     writer = jsonlines.Writer(f)
-                                    try:
-                                        writer.write(params_out)
-                                    except:
-                                        ipdb.set_trace()
+                                    writer.write(params_out)
                             else:
                                 reader.close()
                                 ffop.close()
