@@ -405,17 +405,17 @@ if __name__ == "__main__":
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
-                                        if param in ["sigma_e"]:
-                                            ipdb.set_trace()
-                                        # compute variance over columns
-                                        column_variances = np.var(all_estimates, axis=0)
-                                        # sum acrocs each coordinate's weight
-                                        all_weights_sum = np.sum(column_variances, axis=0)
-                                        all_weights_norm = column_variances/all_weights_sum
-                                        try:
+                                        if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
+                                            # compute variance over columns
+                                            column_variances = np.var(all_estimates, axis=0)
+                                            # sum acrocs each coordinate's weight
+                                            all_weights_sum = np.sum(column_variances, axis=0)
+                                            all_weights_norm = column_variances/all_weights_sum
                                             assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
-                                        except:
+                                        else:
+                                            # same estimate, set uniform weighting
                                             ipdb.set_trace()
+                                            all_weights_norm = 1/len(all_estimates)
                                         # element-wise multiplication
                                         weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
                                         params_out[param] = weighted_estimate.tolist()
