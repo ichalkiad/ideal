@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     Ks = [50000]
     Js = [100]
-    sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]
+    sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]
     M = 10
     batchsize = 1504
     d = 2
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["mle", "icmd", "icmp", "ca"]
+    algorithms = ["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -553,28 +553,48 @@ if __name__ == "__main__":
                 time_fig.update_yaxes(title_text="Duration (in seconds), D-MLE, CA", secondary_y=True)
                 fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
                                         showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False) 
+                fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
+                                        showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
                                         print_pdf=False) 
                 savename = "{}/ram_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
                 fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
                                         showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False) 
+                fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+                                        showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
                                         print_pdf=False) 
                 savename = "{}/ram_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
                 fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average RAM consumption (in GB)", title="", 
                                         showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False) 
+                fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average RAM consumption (in GB)", title="", 
+                                        showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
                                         print_pdf=False) 
                 savename = "{}/cpu_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
                 fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+                                        showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
+                                        print_pdf=False) 
+                fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
                                         showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
                                         print_pdf=False) 
                 savename = "{}/cpu_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
                 fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
                                         showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
                                         print_pdf=False) 
+                fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
+                                        showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
+                                        print_pdf=False)
                 for param in parameter_names:
                     savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
                     if param in ["X", "Z"]:
@@ -583,25 +603,45 @@ if __name__ == "__main__":
                                             savename, xaxis_title="Estimation algorithm", 
                                             yaxis_title="Mean relative error (under rotation/scaling)", 
                                             title="", showgrid=False, showlegend=False, 
-                                            print_png=True, print_html=True, 
+                                            print_png=True, print_html=False, 
+                                            print_pdf=False) 
+                        fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
+                                            savename, xaxis_title="Estimation algorithm", 
+                                            yaxis_title="Mean relative error (under rotation/scaling)", 
+                                            title="", showgrid=False, showlegend=True, 
+                                            print_png=False, print_html=True, 
                                             print_pdf=False) 
                     savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
                                         showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
                                         print_pdf=False)    
+                    fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
+                                        showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
+                                        print_pdf=False) 
                     if param in ["X", "Z"]:
                         savename = "{}/rel_sqerr_RT_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
                         fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
                                         xaxis_title="Estimation algorithm", 
                                         yaxis_title="Mean relative squared error (under rotation/scaling)", 
                                         title="", showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False) 
+                        fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
+                                        xaxis_title="Estimation algorithm", 
+                                        yaxis_title="Mean relative squared error (under rotation/scaling)", 
+                                        title="", showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
                                         print_pdf=False) 
                     savename = "{}/rel_sqerr_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
                     fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
                                         showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=True, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False) 
+                    fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
+                                        showgrid=False, showlegend=True, 
+                                        print_png=False, print_html=True, 
                                         print_pdf=False) 
 
                        
