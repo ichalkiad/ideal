@@ -69,9 +69,8 @@ if __name__ == "__main__":
                     if param in ["X", "Z"]:
                         param_err_fig["{}_RT".format(param)] = go.Figure()
                         param_sqerr_fig["{}_RT".format(param)] = go.Figure()
-                    else:
-                        param_err_fig[param] = go.Figure()
-                        param_sqerr_fig[param] = go.Figure()
+                    param_err_fig[param] = go.Figure()
+                    param_sqerr_fig[param] = go.Figure()
                 time_fig = make_subplots(specs=[[{"secondary_y": True}]])
                 ram_fig_max = go.Figure()
                 cpu_fig_max = go.Figure()
