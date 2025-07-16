@@ -221,7 +221,7 @@ if __name__ == "__main__":
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"     
     parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_data.csv", header=None)
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentII_icm_data.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])
@@ -275,7 +275,7 @@ if __name__ == "__main__":
     niter = 100
     max_restarts = 2
     max_partial_restarts = 4 #2
-    max_halving = 2
+    max_halving = 3 # 2
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
