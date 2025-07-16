@@ -67,8 +67,8 @@ if __name__ == "__main__":
                 param_sqerr_fig = {}
                 for param in parameter_names:
                     if param in ["X", "Z"]:
-                        param_err_fig[param] = make_subplots(specs=[[{"secondary_y": True}]])
-                        param_sqerr_fig[param] = make_subplots(specs=[[{"secondary_y": True}]])
+                        param_err_fig["{}_RT".format(param)] = go.Figure()
+                        param_sqerr_fig["{}_RT".format(param)] = go.Figure()
                     else:
                         param_err_fig[param] = go.Figure()
                         param_sqerr_fig[param] = go.Figure()
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                                     param_positions_dict_ca = result["param_positions_dict"]                                                                 
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
-                                    runtimes.append(result["wall_duration"]/60) # in minutes
+                                    runtimes.append(result["wall_duration"]) # in seconds
                                     cpu_util["avg"].append(result["avg_total_cpu_util"])
                                     cpu_util["max"].append(result["max_total_cpu_util"])
                                     ram["avg"].append(result["avg_total_ram_residentsetsize_MB"]/1000)
@@ -395,8 +395,8 @@ if __name__ == "__main__":
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
                                     else:    
-                                        if param in ["sigma_e", "gamma"]:
-                                            ipdb.set_trace()   
+                                        # if param in ["sigma_e", "gamma"]:
+                                        #     ipdb.set_trace()   
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
@@ -480,13 +480,13 @@ if __name__ == "__main__":
                             batch_ram_max = []
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
-                                    batch_runtimes.append(result["wall_duration"]/60) # in minutes
+                                    batch_runtimes.append(result["wall_duration"]) # in seconds
                                     batch_cpu_util_avg.append(result["avg_total_cpu_util"])
                                     batch_cpu_util_max.append(result["max_total_cpu_util"])
                                     batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"]/1000)
                                     batch_ram_max.append(result["max_total_ram_residentsetsize_MB"]/1000)
                                     break
-                            runtimes.append(np.mean(batch_runtimes)) # in minutes
+                            runtimes.append(np.mean(batch_runtimes)) # in seconds
                             cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
                             ram["avg"].append(np.mean(batch_ram_avg))
@@ -530,19 +530,19 @@ if __name__ == "__main__":
                             param_err_fig[param].add_trace(go.Box(
                                 y=theta_err[param], showlegend=True, name="{}".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ), secondary_y=False)
+                            ))
                             param_sqerr_fig[param].add_trace(go.Box(
                                 y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ), secondary_y=False)
-                            param_err_fig[param].add_trace(go.Box(
+                            ))
+                            param_err_fig["{}_RT".format(param)].add_trace(go.Box(
                                 y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ), secondary_y=True)
-                            param_sqerr_fig[param].add_trace(go.Box(
+                            ))
+                            param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
                                 y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ), secondary_y=True)
+                            ))
                         else:
                             param_err_fig[param].add_trace(go.Box(
                                 y=theta_err[param], showlegend=True, name="{}".format(plotname),
@@ -555,7 +555,7 @@ if __name__ == "__main__":
                 
                 # save figures per K, J, sigma_e
                 savename = "{}/time_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                time_fig.update_yaxes(title_text="Duration (in minutes): D-MLE, CA", secondary_y=True)
+                time_fig.update_yaxes(title_text="Duration (in seconds), ICM-D, CA", secondary_y=True)
                 fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
                                         showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
@@ -583,16 +583,29 @@ if __name__ == "__main__":
                 for param in parameter_names:
                     savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
                     if param in ["X", "Z"]:
-                        param_err_fig[param].update_yaxes(title_text="Mean relative error (under rotation/scaling)", secondary_y=True)
+                        savename = "{}/rel_err_RT_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))
+                        fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
+                                            savename, xaxis_title="Estimation algorithm", 
+                                            yaxis_title="Mean relative error (under rotation/scaling)", 
+                                            title="", showgrid=False, showlegend=False, 
+                                            print_png=True, print_html=True, 
+                                            print_pdf=False) 
+                    savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
-                                        showgrid=False, showlegend=True, 
+                                        showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=True, 
+                                        print_pdf=False)    
+                    if param in ["X", "Z"]:
+                        savename = "{}/rel_sqerr_RT_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
+                        fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
+                                        xaxis_title="Estimation algorithm", 
+                                        yaxis_title="Mean relative squared error (under rotation/scaling)", 
+                                        title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
                                         print_pdf=False) 
-                    savename = "{}/rel_sqerr_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
-                    if param in ["X", "Z"]:
-                        param_sqerr_fig[param].update_yaxes(title_text="Mean relative squared error (under rotation/scaling)", secondary_y=True)
+                    savename = "{}/rel_sqerr_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
                     fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
-                                        showgrid=False, showlegend=True, 
+                                        showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
                                         print_pdf=False) 
 
