@@ -385,14 +385,18 @@ if __name__ == "__main__":
                                                             params_out[param][start*d:end*d] = theta
                                                         else:
                                                             params_out[param][start:end] = theta 
-                                                    else:                                                        
+                                                    else: 
+                                                        if param in ["sigma_e", "gamma"]:
+                                                            print(result[param])                                                       
                                                         theta = result[param]
                                                         all_estimates.append(theta)
                                                     # only consider best solution
                                                     break
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
-                                    else:             
+                                    else:    
+                                        if param in ["sigma_e", "gamma"]:
+                                            ipdb.set_trace()   
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
