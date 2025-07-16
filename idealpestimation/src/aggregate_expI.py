@@ -109,7 +109,8 @@ if __name__ == "__main__":
                         elif algo == "icmp":
                             trial_path = "{}/{}/estimation_ICM_evaluate_posterior_elementwise/".format(res_path, trial)
                         
-                        if algo == "ca":                            
+                        if algo == "ca":   
+                            # only assess ideal points for X, Z                         
                             # load data    
                             with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
                                 Y = pickle.load(f)
@@ -127,23 +128,7 @@ if __name__ == "__main__":
                                     theta_sqerr["Z"].append(result["mse_z_nonRT"])
                                     theta_sqerr_RT["X"].append(result["mse_x_RT"])
                                     theta_sqerr_RT["Z"].append(result["mse_z_RT"])                                    
-                                    param_positions_dict_ca = result["param_positions_dict"] 
-                                    for param in parameter_names:
-                                        if param in ["X", "Z"]:
-                                            continue
-                                        param_true = theta_true_ca[param_positions_dict_ca[param][0]:param_positions_dict_ca[param][1]]
-                                        param_hat = result[param]
-                                        if param in ["gamma", "delta", "sigma_e"]:
-                                            # scalars
-                                            rel_err = (param_true - param_hat)/param_true
-                                            rel_se = rel_err**2
-                                            theta_err[param].append(float(rel_err[0]))
-                                            theta_sqerr[param].append(float(rel_se[0]))
-                                        else:
-                                            rel_err = (param_true - param_hat)/param_true
-                                            sq_err = rel_err**2            
-                                            theta_err[param].append(float(np.mean(rel_err)))    
-                                            theta_sqerr[param].append(float(np.mean(sq_err)))                                                                        
+                                    param_positions_dict_ca = result["param_positions_dict"]                                                                 
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
                                     runtimes.append(result["wall_duration"]/60) # in minutes
