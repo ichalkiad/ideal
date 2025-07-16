@@ -386,7 +386,7 @@ if __name__ == "__main__":
                                                             params_out[param][start:end] = theta 
                                                     else: 
                                                         if param in ["sigma_e", "gamma"]:
-                                                            print(result[param])                                                       
+                                                            print(result[param], trial)                                                       
                                                         theta = result[param]
                                                         all_estimates.append(theta)
                                                     # only consider best solution
