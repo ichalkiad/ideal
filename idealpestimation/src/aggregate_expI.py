@@ -10,7 +10,7 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                             print_threadpool_info, jsonlines, combine_estimate_variance_rule, \
                                                                 optimisation_dict2params, clean_up_data_matrix, get_data_tempering_variance_combined_solution,\
                                                                 get_min_achievable_mse_under_rotation_trnsl, go
-
+from plotly.subplots import make_subplots
 
 if __name__ == "__main__":
 
@@ -68,9 +68,11 @@ if __name__ == "__main__":
                 for param in parameter_names:
                     param_err_fig[param] = go.Figure()
                     param_sqerr_fig[param] = go.Figure()
-                time_fig = go.Figure()
-                ram_fig = go.Figure()
-                cpu_fig = go.Figure()
+                time_fig = make_subplots(specs=[[{"secondary_y": True}]])
+                ram_fig_max = go.Figure()
+                cpu_fig_max = go.Figure()
+                ram_fig_avg = go.Figure()
+                cpu_fig_avg = go.Figure()
                 for algo in algorithms:
                     res_path = "{}/data_K{}_J{}_sigmae{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""))
                     theta_err = {}
@@ -144,11 +146,11 @@ if __name__ == "__main__":
                                             theta_sqerr[param].append(float(np.mean(sq_err)))                                                                        
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
-                                    runtimes.append(result["wall_duration"]) # in seconds
+                                    runtimes.append(result["wall_duration"]/60) # in minutes
                                     cpu_util["avg"].append(result["avg_total_cpu_util"])
                                     cpu_util["max"].append(result["max_total_cpu_util"])
-                                    ram["avg"].append(result["avg_total_ram_residentsetsize_MB"])
-                                    ram["max"].append(result["max_total_ram_residentsetsize_MB"])
+                                    ram["avg"].append(result["avg_total_ram_residentsetsize_MB"]/1000)
+                                    ram["max"].append(result["max_total_ram_residentsetsize_MB"]/1000)
                         elif algo == "icmp":         
                             readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
@@ -223,11 +225,11 @@ if __name__ == "__main__":
                                     break
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
-                                    runtimes.append(result["wall_duration"]) # in seconds
+                                    runtimes.append(result["wall_duration"]/60) # in minutes
                                     cpu_util["avg"].append(result["avg_total_cpu_util"])
                                     cpu_util["max"].append(result["max_total_cpu_util"])
-                                    ram["avg"].append(result["avg_total_ram_residentsetsize_MB"])
-                                    ram["max"].append(result["max_total_ram_residentsetsize_MB"])
+                                    ram["avg"].append(result["avg_total_ram_residentsetsize_MB"]/1000)
+                                    ram["max"].append(result["max_total_ram_residentsetsize_MB"]/1000)
                                     break
                         elif algo == "mle":
                             m = trial
@@ -342,13 +344,13 @@ if __name__ == "__main__":
                                 DIR_read = "{}/{}/estimation/".format(trial_path, subdataset_name)
                                 with jsonlines.open("{}/efficiency_metrics.jsonl".format(DIR_read), mode="r") as f: 
                                     for result in f.iter(type=dict, skip_invalid=True):     
-                                        batch_runtimes.append(result["wall_duration"]) # in seconds
+                                        batch_runtimes.append(result["wall_duration"]/60) # in minutes
                                         batch_cpu_util_avg.append(result["avg_total_cpu_util"])
                                         batch_cpu_util_max.append(result["max_total_cpu_util"])
-                                        batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"])
-                                        batch_ram_max.append(result["max_total_ram_residentsetsize_MB"])
+                                        batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"]/1000)
+                                        batch_ram_max.append(result["max_total_ram_residentsetsize_MB"]/1000)
                                         break
-                            runtimes.append(np.mean(batch_runtimes)) # in seconds
+                            runtimes.append(np.mean(batch_runtimes)) # in minutes
                             cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
                             ram["avg"].append(np.mean(batch_ram_avg))
@@ -485,13 +487,13 @@ if __name__ == "__main__":
                             batch_ram_max = []
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
-                                    batch_runtimes.append(result["wall_duration"]) # in seconds
+                                    batch_runtimes.append(result["wall_duration"]/60) # in minutes
                                     batch_cpu_util_avg.append(result["avg_total_cpu_util"])
                                     batch_cpu_util_max.append(result["max_total_cpu_util"])
-                                    batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"])
-                                    batch_ram_max.append(result["max_total_ram_residentsetsize_MB"])
+                                    batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"]/1000)
+                                    batch_ram_max.append(result["max_total_ram_residentsetsize_MB"]/1000)
                                     break
-                            runtimes.append(np.mean(batch_runtimes)) # in seconds
+                            runtimes.append(np.mean(batch_runtimes)) # in minutes
                             cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
                             ram["avg"].append(np.mean(batch_ram_avg))
@@ -500,29 +502,33 @@ if __name__ == "__main__":
                     # add plots per algorithm
                     if algo == "ca":
                         plotname = "CA"
+                        sec_y = True
                     elif algo == "mle":
                         plotname = "D-MLE"
+                        sec_y = True
                     elif algo == "icmd":
                         plotname = "ICM-D"
+                        sec_y = False
                     elif algo == "icmp":
                         plotname = "ICM-P"
+                        sec_y = False
                     time_fig.add_trace(go.Box(
                         y=runtimes, showlegend=True, name=plotname,
                         boxpoints='outliers', line=dict(color=colors[algo]),                                
-                    ))
-                    ram_fig.add_trace(go.Box(
+                    ), secondary_y=sec_y)
+                    ram_fig_max.add_trace(go.Box(
                         y=ram["max"], showlegend=True, name="{}-max".format(plotname),
                         boxpoints='outliers', line=dict(color=colors[algo])                          
                     ))
-                    ram_fig.add_trace(go.Box(
+                    ram_fig_avg.add_trace(go.Box(
                         y=ram["avg"], showlegend=True, name="{}-avg".format(plotname),
                         boxpoints='outliers', line=dict(color=colors[algo])                          
                     ))
-                    cpu_fig.add_trace(go.Box(
+                    cpu_fig_max.add_trace(go.Box(
                         y=cpu_util["max"], showlegend=True, name="{}-max".format(plotname),
                         boxpoints='outliers', line=dict(color=colors[algo])                          
                     ))
-                    cpu_fig.add_trace(go.Box(
+                    cpu_fig_avg.add_trace(go.Box(
                         y=cpu_util["avg"], showlegend=True, name="{}-avg".format(plotname),
                         boxpoints='outliers', line=dict(color=colors[algo])                          
                     ))
@@ -547,18 +553,29 @@ if __name__ == "__main__":
                 
                 # save figures per K, J, sigma_e
                 savename = "{}/time_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in seconds)", title="", 
-                                        showgrid=False, showlegend=True, 
+                time_fig.update_yaxes(title_text="Duration (in minutes): D-MLE, CA", secondary_y=True)
+                fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
+                                        showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
                                         print_pdf=False) 
-                savename = "{}/ram_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(ram_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="RAM consumption (in MB)", title="", 
-                                        showgrid=False, showlegend=True, 
+                savename = "{}/ram_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
+                fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+                                        showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
                                         print_pdf=False) 
-                savename = "{}/cpu_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(cpu_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=True, 
+                savename = "{}/ram_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
+                fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average RAM consumption (in GB)", title="", 
+                                        showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=True, 
+                                        print_pdf=False) 
+                savename = "{}/cpu_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
+                fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+                                        showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=True, 
+                                        print_pdf=False) 
+                savename = "{}/cpu_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
+                fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
+                                        showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
                                         print_pdf=False) 
                 for param in parameter_names:
