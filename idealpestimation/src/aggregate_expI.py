@@ -384,18 +384,14 @@ if __name__ == "__main__":
                                                             params_out[param][start*d:end*d] = theta
                                                         else:
                                                             params_out[param][start:end] = theta 
-                                                    else: 
-                                                        if param in ["sigma_e", "gamma"]:
-                                                            print(result[param], trial)                                                       
+                                                    else:                                                 
                                                         theta = result[param]
                                                         all_estimates.append(theta)
                                                     # only consider best solution
                                                     break
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
-                                    else:    
-                                        # if param in ["sigma_e", "gamma"]:
-                                        #     ipdb.set_trace()   
+                                    else:     
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
@@ -479,13 +475,13 @@ if __name__ == "__main__":
                             batch_ram_max = []
                             with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):     
-                                    batch_runtimes.append(result["wall_duration"]) # in seconds
+                                    batch_runtimes.append(result["wall_duration"]/60) # in minutes
                                     batch_cpu_util_avg.append(result["avg_total_cpu_util"])
                                     batch_cpu_util_max.append(result["max_total_cpu_util"])
                                     batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"]/1000)
                                     batch_ram_max.append(result["max_total_ram_residentsetsize_MB"]/1000)
                                     break
-                            runtimes.append(np.mean(batch_runtimes)) # in seconds
+                            runtimes.append(np.mean(batch_runtimes)) # in minutes
                             cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
                             cpu_util["max"].append(np.mean(batch_cpu_util_max))
                             ram["avg"].append(np.mean(batch_ram_avg))
@@ -500,7 +496,7 @@ if __name__ == "__main__":
                         sec_y = True
                     elif algo == "icmd":
                         plotname = "ICM-D"
-                        sec_y = True
+                        sec_y = False
                     elif algo == "icmp":
                         plotname = "ICM-P"
                         sec_y = False
@@ -554,7 +550,7 @@ if __name__ == "__main__":
                 
                 # save figures per K, J, sigma_e
                 savename = "{}/time_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                time_fig.update_yaxes(title_text="Duration (in seconds), D-MLE, ICM-D, CA", secondary_y=True)
+                time_fig.update_yaxes(title_text="Duration (in seconds), D-MLE, CA", secondary_y=True)
                 fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
                                         showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
