@@ -21,7 +21,7 @@ if __name__ == "__main__":
     Ks = [50000]
     Js = [100]
     sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]
-    M = 5
+    M = 10
     batchsize = 1504
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
@@ -66,8 +66,12 @@ if __name__ == "__main__":
                 param_err_fig = {}
                 param_sqerr_fig = {}
                 for param in parameter_names:
-                    param_err_fig[param] = go.Figure()
-                    param_sqerr_fig[param] = go.Figure()
+                    if param in ["X", "Z"]:
+                        param_err_fig[param] = make_subplots(specs=[[{"secondary_y": True}]])
+                        param_sqerr_fig[param] = make_subplots(specs=[[{"secondary_y": True}]])
+                    else:
+                        param_err_fig[param] = go.Figure()
+                        param_sqerr_fig[param] = go.Figure()
                 time_fig = make_subplots(specs=[[{"secondary_y": True}]])
                 ram_fig_max = go.Figure()
                 cpu_fig_max = go.Figure()
@@ -518,21 +522,30 @@ if __name__ == "__main__":
                         boxpoints='outliers', line=dict(color=colors[algo])                          
                     ))
                     for param in parameter_names:
-                        param_err_fig[param].add_trace(go.Box(
+                        if param in ["X", "Z"]:
+                            param_err_fig[param].add_trace(go.Box(
                                 y=theta_err[param], showlegend=True, name="{}".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                        param_sqerr_fig[param].add_trace(go.Box(
+                            ), secondary_y=False)
+                            param_sqerr_fig[param].add_trace(go.Box(
                                 y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                        if param in ["X", "Z"]:
+                            ), secondary_y=False)
                             param_err_fig[param].add_trace(go.Box(
                                 y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
+                            ), secondary_y=True)
                             param_sqerr_fig[param].add_trace(go.Box(
                                 y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ), secondary_y=True)
+                        else:
+                            param_err_fig[param].add_trace(go.Box(
+                                y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                            param_sqerr_fig[param].add_trace(go.Box(
+                                y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
                 
@@ -565,11 +578,15 @@ if __name__ == "__main__":
                                         print_pdf=False) 
                 for param in parameter_names:
                     savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
+                    if param in ["X", "Z"]:
+                        param_err_fig[param].update_yaxes(title_text="Mean relative error (under rotation/scaling)", secondary_y=True)
                     fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
                                         showgrid=False, showlegend=True, 
                                         print_png=True, print_html=True, 
                                         print_pdf=False) 
                     savename = "{}/rel_sqerr_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
+                    if param in ["X", "Z"]:
+                        param_sqerr_fig[param].update_yaxes(title_text="Mean relative squared error (under rotation/scaling)", secondary_y=True)
                     fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
                                         showgrid=False, showlegend=True, 
                                         print_png=True, print_html=True, 
