@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expI/".format(dataspace)
+    dir_out = "{}/rsspaper_expII/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     algorithms = ["icmd"] #["icmp", "icmd", "ca", "mle"]
@@ -371,6 +371,8 @@ if __name__ == "__main__":
                                         estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
                                         if len(estimates_names) > 1:
                                             raise AttributeError("Should have 1 output estimation file.")
+                                        elif len(estimates_names)==0:
+                                            print("skip trial {}".format(trial))
                                         for estim in estimates_names:
                                             with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
                                                 for result in f.iter(type=dict, skip_invalid=True):
@@ -391,10 +393,7 @@ if __name__ == "__main__":
                                                     break
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
-                                    else:     
-                                        if param in ["gamma", "sigma_e"]:
-                                            print(param)
-                                            print(all_estimates)
+                                    else:
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
