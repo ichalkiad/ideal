@@ -117,13 +117,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
                         
             path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))                      
             
-            subdataset_name = "dataset_{}_{}".format(data_start, data_end)
-            DIR_out_icm = "{}/{}/".format(DIR_out, subdataset_name)
-            out_file_exist_prev = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
-            out_file_exist_best = "{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
-            if pathlib.Path(out_file_exist_prev).exists() and pathlib.Path(out_file_exist_best).exists():
-                print("Found: {}".format(out_file_exist_best))
-                return            
+            subdataset_name = "dataset_{}_{}".format(data_start, data_end)     
 
             k_prev = data_start
             y_rows = data_end        
@@ -133,6 +127,13 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
             parameter_space_dim_theta = (batchrows+J)*d + J + batchrows + 2
             theta_true_partial_annealing = np.zeros((parameter_space_dim_theta,))
             param_positions_dict_partial_theta = dict()      
+
+            DIR_out_icm = "{}/{}/".format(DIR_out, subdataset_name)
+            out_file_exist_prev = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+            out_file_exist_best = "{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+            if pathlib.Path(out_file_exist_prev).exists() and pathlib.Path(out_file_exist_best).exists():
+                print("Found: {}".format(out_file_exist_best))
+                return      
             for param in parameter_names:
                 if param == "X":
                     param_positions_dict_partial_theta[param] = (k, k + batchrows*d)
