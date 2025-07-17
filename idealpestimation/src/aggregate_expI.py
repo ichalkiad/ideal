@@ -18,11 +18,11 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    Ks = [50000]
+    Ks = [10000]
     Js = [100]
-    sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]
+    sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]
     M = 10
-    batchsize = 1504
+    batchsize = 304 # 10k  #1504 # 50k
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["icmp", "icmd", "ca", "mle"]
+    algorithms = ["icmd"] #["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -392,6 +392,9 @@ if __name__ == "__main__":
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
                                     else:     
+                                        if param in ["gamma", "sigma_e"]:
+                                            print(param)
+                                            print(all_estimates)
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
