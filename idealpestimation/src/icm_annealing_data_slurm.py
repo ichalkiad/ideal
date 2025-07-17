@@ -47,7 +47,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
                 DIR_out = "{}/{}/estimation_ICM_data_annealing_evaluate_posterior_vector/".format(data_location, m)                
             else:
                 raise NotImplementedError("At the moment we only evaluate the posterior with vector parameters - minimising coordinate-wise is more efficient.")
-        pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)     
+        pathlib.Path(DIR_out).mkdir(parents=True, exist_ok=True)        
         # load data    
         with open("{}/{}/Y.pickle".format(data_location, m), "rb") as f:
             Y = pickle.load(f)
@@ -118,6 +118,13 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
             path = pathlib.Path("{}/{}/{}/".format(data_location, m, batchsize))                      
             
             subdataset_name = "dataset_{}_{}".format(data_start, data_end)
+            DIR_out_icm = "{}/{}/".format(DIR_out, subdataset_name)
+            out_file_exist_prev = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+            out_file_exist_best = "{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+            if pathlib.Path(out_file_exist_prev).exists() and pathlib.Path(out_file_exist_best).exists():
+                print("Found: {}".format(out_file_exist_best))
+                return            
+
             k_prev = data_start
             y_rows = data_end        
             Y_annealed = Y[k_prev:y_rows, :]            
