@@ -363,7 +363,11 @@ if __name__ == "__main__":
                                     theta = None
                                     all_estimates = []
                                     path = pathlib.Path(DIR_base)  
-                                    subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
+                                    try:
+                                        subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
+                                    except:
+                                        print("skip trial {}".format(trial))
+                                        continue
                                     for dataset_index in range(len(subdatasets_names)):                    
                                         subdataset_name = subdatasets_names[dataset_index]                        
                                         DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
@@ -371,8 +375,6 @@ if __name__ == "__main__":
                                         estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
                                         if len(estimates_names) > 1:
                                             raise AttributeError("Should have 1 output estimation file.")
-                                        elif len(estimates_names)==0:
-                                            print("skip trial {}".format(trial))
                                         for estim in estimates_names:
                                             with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
                                                 for result in f.iter(type=dict, skip_invalid=True):
