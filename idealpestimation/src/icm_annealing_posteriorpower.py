@@ -814,8 +814,6 @@ def icm_posterior_power_annealing(Y, param_positions_dict, args, temperature_rat
                 target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d) 
                 
                 if (not data_annealing and ( target_param == "gamma" or target_param == "sigma_e" ) and (l > 10 and not (l % 5 == 0)) ): #(l % 3 == 0) enough for most to converge  
-                        if data_annealing:
-                            raise NotImplementedError("Shouldn't be in here!")
                         i += 1 
                         continue                         
                 # t00 = time.time()

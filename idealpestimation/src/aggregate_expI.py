@@ -363,11 +363,7 @@ if __name__ == "__main__":
                                     theta = None
                                     all_estimates = []
                                     path = pathlib.Path(DIR_base)  
-                                    try:
-                                        subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
-                                    except:
-                                        print("skip trial {}".format(trial))
-                                        continue
+                                    subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                     for dataset_index in range(len(subdatasets_names)):                    
                                         subdataset_name = subdatasets_names[dataset_index]                        
                                         DIR_read = "{}/{}/".format(DIR_base, subdataset_name)

@@ -272,10 +272,10 @@ if __name__ == "__main__":
     tempering_steps = [0.1, 1]
     tempering_rate = [0.1]
 
-    niter = 100
-    max_restarts = 2
-    max_partial_restarts = 4 #2
-    max_halving = 3 # 2
+    niter = 200
+    max_restarts = 3 #
+    max_partial_restarts = 5 #4 
+    max_halving = 5 # 2
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
