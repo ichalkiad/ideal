@@ -2,7 +2,7 @@
 #SBATCH --job-name=expII_icmd
 #SBATCH --output=%x_%A_%a.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost #cpu_p1
-#SBATCH --time=05:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
+#SBATCH --time=10:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
 ##SBATCH --qos=qos_cpu-t3   #qos_cpu-dev
 #SBATCH --hint=nomultithread 
 #SBATCH --nodes=1          

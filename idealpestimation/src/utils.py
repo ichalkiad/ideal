@@ -3086,9 +3086,9 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
     else:
         gridpoints_num_alpha_beta = gridpoints_num*2
         if param in ["gamma"]:
-            gridpoints_num_alpha_beta = gridpoints_num*4 # *3 enough for most to converge - for ICM-P
+            gridpoints_num_alpha_beta = gridpoints_num*5 # *3 enough for most to converge, then 4 ok - for ICM-P
         if param in ["sigma_e"]: # for ICM-D
-            gridpoints_num_alpha_beta = gridpoints_num*3
+            gridpoints_num_alpha_beta = gridpoints_num*4  # 3 ok for most
     xx_ = None
 
     if param == "alpha":

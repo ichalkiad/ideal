@@ -258,7 +258,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 60 #50
+    gridpoints_num = 80 #50
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -283,7 +283,7 @@ if __name__ == "__main__":
     niter = 300 #100
     max_restarts = 5 # 2,3 
     max_partial_restarts = 5 #4 
-    max_halving = 2
+    max_halving = 2 # not applicable in data annealing
     max_signal2noise_ratio = 25 # in dB   # max snr
 
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
