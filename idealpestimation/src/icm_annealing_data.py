@@ -73,7 +73,7 @@ def serial_worker(args):
                 Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
                 z_rel_err = (Z_true_vec - Z_hat_vec)/Z_true_vec
                 z_sq_err = z_rel_err**2
-        thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err)))
+        thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err), solution[-1]))
          
     theta_part_annealing = rank_and_plot_solutions(thetas_and_errors, elapsedtime, None, Y_annealed, J, batchrows, d, parameter_names, 
                                                 dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
