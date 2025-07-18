@@ -79,19 +79,22 @@ def serial_worker(args):
                                                 dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
                                                 row_start=k_prev, row_end=k_prev+batchrows, seedint=seedint, get_RT_error=False, plot_solutions=False)
     
-    out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
-    params_out = dict()
-    with jsonlines.open(out_file, 'r') as f:         
-        for result in f.iter(type=dict, skip_invalid=True):
-            for kparam in result.keys():
-                params_out[kparam] = result[kparam]
-                if isinstance(params_out[kparam], np.ndarray):
-                    params_out[kparam] = params_out[kparam].tolist()
-            break
-    out_file = "{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
-    with open(out_file, 'a') as f:         
-        writer = jsonlines.Writer(f)
-        writer.write(params_out)
+    try:
+        out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+        params_out = dict()
+        with jsonlines.open(out_file, 'r') as f:         
+            for result in f.iter(type=dict, skip_invalid=True):
+                for kparam in result.keys():
+                    params_out[kparam] = result[kparam]
+                    if isinstance(params_out[kparam], np.ndarray):
+                        params_out[kparam] = params_out[kparam].tolist()
+                break
+        out_file = "{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out)
+    except:
+        print("Did not converge: {}".format(DIR_out_icm))
            
             
 
