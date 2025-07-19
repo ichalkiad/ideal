@@ -2195,13 +2195,13 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
         avg_processes = None
         max_processes = None
 
-    allconv = True
+    oneconv = False
     best_theta = None
     computed_logfullposterior = []
     for theta_set in estimated_thetas:
         if len(theta_set) == 10:
             print("Convergence status: {}".format(theta_set[-1]))
-            allconv = allconv or theta_set[-1]
+            oneconv = oneconv or theta_set[-1]
         theta = theta_set[0]
         _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
         computed_logfullposterior.append(posterior[0])
@@ -2259,13 +2259,13 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             if isinstance(params_out[param], np.ndarray):
                 params_out[param] = params_out[param].tolist()
         if data_tempering:
-            if allconv:
+            if oneconv:
                 out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out, row_start, row_end)
                 with open(out_file, 'a') as f:         
                     writer = jsonlines.Writer(f)
                     writer.write(params_out)
         else:
-            if allconv:
+            if oneconv:
                 out_file = "{}/params_out_global_theta_hat.jsonl".format(DIR_out)
                 with open(out_file, 'a') as f:         
                     writer = jsonlines.Writer(f)
