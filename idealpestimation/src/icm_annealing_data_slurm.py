@@ -281,8 +281,8 @@ if __name__ == "__main__":
     tempering_rate = [0.1]
 
     niter = 300 #100
-    max_restarts = 5 # 2,3 
-    max_partial_restarts = 5 #4 
+    max_restarts = 10 # 2,3 ,5
+    max_partial_restarts = 10 #4 ,5
     max_halving = 2 # not applicable in data annealing
     max_signal2noise_ratio = 25 # in dB   # max snr
 
