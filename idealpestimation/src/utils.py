@@ -2471,7 +2471,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     H = X_centered.T @ Y_centered
     
     # SVD
-    if param_true.shape[1] <= 10000:
+    if param_true.shape[1] < 10000:
         try:
             U, S, Vt = np.linalg.svd(H)
         except:
@@ -2496,7 +2496,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     # Construct the rotation matrix
     # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
     vu = Vt.T @ U.T
-    if param_true.shape[1] <= 10000:
+    if param_true.shape[1] < 10000:
         try:
             d = np.linalg.det(vu)
         except:            
@@ -2529,7 +2529,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     meanrelerror_nonRT = np.mean(rel_err_nonRT)
     meansquarederror_nonRT = np.mean(sq_err_nonRT)
 
-    if param_true.shape[1] <= 10000:   
+    if param_true.shape[1] < 10000:   
         orthogonality_error = np.linalg.norm(R.T @ R - np.eye(R.shape[0]))    
         det_is_one = np.abs(np.linalg.det(R) - 1.0) < 1e-10    
         t_shape_correct = t.shape == (param_hat.shape[1],)

@@ -31,7 +31,7 @@ if __name__ == "__main__":
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     algorithms = ["icmd"]
-    colors = {Ks[0]:"Crimson", Ks[1]:"ForestGreen", Ks[2]:"Maroon"}
+    colors = {Ks[0]:"Crimson"}#, Ks[1]:"ForestGreen", Ks[2]:"Maroon"}
     param_err_fig = {}
     param_sqerr_fig = {}
     for param in parameter_names:
@@ -372,6 +372,7 @@ if __name__ == "__main__":
                                         if len(estimates_names) > 1:
                                             raise AttributeError("Should have 1 output estimation file.")
                                         elif len(estimates_names) == 0:  #######################################################
+                                            print(trial_path)
                                             continue
                                         for estim in estimates_names:
                                             with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
