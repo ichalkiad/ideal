@@ -18,21 +18,51 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    Ks = [50000]
+    Ks = [10000, 50000, 100000]
     Js = [100]
-    sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]
+    sigma_es = [0.01]
     M = 10
-    batchsize = 1504 # 50k
+    batchsize = [304, 1504, 3004]
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expI/".format(dataspace)
+    dir_out = "{}/rsspaper_expII/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["icmd"] #["icmp", "icmd", "ca", "mle"]
-    colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
-    for K in Ks:
+    algorithms = ["icmd"]
+    colors = {Ks[0]:"Crimson", Ks[1]:"ForestGreen", Ks[2]:"Maroon"}
+    param_err_fig = {}
+    param_sqerr_fig = {}
+    for param in parameter_names:
+        if param in ["X", "Z"]:
+            param_err_fig["{}_RT".format(param)] = go.Figure()
+            param_sqerr_fig["{}_RT".format(param)] = go.Figure()
+        param_err_fig[param] = go.Figure()
+        param_sqerr_fig[param] = go.Figure()
+    time_fig = make_subplots(specs=[[{"secondary_y": True}]])
+    ram_fig_max = go.Figure()
+    cpu_fig_max = go.Figure()
+    ram_fig_avg = go.Figure()
+    cpu_fig_avg = go.Figure()
+    for K in Ks:                
+        theta_err = {}
+        theta_sqerr = {}
+        theta_err_RT = {}
+        theta_sqerr_RT = {}
+        for param in parameter_names:
+            theta_err[param] = []
+            theta_sqerr[param] = []
+            theta_err_RT[param] = []
+            theta_sqerr_RT[param] = []
+        ram = {"max":[], "avg":[]}
+        cpu_util = {"max":[], "avg":[]}
+        runtimes = []
+        dataloglik = []
+        estimation_sq_error_per_trial_per_batch = dict()
+        estimation_sq_error_per_trial_per_batch_nonRT = dict()
+        estimation_error_per_trial_per_batch = dict()
+        estimation_error_per_trial_per_batch_nonRT = dict()
         for J in Js:
             parameter_space_dim = (K+J)*d + J + K + 2
             param_positions_dict = dict()            
@@ -62,39 +92,9 @@ if __name__ == "__main__":
                 elif param == "sigma_e":
                     param_positions_dict[param] = (k, k + 1)                                
                     k += 1    
-            for sigma_e in sigma_es:
-                param_err_fig = {}
-                param_sqerr_fig = {}
-                for param in parameter_names:
-                    if param in ["X", "Z"]:
-                        param_err_fig["{}_RT".format(param)] = go.Figure()
-                        param_sqerr_fig["{}_RT".format(param)] = go.Figure()
-                    param_err_fig[param] = go.Figure()
-                    param_sqerr_fig[param] = go.Figure()
-                time_fig = make_subplots(specs=[[{"secondary_y": True}]])
-                ram_fig_max = go.Figure()
-                cpu_fig_max = go.Figure()
-                ram_fig_avg = go.Figure()
-                cpu_fig_avg = go.Figure()
+            for sigma_e in sigma_es:                
                 for algo in algorithms:
-                    res_path = "{}/data_K{}_J{}_sigmae{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""))
-                    theta_err = {}
-                    theta_sqerr = {}
-                    theta_err_RT = {}
-                    theta_sqerr_RT = {}
-                    for param in parameter_names:
-                        theta_err[param] = []
-                        theta_sqerr[param] = []
-                        theta_err_RT[param] = []
-                        theta_sqerr_RT[param] = []
-                    ram = {"max":[], "avg":[]}
-                    cpu_util = {"max":[], "avg":[]}
-                    runtimes = []
-                    dataloglik = []
-                    estimation_sq_error_per_trial_per_batch = dict()
-                    estimation_sq_error_per_trial_per_batch_nonRT = dict()
-                    estimation_error_per_trial_per_batch = dict()
-                    estimation_error_per_trial_per_batch_nonRT = dict()
+                    res_path = "{}/data_K{}_J{}_sigmae{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""))                    
                     for trial in range(M):              
                         theta_true = np.zeros((parameter_space_dim,))
                         # load true param vector - same over all trials but store in each trial folder for convenience
@@ -371,6 +371,8 @@ if __name__ == "__main__":
                                         estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
                                         if len(estimates_names) > 1:
                                             raise AttributeError("Should have 1 output estimation file.")
+                                        elif len(estimates_names) == 0:  #######################################################
+                                            continue
                                         for estim in estimates_names:
                                             with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
                                                 for result in f.iter(type=dict, skip_invalid=True):
@@ -487,161 +489,157 @@ if __name__ == "__main__":
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max)) 
                     
-                    # add plots per algorithm
-                    if algo == "ca":
-                        plotname = "CA"
-                        sec_y = True
-                    elif algo == "mle":
-                        plotname = "D-MLE"
-                        sec_y = True
-                    elif algo == "icmd":
-                        plotname = "ICM-D"
-                        sec_y = False
-                    elif algo == "icmp":
-                        plotname = "ICM-P"
-                        sec_y = False
-                    time_fig.add_trace(go.Box(
-                        y=runtimes, showlegend=True, name=plotname,
-                        boxpoints='outliers', line=dict(color=colors[algo]),                                
-                    ), secondary_y=sec_y)
-                    ram_fig_max.add_trace(go.Box(
-                        y=ram["max"], showlegend=True, name="{}-max".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
-                    ram_fig_avg.add_trace(go.Box(
-                        y=ram["avg"], showlegend=True, name="{}-avg".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
-                    cpu_fig_max.add_trace(go.Box(
-                        y=cpu_util["max"], showlegend=True, name="{}-max".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
-                    cpu_fig_avg.add_trace(go.Box(
-                        y=cpu_util["avg"], showlegend=True, name="{}-avg".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
-                    for param in parameter_names:
-                        if param in ["X", "Z"]:
-                            param_err_fig[param].add_trace(go.Box(
-                                y=theta_err[param], showlegend=True, name="{}".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                            param_sqerr_fig[param].add_trace(go.Box(
-                                y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                            param_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                                y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                            param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
-                                y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                        else:
-                            param_err_fig[param].add_trace(go.Box(
-                                y=theta_err[param], showlegend=True, name="{}".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                            param_sqerr_fig[param].add_trace(go.Box(
-                                y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
+        
+        if K == 10000:
+            plotname = "10,000"
+            sec_y = False
+        elif K == 50000:
+            plotname = "50,000"
+            sec_y = False
+        elif K == 100000:
+            plotname = "100,000"
+            sec_y = False
+        time_fig.add_trace(go.Box(
+            y=runtimes, showlegend=True, name=plotname,
+            boxpoints='outliers', line=dict(color=colors[K]),                                
+        ), secondary_y=sec_y)
+        ram_fig_max.add_trace(go.Box(
+            y=ram["max"], showlegend=True, name="{}-max".format(plotname),
+            boxpoints='outliers', line=dict(color=colors[K])                          
+        ))
+        ram_fig_avg.add_trace(go.Box(
+            y=ram["avg"], showlegend=True, name="{}-avg".format(plotname),
+            boxpoints='outliers', line=dict(color=colors[K])                          
+        ))
+        cpu_fig_max.add_trace(go.Box(
+            y=cpu_util["max"], showlegend=True, name="{}-max".format(plotname),
+            boxpoints='outliers', line=dict(color=colors[K])                          
+        ))
+        cpu_fig_avg.add_trace(go.Box(
+            y=cpu_util["avg"], showlegend=True, name="{}-avg".format(plotname),
+            boxpoints='outliers', line=dict(color=colors[K])                          
+        ))
+        for param in parameter_names:
+            if param in ["X", "Z"]:
+                param_err_fig[param].add_trace(go.Box(
+                    y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                    boxpoints='outliers', line=dict(color=colors[K])                          
+                ))
+                param_sqerr_fig[param].add_trace(go.Box(
+                    y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
+                    boxpoints='outliers', line=dict(color=colors[K])                          
+                ))
+                param_err_fig["{}_RT".format(param)].add_trace(go.Box(
+                    y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
+                    boxpoints='outliers', line=dict(color=colors[K])                          
+                ))
+                param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
+                    y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
+                    boxpoints='outliers', line=dict(color=colors[K])                          
+                ))
+            else:
+                param_err_fig[param].add_trace(go.Box(
+                    y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                    boxpoints='outliers', line=dict(color=colors[K])                          
+                ))
+                param_sqerr_fig[param].add_trace(go.Box(
+                    y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
+                    boxpoints='outliers', line=dict(color=colors[K])                          
+                ))
                 
-                # save figures per K, J, sigma_e
-                savename = "{}/time_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                time_fig.update_yaxes(title_text="Duration (in seconds), D-MLE, CA", secondary_y=True)
-                fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                savename = "{}/ram_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                savename = "{}/ram_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                savename = "{}/cpu_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                savename = "{}/cpu_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False)
-                for param in parameter_names:
-                    savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
-                    if param in ["X", "Z"]:
-                        savename = "{}/rel_err_RT_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))
-                        fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
-                                            savename, xaxis_title="Estimation algorithm", 
-                                            yaxis_title="Mean relative error (under rotation/scaling)", 
-                                            title="", showgrid=False, showlegend=False, 
-                                            print_png=True, print_html=False, 
-                                            print_pdf=False) 
-                        fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
-                                            savename, xaxis_title="Estimation algorithm", 
-                                            yaxis_title="Mean relative error (under rotation/scaling)", 
-                                            title="", showgrid=False, showlegend=True, 
-                                            print_png=False, print_html=True, 
-                                            print_pdf=False) 
-                    savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))
-                    fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False)    
-                    fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                    if param in ["X", "Z"]:
-                        savename = "{}/rel_sqerr_RT_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
-                        fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
-                                        xaxis_title="Estimation algorithm", 
-                                        yaxis_title="Mean relative squared error (under rotation/scaling)", 
-                                        title="", showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                        fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
-                                        xaxis_title="Estimation algorithm", 
-                                        yaxis_title="Mean relative squared error (under rotation/scaling)", 
-                                        title="", showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                    savename = "{}/rel_sqerr_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
-                    fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                    fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
+    # save figures per K
+    savename = "{}/time_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))        
+    fix_plot_layout_and_save(time_fig, savename, xaxis_title="Users sample size", yaxis_title="Duration (in minutes)", title="", 
+                            showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False) 
+    fix_plot_layout_and_save(time_fig, savename, xaxis_title="Users sample size", yaxis_title="Duration (in minutes)", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False) 
+    savename = "{}/ram_max_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))    
+    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+                            showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False) 
+    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False) 
+    savename = "{}/ram_avg_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))    
+    fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average RAM consumption (in GB)", title="", 
+                            showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False) 
+    fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average RAM consumption (in GB)", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False) 
+    savename = "{}/cpu_max_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))    
+    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False) 
+    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+                            showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False) 
+    savename = "{}/cpu_avg_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))    
+    fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
+                            showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False) 
+    fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False)
+    for param in parameter_names:
+        savename = "{}/rel_err_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))    
+        if param in ["X", "Z"]:
+            savename = "{}/rel_err_RT_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))
+            fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
+                                savename, xaxis_title="Users sample size", 
+                                yaxis_title="Mean relative error (under rotation/scaling)", 
+                                title="", showgrid=False, showlegend=False, 
+                                print_png=True, print_html=False, 
+                                print_pdf=False) 
+            fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
+                                savename, xaxis_title="Users sample size", 
+                                yaxis_title="Mean relative error (under rotation/scaling)", 
+                                title="", showgrid=False, showlegend=True, 
+                                print_png=False, print_html=True, 
+                                print_pdf=False) 
+        savename = "{}/rel_err_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))
+        fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative error", title="", 
+                            showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False)    
+        fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative error", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False) 
+        if param in ["X", "Z"]:
+            savename = "{}/rel_sqerr_RT_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", "")) 
+            fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
+                            xaxis_title="Users sample size", 
+                            yaxis_title="Mean relative squared error (under rotation/scaling)", 
+                            title="", showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False) 
+            fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
+                            xaxis_title="Users sample size", 
+                            yaxis_title="Mean relative squared error (under rotation/scaling)", 
+                            title="", showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False) 
+        savename = "{}/rel_sqerr_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", "")) 
+        fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative squared error", title="", 
+                            showgrid=False, showlegend=False, 
+                            print_png=True, print_html=False, 
+                            print_pdf=False) 
+        fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative squared error", title="", 
+                            showgrid=False, showlegend=True, 
+                            print_png=False, print_html=True, 
+                            print_pdf=False) 
 
                        
