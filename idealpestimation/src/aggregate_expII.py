@@ -18,7 +18,7 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    Ks = [10000] #, 50000, 100000]
+    Ks = [10000, 50000, 100000]
     Js = [100]
     sigma_es = [0.01]
     M = 10
