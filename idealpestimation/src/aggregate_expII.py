@@ -262,7 +262,7 @@ if __name__ == "__main__":
                                         params_out["err_x_RT"] = err_x
                                         params_out["mse_x_nonRT"] = mse_x_nonRT
                                         params_out["mse_x_RT"] = mse_x
-                                        params_out[param] = param_hat
+                                        params_out[param] = param_hat.copy()
                                     else:
                                         err_x_nonRT = params_out["err_x_nonRT"]
                                         err_x = params_out["err_x_RT"]
@@ -284,7 +284,7 @@ if __name__ == "__main__":
                                         params_out["err_z_RT"] = err_z
                                         params_out["mse_z_nonRT"] = mse_z_nonRT
                                         params_out["mse_z_RT"] = mse_z 
-                                        params_out[param] = param_hat
+                                        params_out[param] = param_hat.copy()
                                     else:
                                         err_z_nonRT = params_out["err_z_nonRT"]
                                         err_z = params_out["err_z_RT"]
@@ -303,7 +303,7 @@ if __name__ == "__main__":
                                     mse = np.mean(rel_err**2)  
                                     theta_err[param].append(float(np.mean(rel_err)))    
                                     theta_sqerr[param].append(float(mse))
-                                    params_out[param] = param_hat
+                                    params_out[param] = param_hat.copy()
                                 else:
                                     param_hat = params_out[param]
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
@@ -378,6 +378,10 @@ if __name__ == "__main__":
                                         elif len(estimates_names) == 0:  #######################################################
                                             ipdb.set_trace()
                                             print(trial_path)
+                                            namesplit = DIR_read.split("_")
+                                            start = int(namesplit[-2])
+                                            end   = int(namesplit[-1].replace("/", ""))
+                                            print(params_out[param][start*d:end*d])
                                             continue
                                         for estim in estimates_names:
                                             with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
@@ -389,9 +393,9 @@ if __name__ == "__main__":
                                                         start = int(namesplit[5])
                                                         end   = int(namesplit[6].replace(".jsonl", ""))
                                                         if param == "X":
-                                                            params_out[param][start*d:end*d] = theta
+                                                            params_out[param][start*d:end*d] = theta.copy()
                                                         else:
-                                                            params_out[param][start:end] = theta 
+                                                            params_out[param][start:end] = theta.copy()
                                                     else:                                                 
                                                         theta = result[param]
                                                         all_estimates.append(theta)
