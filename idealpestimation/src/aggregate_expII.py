@@ -50,11 +50,11 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    Ks = [100000]#, 50000, 10000]
+    Ks = [100000, 50000, 10000]
     Js = [100]
     sigma_es = [0.01]
     M = 10
-    batchsize = [3004] #, 1504, 304]
+    batchsize = [3004, 1504, 304]
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
@@ -376,9 +376,6 @@ if __name__ == "__main__":
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max))
                         elif algo == "icmd":
-                            
-                            # ipdb.set_trace()
-                            
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
@@ -401,10 +398,6 @@ if __name__ == "__main__":
                                     subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                     for dataset_index in range(len(subdatasets_names)):                    
                                         subdataset_name = subdatasets_names[dataset_index]    
-
-                                        if subdataset_name == "dataset_87116_90120":
-                                            ipdb.set_trace()
-
                                         # print(subdataset_name)            
                                         DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
                                         path = pathlib.Path(DIR_read)  
