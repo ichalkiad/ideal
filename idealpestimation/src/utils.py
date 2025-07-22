@@ -713,13 +713,13 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                             start = int(namesplit[2])
                             end   = int(namesplit[3].replace(".jsonl", ""))
                             if param == "X":
-                                params_out[param][start*d:end*d] = theta
+                                params_out[param][start*d:end*d] = theta.copy()
                                 X_true = np.asarray(theta_true[param_positions_dict[param][0]+start*d:param_positions_dict[param][0]+end*d]).reshape((d, end-start), order="F")
                                 X_hat = np.asarray(theta).reshape((d, end-start), order="F")
                                 Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
                                     get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
                             else:
-                                params_out[param][start:end] = theta      
+                                params_out[param][start:end] = theta.copy()    
                                 rel_err = (theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end] - theta)/theta_true[param_positions_dict[param][0]+start:param_positions_dict[param][0]+end]                      
                                 err_trial_m_batch_index = np.mean(rel_err)
                                 mse_trial_m_batch_index = np.mean(rel_err**2)

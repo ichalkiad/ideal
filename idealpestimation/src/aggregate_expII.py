@@ -12,6 +12,38 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                                 get_min_achievable_mse_under_rotation_trnsl, go
 from plotly.subplots import make_subplots
 
+
+
+def huber_weighted_mean(x, delta=1.345, tol=1e-6, max_iter=100):
+    """
+    Compute the Huber weighted mean of a 1D numpy array `x`.
+    
+    Parameters:
+        x (array-like): 1D array of values.
+        delta (float): Huber threshold (in units of MAD). Default is 1.345.
+        tol (float): Convergence tolerance.
+        max_iter (int): Maximum number of iterations.
+
+    Returns:
+        float: The robust Huber-weighted mean.
+    """
+    x = np.asarray(x)
+    median = np.median(x)
+    mad = np.median(np.abs(x - median))
+    scale = delta * mad if mad > 0 else delta * np.std(x)  # fallback if MAD = 0
+
+    mu = median
+    for _ in range(max_iter):
+        residuals = x - mu
+        abs_res = np.abs(residuals)
+        weights = np.where(abs_res <= scale, 1.0, scale / abs_res)
+        mu_new = np.sum(weights * x) / np.sum(weights)
+        if np.abs(mu - mu_new) < tol:
+            break
+        mu = mu_new
+    return mu
+
+
 if __name__ == "__main__":
 
     seed_value = 8125
@@ -405,17 +437,24 @@ if __name__ == "__main__":
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
-                                            # compute variance over columns
-                                            column_variances = np.var(all_estimates, ddof=1, axis=0)
-                                            # sum acrocs each coordinate's weight
-                                            all_weights_sum = np.sum(column_variances, axis=0)
-                                            all_weights_norm = column_variances/all_weights_sum
-                                            assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
+                                            if param in ["Z", "Phi", "alpha"]:
+                                                # compute variance over columns
+                                                column_variances = np.var(all_estimates, ddof=1, axis=0)
+                                                # sum acrocs each coordinate's weight
+                                                all_weights_sum = np.sum(column_variances, axis=0)
+                                                all_weights_norm = column_variances/all_weights_sum
+                                                assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
+                                                # element-wise multiplication
+                                                weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
+                                            else:
+                                                # gamm, sigma_e: use the variance as weight
+                                                ipdb.set_trace()
+                                                weighted_estimate = np.asarray(np.percentile(all_estimates, 50, method="lower"))
+
+                                                wwe = huber_weighted_mean(all_estimates, delta=1.345, tol=1e-6, max_iter=100)
                                         else:
                                             # same estimate, set uniform weighting
                                             all_weights_norm = 1/len(all_estimates)
-                                        # element-wise multiplication
-                                        weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
                                         params_out[param] = weighted_estimate.tolist()                            
                             for param in parameter_names:
                                 if param == "X":       
