@@ -14,34 +14,34 @@ from plotly.subplots import make_subplots
 
 
 
-def huber_weighted_mean(x, delta=1.345, tol=1e-6, max_iter=100):
-    """
-    Compute the Huber weighted mean of a 1D numpy array `x`.
+# def huber_weighted_mean(x, delta=1.345, tol=1e-6, max_iter=100):
+#     """
+#     Compute the Huber weighted mean of a 1D numpy array `x`.
     
-    Parameters:
-        x (array-like): 1D array of values.
-        delta (float): Huber threshold (in units of MAD). Default is 1.345.
-        tol (float): Convergence tolerance.
-        max_iter (int): Maximum number of iterations.
+#     Parameters:
+#         x (array-like): 1D array of values.
+#         delta (float): Huber threshold (in units of MAD). Default is 1.345.
+#         tol (float): Convergence tolerance.
+#         max_iter (int): Maximum number of iterations.
 
-    Returns:
-        float: The robust Huber-weighted mean.
-    """
-    x = np.asarray(x)
-    median = np.median(x)
-    mad = np.median(np.abs(x - median))
-    scale = delta * mad if mad > 0 else delta * np.std(x)  # fallback if MAD = 0
+#     Returns:
+#         float: The robust Huber-weighted mean.
+#     """
+#     x = np.asarray(x)
+#     median = np.median(x)
+#     mad = np.median(np.abs(x - median))
+#     scale = delta * mad if mad > 0 else delta * np.std(x)  # fallback if MAD = 0
 
-    mu = median
-    for _ in range(max_iter):
-        residuals = x - mu
-        abs_res = np.abs(residuals)
-        weights = np.where(abs_res <= scale, 1.0, scale / abs_res)
-        mu_new = np.sum(weights * x) / np.sum(weights)
-        if np.abs(mu - mu_new) < tol:
-            break
-        mu = mu_new
-    return mu
+#     mu = median
+#     for _ in range(max_iter):
+#         residuals = x - mu
+#         abs_res = np.abs(residuals)
+#         weights = np.where(abs_res <= scale, 1.0, scale / abs_res)
+#         mu_new = np.sum(weights * x) / np.sum(weights)
+#         if np.abs(mu - mu_new) < tol:
+#             break
+#         mu = mu_new
+#     return mu
 
 
 if __name__ == "__main__":
@@ -377,7 +377,7 @@ if __name__ == "__main__":
                             ram["max"].append(np.mean(batch_ram_max))
                         elif algo == "icmd":
                             
-                            ipdb.set_trace()
+                            # ipdb.set_trace()
                             
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
@@ -407,7 +407,7 @@ if __name__ == "__main__":
                                         estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
                                         if len(estimates_names) > 1:
                                             raise AttributeError("Should have 1 output estimation file.")
-                                        elif len(estimates_names) == 0:  #######################################################
+                                        elif len(estimates_names) == 0:
                                             print(trial_path)
                                             continue
                                         for estim in estimates_names:
@@ -428,11 +428,9 @@ if __name__ == "__main__":
                                                         all_estimates.append(theta)
                                                     # only consider best solution
                                                     break
-                                    ipdb.set_trace()
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
                                     else:
-                                        ipdb.set_trace()
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
@@ -447,11 +445,8 @@ if __name__ == "__main__":
                                                 # element-wise multiplication
                                                 weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
                                             else:
-                                                # gamm, sigma_e: use the variance as weight
-                                                ipdb.set_trace()
+                                                # gamma, sigma_e: get median
                                                 weighted_estimate = np.asarray(np.percentile(all_estimates, 50, method="lower"))
-
-                                                wwe = huber_weighted_mean(all_estimates, delta=1.345, tol=1e-6, max_iter=100)
                                         else:
                                             # same estimate, set uniform weighting
                                             all_weights_norm = 1/len(all_estimates)
