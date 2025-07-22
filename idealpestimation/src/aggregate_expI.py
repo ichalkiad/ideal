@@ -398,7 +398,7 @@ if __name__ == "__main__":
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # compute variance over columns
-                                                column_variances = np.var(all_estimates, ddof=1, axis=0)
+                                                column_variances = 1/np.var(all_estimates, ddof=1, axis=0)  ########################## weight with inverse of variance!!!!
                                                 # sum acrocs each coordinate's weight
                                                 all_weights_sum = np.sum(column_variances, axis=0)
                                                 all_weights_norm = column_variances/all_weights_sum

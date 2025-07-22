@@ -400,8 +400,12 @@ if __name__ == "__main__":
                                     path = pathlib.Path(DIR_base)  
                                     subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                     for dataset_index in range(len(subdatasets_names)):                    
-                                        subdataset_name = subdatasets_names[dataset_index]            
-                                        print(subdataset_name)            
+                                        subdataset_name = subdatasets_names[dataset_index]    
+
+                                        if subdataset_name == "dataset_87116_90120":
+                                            ipdb.set_trace()
+
+                                        # print(subdataset_name)            
                                         DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
                                         path = pathlib.Path(DIR_read)  
                                         estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
@@ -437,7 +441,7 @@ if __name__ == "__main__":
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # compute variance over columns
-                                                column_variances = np.var(all_estimates, ddof=1, axis=0)
+                                                column_variances = 1/np.var(all_estimates, ddof=1, axis=0)  ########################## weight with inverse of variance!!!!
                                                 # sum acrocs each coordinate's weight
                                                 all_weights_sum = np.sum(column_variances, axis=0)
                                                 all_weights_norm = column_variances/all_weights_sum

@@ -724,7 +724,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 err_trial_m_batch_index = np.mean(rel_err)
                                 mse_trial_m_batch_index = np.mean(rel_err**2)
                         else:                            
-                            weight = result["variance_{}".format(param)]                            
+                            weight = 1/result["variance_{}".format(param)]     ########################### weight with inverse variance!!!!!!!!!!!!!!!!                       
                             theta = result[param]
                             all_weights.append(weight)
                             all_estimates.append(theta)
