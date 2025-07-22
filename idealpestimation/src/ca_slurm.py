@@ -128,7 +128,7 @@ if __name__ == "__main__":
     
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"    
     parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_ca.csv", header=None)
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentIII_ca.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])
