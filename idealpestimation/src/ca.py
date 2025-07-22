@@ -283,15 +283,28 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-      
-    Ks = [50000]
-    Js = [100]
-    sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]
     M = 10
-    batchsize = 1504
+    # Exp I        
+    # Ks = [50000]
+    # Js = [100]
+    # sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]    
+    # batchsize = {50000: 1504}
+    # Exp II
+    # Ks = [10000, 100000]
+    # Js = [100]
+    # sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]    
+    # batchsize = {10000: 304, 50000: 1504, 100000: 3004}
+    # dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
+    # dir_out = "/mnt/hdd2/ioannischalkiadakis/"
+    # get_slurm_experiment_csvs("II", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
+    # Exp III
+    Ks = [10000]
+    Js = [50, 500, 1000]
+    sigma_es = [0.01, 0.5, 5.0]
+    batchsize = {50: 604, 500: 64, 1000: 32}
     dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
     dir_out = "/mnt/hdd2/ioannischalkiadakis/"
-    get_slurm_experiment_csvs("I", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
+    get_slurm_experiment_csvs("III", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
     sys.exit()
 
     # python idealpestimation/src/ca.py --trials 1 --K 30 --J 10 --sigmae 001

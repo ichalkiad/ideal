@@ -30,52 +30,8 @@ from prince import svd as ca_svd
 import sqlite3
 from sqlite3 import Error
 from scipy import sparse
-import os
-import tempfile
-import shutil
 
-def memmap_matmul_temp(A_np, B_np, block_size=1024):
-    assert A_np.shape[1] == B_np.shape[0], "Matrix dimensions must align"
 
-    temp_dir = tempfile.mkdtemp()
-    try:
-        a_shape = A_np.shape
-        b_shape = B_np.shape
-        c_shape = (a_shape[0], b_shape[1])
-
-        # Create memory-mapped files
-        A_path = os.path.join(temp_dir, 'A.dat')
-        B_path = os.path.join(temp_dir, 'B.dat')
-        C_path = os.path.join(temp_dir, 'C.dat')
-
-        A = np.memmap(A_path, dtype=A_np.dtype, mode='w+', shape=a_shape)
-        B = np.memmap(B_path, dtype=B_np.dtype, mode='w+', shape=b_shape)
-        C = np.memmap(C_path, dtype=A_np.dtype, mode='w+', shape=c_shape)
-
-        # Copy input data to memmap
-        A[:] = A_np[:]
-        B[:] = B_np[:]
-        A.flush()
-        B.flush()
-
-        # Block matrix multiplication
-        for i in range(0, c_shape[0], block_size):
-            for j in range(0, c_shape[1], block_size):
-                for k in range(0, a_shape[1], block_size):
-                    i_end = min(i + block_size, c_shape[0])
-                    j_end = min(j + block_size, c_shape[1])
-                    k_end = min(k + block_size, a_shape[1])
-                    C[i:i_end, j:j_end] += np.dot(
-                        A[i:i_end, k:k_end],
-                        B[k:k_end, j:j_end]
-                    )
-        C.flush()
-        result = np.array(C)
-
-    finally:
-        shutil.rmtree(temp_dir)
-
-    return result
 
 def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
 
@@ -86,7 +42,19 @@ def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir
     for m in range(M):
         for K in Ks:
             for J in Js:
-                for sigma_e in sigma_es:
+                if exper == "III":
+                    if J==50:
+                        sigma_es_ = [0.01]
+                    elif J==500:
+                        sigma_es_ = [0.5]
+                    elif J==1000:
+                        sigma_es_ = [5.0]
+                    else:
+                        sigma_es_ = []
+                        continue
+                else:
+                    sigma_es_ = sigma_es.copy()
+                for sigma_e in sigma_es_:
                     ca["trial"].append(m)                    
                     icm_poster["trial"].append(m)                    
                     ca["K"].append(K)                    
@@ -97,7 +65,10 @@ def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir
                     icm_poster["sigma_e"].append(sigma_e)                 
 
                     # mle, icm_data batches
-                    path = pathlib.Path("{}/data_K{}_J{}_sigmae{}/{}/{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""), m, batchsize[K]))
+                    if exper == "III":
+                        path = pathlib.Path("{}/data_K{}_J{}_sigmae{}/{}/{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""), m, batchsize[J]))
+                    else:
+                        path = pathlib.Path("{}/data_K{}_J{}_sigmae{}/{}/{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""), m, batchsize[K]))
                     subdatasets_names = [file.name for file in path.iterdir() if not file.is_file() and "dataset_" in file.name]               
                     for dataset_index in range(len(subdatasets_names)):               
                         mle["trial"].append(m)
@@ -108,8 +79,12 @@ def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir
                         icm_data["J"].append(J)
                         mle["sigma_e"].append(sigma_e)
                         icm_data["sigma_e"].append(sigma_e)
-                        mle["batchsize"].append(batchsize[K])
-                        icm_data["batchsize"].append(batchsize[K])
+                        if exper == "III":
+                            mle["batchsize"].append(batchsize[J])
+                            icm_data["batchsize"].append(batchsize[J])
+                        else:
+                            mle["batchsize"].append(batchsize[K])
+                            icm_data["batchsize"].append(batchsize[K])
                         subdataset_name = subdatasets_names[dataset_index]                            
                         start = int(subdataset_name.split("_")[1])
                         end = int(subdataset_name.split("_")[2])
@@ -2515,9 +2490,6 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     # Compute the covariance
     H = X_centered.T @ Y_centered
     
-    Hcheck = memmap_matmul_temp(X_centered.T, Y_centered, block_size=1024)
-    assert np.allclose(H, Hcheck)
-
     # SVD
     if param_true.shape[1] < 10000:
         try:
@@ -2543,9 +2515,6 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
 
     # Construct the rotation matrix
     # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
-    vucheck = memmap_matmul_temp(Vt.T, U.T, block_size=1024)
-    
-
     vu = Vt.T @ U.T
     if param_true.shape[1] < 10000:
         try:

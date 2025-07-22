@@ -586,15 +586,25 @@ if __name__ == "__main__":
     # trials
     M = 10
     # number of leaders
-    Js = [100] #, 500, 1000]
+    Js = [50, 500, 1000]  #[100] #, 500, 1000]
     # number of followers
-    Ks = [10000, 50000, 100000]
-    sigma_es = [0.1, 0.5, 1.0, 5.0, 0.01]
+    Ks = [10000] #, 50000, 100000]
+    sigma_es = [0.01, 0.5, 5.0] #[0.1, 0.5, 1.0, 5.0, 0.01]  # expI-expII
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:
         for J in Js:
+            # if J==50:
+            #     sigma_es = [0.01]
+            # elif J==500:
+            #     sigma_es = [0.5]
+            # elif J==1000:
+            #     sigma_es = [5.0]
+            # else:
+            #     sigma_es = []
+            #     continue
             for sigma_e in sigma_es:
+                print(K, J, sigma_e)
                 parameter_space_dim = (K+J)*d + J + K + 2
 
                 alpha_js = generate_normal_data(n_samples=J, n_dimensions=1, mu=alpha_mean, sigma=alpha_var, rng=rng)                
@@ -624,7 +634,7 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_clean/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
                     # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)
