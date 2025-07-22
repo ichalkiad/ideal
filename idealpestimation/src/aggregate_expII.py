@@ -18,11 +18,11 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    Ks = [10000, 50000, 100000]
+    Ks = [100000]#, 50000, 10000]
     Js = [100]
     sigma_es = [0.01]
     M = 10
-    batchsize = [304, 1504, 3004]
+    batchsize = [3004] #, 1504, 304]
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
@@ -344,6 +344,9 @@ if __name__ == "__main__":
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max))
                         elif algo == "icmd":
+                            
+                            ipdb.set_trace()
+                            
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
