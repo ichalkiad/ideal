@@ -556,53 +556,54 @@ def estimate_mle(args):
         writer = jsonlines.Writer(f)
         writer.write(grid_and_optim_outcome)
     
-    # keep best estimate for weighted combining
-    best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus =\
-                                            rank_and_return_best_theta(estimated_thetas, Y, J, N, d, parameter_names, 
-                                                            dst_func, param_positions_dict_theta, DIR_out, args_theta)
-    params_hat = optimisation_dict2paramvectors(best_theta, param_positions_dict_theta, J, N, d, parameter_names)
-    variance_hat = optimisation_dict2paramvectors(best_theta_var, param_positions_dict_theta, J, N, d, parameter_names) 
-    grid_and_optim_outcome = dict()
-    grid_and_optim_outcome["PID"] = current_pid
-    grid_and_optim_outcome["timestamp"] = timestamp
-    elapsedtime = str(timedelta(seconds=time.time()-t0))
-    time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
-    # total_seconds = int(elapsedtime.total_seconds())
-    # hours = total_seconds // 3600
-    # minutes = (total_seconds % 3600) // 60
-    # seconds = total_seconds % 60                      
-    grid_and_optim_outcome["elapsedtime_besttheta"] = eltime
-    grid_and_optim_outcome["elapsedtime_full"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
-    grid_and_optim_outcome["elapsedtime_full_hours"] = hours
-    grid_and_optim_outcome["retry"] = retry
-    grid_and_optim_outcome["parameter names"] = parameter_names
-    grid_and_optim_outcome["local theta"] = [best_theta.tolist()]
-    grid_and_optim_outcome["X"] = params_hat["X"]
-    grid_and_optim_outcome["Z"] = params_hat["Z"]   
-    if "Phi" in params_hat.keys():
-        grid_and_optim_outcome["Phi"] = params_hat["Phi"]
-    grid_and_optim_outcome["alpha"] = params_hat["alpha"]
-    grid_and_optim_outcome["beta"] = params_hat["beta"]
-    grid_and_optim_outcome["gamma"] = params_hat["gamma"][0]
-    if "delta" in params_hat.keys():
-        grid_and_optim_outcome["delta"] = params_hat["delta"][0]        
-    grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"][0]
-    grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
-    if "Phi" in params_hat.keys():
-        grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
-    grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
-    grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
-    if "delta" in params_hat.keys():
-        grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]        
-    grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
-    
-    grid_and_optim_outcome["param_positions_dict"] = param_positions_dict_theta
-    grid_and_optim_outcome["mle_estimation_status"] = success
-    grid_and_optim_outcome["variance_estimation_status"] = varstatus
-    out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
-    with open(out_file, 'a') as f:         
-        writer = jsonlines.Writer(f)
-        writer.write(grid_and_optim_outcome)
+    if len(estimated_thetas) > 0:
+        # keep best estimate for weighted combining
+        best_theta, best_theta_var, current_pid, timestamp, eltime, hours, retry, success, varstatus =\
+                                                rank_and_return_best_theta(estimated_thetas, Y, J, N, d, parameter_names, 
+                                                                dst_func, param_positions_dict_theta, DIR_out, args_theta)
+        params_hat = optimisation_dict2paramvectors(best_theta, param_positions_dict_theta, J, N, d, parameter_names)
+        variance_hat = optimisation_dict2paramvectors(best_theta_var, param_positions_dict_theta, J, N, d, parameter_names) 
+        grid_and_optim_outcome = dict()
+        grid_and_optim_outcome["PID"] = current_pid
+        grid_and_optim_outcome["timestamp"] = timestamp
+        elapsedtime = str(timedelta(seconds=time.time()-t0))
+        time_obj, hours, minutes, seconds, microsec = parse_timedelta_string(elapsedtime)
+        # total_seconds = int(elapsedtime.total_seconds())
+        # hours = total_seconds // 3600
+        # minutes = (total_seconds % 3600) // 60
+        # seconds = total_seconds % 60                      
+        grid_and_optim_outcome["elapsedtime_besttheta"] = eltime
+        grid_and_optim_outcome["elapsedtime_full"] = f"{hours}:{minutes:02d}:{seconds:02d}"       
+        grid_and_optim_outcome["elapsedtime_full_hours"] = hours
+        grid_and_optim_outcome["retry"] = retry
+        grid_and_optim_outcome["parameter names"] = parameter_names
+        grid_and_optim_outcome["local theta"] = [best_theta.tolist()]
+        grid_and_optim_outcome["X"] = params_hat["X"]
+        grid_and_optim_outcome["Z"] = params_hat["Z"]   
+        if "Phi" in params_hat.keys():
+            grid_and_optim_outcome["Phi"] = params_hat["Phi"]
+        grid_and_optim_outcome["alpha"] = params_hat["alpha"]
+        grid_and_optim_outcome["beta"] = params_hat["beta"]
+        grid_and_optim_outcome["gamma"] = params_hat["gamma"][0]
+        if "delta" in params_hat.keys():
+            grid_and_optim_outcome["delta"] = params_hat["delta"][0]        
+        grid_and_optim_outcome["sigma_e"] = params_hat["sigma_e"][0]
+        grid_and_optim_outcome["variance_Z"] = variance_hat["Z"]
+        if "Phi" in params_hat.keys():
+            grid_and_optim_outcome["variance_Phi"] = variance_hat["Phi"]
+        grid_and_optim_outcome["variance_alpha"] = variance_hat["alpha"]    
+        grid_and_optim_outcome["variance_gamma"] = variance_hat["gamma"]
+        if "delta" in params_hat.keys():
+            grid_and_optim_outcome["variance_delta"] = variance_hat["delta"]        
+        grid_and_optim_outcome["variance_sigma_e"] = variance_hat["sigma_e"]
+        
+        grid_and_optim_outcome["param_positions_dict"] = param_positions_dict_theta
+        grid_and_optim_outcome["mle_estimation_status"] = success
+        grid_and_optim_outcome["variance_estimation_status"] = varstatus        
+        out_file = "{}/estimationresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(grid_and_optim_outcome)
 
     
 class ProcessManagerSynthetic(ProcessManager):
