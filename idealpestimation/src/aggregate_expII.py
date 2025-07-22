@@ -375,6 +375,7 @@ if __name__ == "__main__":
                                         if len(estimates_names) > 1:
                                             raise AttributeError("Should have 1 output estimation file.")
                                         elif len(estimates_names) == 0:  #######################################################
+                                            ipdb.set_trace()
                                             print(trial_path)
                                             continue
                                         for estim in estimates_names:
