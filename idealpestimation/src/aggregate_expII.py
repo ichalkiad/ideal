@@ -31,7 +31,7 @@ if __name__ == "__main__":
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     algorithms = ["icmd"]
-    colors = {Ks[0]:"Crimson"}#, Ks[1]:"ForestGreen", Ks[2]:"Maroon"}
+    colors = {Ks[0]:"Crimson", Ks[1]:"ForestGreen", Ks[2]:"Maroon"}
     param_err_fig = {}
     param_sqerr_fig = {}
     for param in parameter_names:
