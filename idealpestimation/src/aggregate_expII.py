@@ -397,7 +397,7 @@ if __name__ == "__main__":
                                                         all_estimates.append(theta)
                                                     # only consider best solution
                                                     break
-                                                ipdb.set_trace()
+                                    ipdb.set_trace()
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
                                     else:
@@ -407,7 +407,7 @@ if __name__ == "__main__":
                                             all_estimates = all_estimates.flatten()
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
                                             # compute variance over columns
-                                            column_variances = np.var(all_estimates, df=1, axis=0)
+                                            column_variances = np.var(all_estimates, ddof=1, axis=0)
                                             # sum acrocs each coordinate's weight
                                             all_weights_sum = np.sum(column_variances, axis=0)
                                             all_weights_norm = column_variances/all_weights_sum
