@@ -3714,7 +3714,7 @@ def get_data_tempering_variance_combined_solution(parameter_names, M, d, K, J, D
                 if param not in ["Z", "Phi", "alpha"]:
                     all_estimates = all_estimates.flatten()
                 # compute variance over columns
-                column_variances = np.var(all_estimates, axis=0)
+                column_variances = np.var(all_estimates, df=1, axis=0)
                 # sum acrocs each coordinate's weight
                 all_weights_sum = np.sum(column_variances, axis=0)
                 all_weights_norm = column_variances/all_weights_sum

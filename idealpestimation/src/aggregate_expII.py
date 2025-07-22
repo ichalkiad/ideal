@@ -368,7 +368,8 @@ if __name__ == "__main__":
                                     path = pathlib.Path(DIR_base)  
                                     subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file()]                    
                                     for dataset_index in range(len(subdatasets_names)):                    
-                                        subdataset_name = subdatasets_names[dataset_index]                        
+                                        subdataset_name = subdatasets_names[dataset_index]            
+                                        print(subdataset_name)            
                                         DIR_read = "{}/{}/".format(DIR_base, subdataset_name)
                                         path = pathlib.Path(DIR_read)  
                                         estimates_names = [file.name for file in pathlib.Path(path).iterdir() if file.is_file() and "_best" in file.name]
@@ -396,15 +397,17 @@ if __name__ == "__main__":
                                                         all_estimates.append(theta)
                                                     # only consider best solution
                                                     break
+                                                ipdb.set_trace()
                                     if param in ["X", "beta"]:
                                         params_out[param] = params_out[param].tolist()       
                                     else:
+                                        ipdb.set_trace()
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
                                             # compute variance over columns
-                                            column_variances = np.var(all_estimates, axis=0)
+                                            column_variances = np.var(all_estimates, df=1, axis=0)
                                             # sum acrocs each coordinate's weight
                                             all_weights_sum = np.sum(column_variances, axis=0)
                                             all_weights_norm = column_variances/all_weights_sum
