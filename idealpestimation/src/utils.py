@@ -30,7 +30,52 @@ from prince import svd as ca_svd
 import sqlite3
 from sqlite3 import Error
 from scipy import sparse
+import os
+import tempfile
+import shutil
 
+def memmap_matmul_temp(A_np, B_np, block_size=1024):
+    assert A_np.shape[1] == B_np.shape[0], "Matrix dimensions must align"
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        a_shape = A_np.shape
+        b_shape = B_np.shape
+        c_shape = (a_shape[0], b_shape[1])
+
+        # Create memory-mapped files
+        A_path = os.path.join(temp_dir, 'A.dat')
+        B_path = os.path.join(temp_dir, 'B.dat')
+        C_path = os.path.join(temp_dir, 'C.dat')
+
+        A = np.memmap(A_path, dtype=A_np.dtype, mode='w+', shape=a_shape)
+        B = np.memmap(B_path, dtype=B_np.dtype, mode='w+', shape=b_shape)
+        C = np.memmap(C_path, dtype=A_np.dtype, mode='w+', shape=c_shape)
+
+        # Copy input data to memmap
+        A[:] = A_np[:]
+        B[:] = B_np[:]
+        A.flush()
+        B.flush()
+
+        # Block matrix multiplication
+        for i in range(0, c_shape[0], block_size):
+            for j in range(0, c_shape[1], block_size):
+                for k in range(0, a_shape[1], block_size):
+                    i_end = min(i + block_size, c_shape[0])
+                    j_end = min(j + block_size, c_shape[1])
+                    k_end = min(k + block_size, a_shape[1])
+                    C[i:i_end, j:j_end] += np.dot(
+                        A[i:i_end, k:k_end],
+                        B[k:k_end, j:j_end]
+                    )
+        C.flush()
+        result = np.array(C)
+
+    finally:
+        shutil.rmtree(temp_dir)
+
+    return result
 
 def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
 
@@ -2470,6 +2515,9 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     # Compute the covariance
     H = X_centered.T @ Y_centered
     
+    Hcheck = memmap_matmul_temp(X_centered, Y_centered, block_size=1024)
+    assert np.allclose(H, Hcheck)
+
     # SVD
     if param_true.shape[1] < 10000:
         try:
@@ -2495,6 +2543,9 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
 
     # Construct the rotation matrix
     # Handle reflection by ensuring proper rotation, i.e. det(R) = 1
+    vucheck = memmap_matmul_temp(Vt.T, U.T, block_size=1024)
+    
+
     vu = Vt.T @ U.T
     if param_true.shape[1] < 10000:
         try:
