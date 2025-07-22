@@ -2515,7 +2515,7 @@ def get_min_achievable_mse_under_rotation_trnsl(param_true, param_hat, seedint):
     # Compute the covariance
     H = X_centered.T @ Y_centered
     
-    Hcheck = memmap_matmul_temp(X_centered, Y_centered, block_size=1024)
+    Hcheck = memmap_matmul_temp(X_centered.T, Y_centered, block_size=1024)
     assert np.allclose(H, Hcheck)
 
     # SVD
