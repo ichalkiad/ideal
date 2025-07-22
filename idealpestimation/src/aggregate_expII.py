@@ -376,12 +376,7 @@ if __name__ == "__main__":
                                         if len(estimates_names) > 1:
                                             raise AttributeError("Should have 1 output estimation file.")
                                         elif len(estimates_names) == 0:  #######################################################
-                                            ipdb.set_trace()
                                             print(trial_path)
-                                            namesplit = DIR_read.split("_")
-                                            start = int(namesplit[-2])
-                                            end   = int(namesplit[-1].replace("/", ""))
-                                            print(params_out[param][start*d:end*d])
                                             continue
                                         for estim in estimates_names:
                                             with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
