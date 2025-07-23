@@ -2231,8 +2231,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
     # save in the order of best to worst solution
     best2worst = list(reversed(sorted_idx_lst))    
     theta_list = []
-    posterior_list = []
-    print("Computed full posterior")
+    posterior_list = []    
     for i in best2worst:
         theta = estimated_thetas[i][0]
         theta_list.append(theta)
@@ -2246,10 +2245,8 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             X_hat = np.asarray(params_hat["X"]) # d x K         
             Z_true = np.asarray(params_true["Z"]) # d x J       
             Z_hat = np.asarray(params_hat["Z"]) # d x J                                  
-            Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
-            print("X error")
-            Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
-            print("Z error")
+            Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)            
+            Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)            
         else:
             mse_x_RT = estimated_thetas[i][1]
             mse_z_RT = estimated_thetas[i][2]
