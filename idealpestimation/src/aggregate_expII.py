@@ -379,7 +379,7 @@ if __name__ == "__main__":
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
-                            if pathlib.Path(readinfile).exists():
+                            if not pathlib.Path(readinfile).exists():   ###################################### remove not
                                 precomputed_errors = True
                                 ffop = open(readinfile, mode="r")
                                 reader = jsonlines.Reader(ffop)
@@ -431,6 +431,11 @@ if __name__ == "__main__":
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
+                                        if param in ["sigma_e", "gamma"]:
+                                            print(trial_path)
+                                            print(all_estimates)
+                                            print(np.asarray(np.percentile(all_estimates, 50, method="lower")))
+                                            ipdb.set_trace()
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # compute variance over columns
