@@ -109,7 +109,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                                     avg_threads, max_threads, avg_processes, max_processes)
         elapsedtime = str(timedelta(seconds=t_end - t_start))   
     
-        theta = [(theta_hat, None, None, None, None, None, None, None, None)]
+        theta = [(theta_hat, None, None, None, None, None, None, None, None, True)]
         rank_and_plot_solutions(theta, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, param_positions_dict, 
                                 DIR_out, args, seedint=seedint, get_RT_error=True)
 
