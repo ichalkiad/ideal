@@ -65,7 +65,7 @@ if __name__ == "__main__":
     total_running_processes = 1
 
     dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"    
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_mle.csv", header=None)
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentIII_mle.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])
