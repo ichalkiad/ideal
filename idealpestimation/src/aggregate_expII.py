@@ -14,34 +14,34 @@ from plotly.subplots import make_subplots
 
 
 
-# def huber_weighted_mean(x, delta=1.345, tol=1e-6, max_iter=100):
-#     """
-#     Compute the Huber weighted mean of a 1D numpy array `x`.
+def huber_weighted_mean(x, delta=1.345, tol=1e-6, max_iter=100):
+    """
+    Compute the Huber weighted mean of a 1D numpy array `x`.
     
-#     Parameters:
-#         x (array-like): 1D array of values.
-#         delta (float): Huber threshold (in units of MAD). Default is 1.345.
-#         tol (float): Convergence tolerance.
-#         max_iter (int): Maximum number of iterations.
+    Parameters:
+        x (array-like): 1D array of values.
+        delta (float): Huber threshold (in units of MAD). Default is 1.345.
+        tol (float): Convergence tolerance.
+        max_iter (int): Maximum number of iterations.
 
-#     Returns:
-#         float: The robust Huber-weighted mean.
-#     """
-#     x = np.asarray(x)
-#     median = np.median(x)
-#     mad = np.median(np.abs(x - median))
-#     scale = delta * mad if mad > 0 else delta * np.std(x)  # fallback if MAD = 0
+    Returns:
+        float: The robust Huber-weighted mean.
+    """
+    x = np.asarray(x)
+    median = np.median(x)
+    mad = np.median(np.abs(x - median))
+    scale = delta * mad if mad > 0 else delta * np.std(x)  # fallback if MAD = 0
 
-#     mu = median
-#     for _ in range(max_iter):
-#         residuals = x - mu
-#         abs_res = np.abs(residuals)
-#         weights = np.where(abs_res <= scale, 1.0, scale / abs_res)
-#         mu_new = np.sum(weights * x) / np.sum(weights)
-#         if np.abs(mu - mu_new) < tol:
-#             break
-#         mu = mu_new
-#     return mu
+    mu = median
+    for _ in range(max_iter):
+        residuals = x - mu
+        abs_res = np.abs(residuals)
+        weights = np.where(abs_res <= scale, 1.0, scale / abs_res)
+        mu_new = np.sum(weights * x) / np.sum(weights)
+        if np.abs(mu - mu_new) < tol:
+            break
+        mu = mu_new
+    return mu
 
 
 if __name__ == "__main__":
@@ -50,11 +50,11 @@ if __name__ == "__main__":
     random.seed(seed_value)
     np.random.seed(seed_value)
 
-    Ks = [100000, 50000, 10000]
+    Ks = [10000, 50000, 100000]
     Js = [100]
     sigma_es = [0.01]
     M = 10
-    batchsize = [3004, 1504, 304]
+    batchsize = [304, 1504, 3004]
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
@@ -434,7 +434,7 @@ if __name__ == "__main__":
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # compute variance over columns
-                                                column_variances = 1/np.var(all_estimates, ddof=1, axis=0)  ########################## weight with inverse of variance!!!!
+                                                column_variances = np.var(all_estimates, ddof=1, axis=0)
                                                 # sum acrocs each coordinate's weight
                                                 all_weights_sum = np.sum(column_variances, axis=0)
                                                 all_weights_norm = column_variances/all_weights_sum
@@ -443,10 +443,14 @@ if __name__ == "__main__":
                                                 weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
                                             else:
                                                 # gamma, sigma_e: get median
-                                                weighted_estimate = np.asarray(np.percentile(all_estimates, 50, method="lower"))
+                                                weighted_estimate = huber_weighted_mean(all_estimates, delta=1.345, tol=1e-6, max_iter=100) #np.asarray(np.percentile(all_estimates, 50, method="lower"))
                                         else:
-                                            # same estimate, set uniform weighting
-                                            all_weights_norm = 1/len(all_estimates)
+                                            if param in ["Z", "Phi", "alpha"]:
+                                                # same estimate, set uniform weighting
+                                                all_weights_norm = 1/len(all_estimates)     
+                                                weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)    
+                                            else:
+                                                weighted_estimate = np.asarray([all_estimates[0]])                                            
                                         params_out[param] = weighted_estimate.tolist()                            
                             for param in parameter_names:
                                 if param == "X":       
