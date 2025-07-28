@@ -30,7 +30,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["icmp", "icmd", "ca", "mle"]
+    algorithms = ["mle"] #["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -399,9 +399,15 @@ if __name__ == "__main__":
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # compute variance over columns
                                                 column_variances = np.var(all_estimates, ddof=1, axis=0)
+                                                weights = 1/column_variances
+                                                if np.any(np.isnan(weights)) or np.any(np.isinf(weights)):
+                                                    ipdb.set_trace()
                                                 # sum acrocs each coordinate's weight
-                                                all_weights_sum = np.sum(column_variances, axis=0)
-                                                all_weights_norm = column_variances/all_weights_sum
+                                                all_weights_sum = np.sum(weights, axis=0)
+                                                try:
+                                                    all_weights_norm = weights/all_weights_sum
+                                                except:
+                                                    ipdb.set_trace()
                                                 assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
                                                 # element-wise multiplication
                                                 weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)

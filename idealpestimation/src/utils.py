@@ -744,7 +744,11 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 err_trial_m_batch_index = np.mean(rel_err)
                                 mse_trial_m_batch_index = np.mean(rel_err**2)
                         else:                            
-                            weight = result["variance_{}".format(param)]  
+                            est_variance = result["variance_{}".format(param)]  
+                            weight = 1/est_variance
+                            if np.isnan(weight) or np.isinf(est_variance):
+                                ipdb.set_trace()
+
                             theta = result[param]
                             all_weights.append(weight)
                             all_estimates.append(theta)
@@ -782,7 +786,10 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
             all_estimates = np.stack(all_estimates)
             # sum acrocs each coordinate's weight
             all_weights_sum = np.sum(all_weights, axis=0)
-            all_weights_norm = all_weights/all_weights_sum
+            try:
+                all_weights_norm = all_weights/all_weights_sum
+            except:
+                ipdb.set_trace()
             assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
             # element-wise multiplication
             weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
