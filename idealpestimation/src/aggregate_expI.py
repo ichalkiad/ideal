@@ -407,6 +407,7 @@ if __name__ == "__main__":
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # compute variance over columns
                                                 column_variances = np.var(all_estimates, ddof=1, axis=0)
+                                                column_variances[np.argwhere(abs(column_variances)<1e-14)] = 1
                                                 weights = 1/column_variances
                                                 if np.any(np.isnan(weights)) or np.any(np.isinf(weights)):
                                                     ipdb.set_trace()
