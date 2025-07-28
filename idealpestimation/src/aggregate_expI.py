@@ -255,9 +255,13 @@ if __name__ == "__main__":
                                         param_hat = params_out[param].reshape((d*K,), order="F").tolist()     
                                         X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
                                         X_hat = np.asarray(param_hat).reshape((d, K), order="F")
-                                        Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
-                                                                                                                                    param_hat=X_hat, 
-                                                                                                                                    seedint=seed_value)
+                                        mse_x = None
+                                        mse_x_nonRT = None
+                                        err_x = None
+                                        err_x_nonRT = None
+                                        # Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
+                                        #                                                                                             param_hat=X_hat, 
+                                        #                                                                                             seedint=seed_value)
                                         params_out["err_x_nonRT"] = err_x_nonRT
                                         params_out["err_x_RT"] = err_x
                                         params_out["mse_x_nonRT"] = mse_x_nonRT
@@ -277,9 +281,13 @@ if __name__ == "__main__":
                                         param_hat = params_out[param].reshape((d*J,), order="F").tolist()     
                                         Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
                                         Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
-                                        Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
-                                                                                                                                    param_hat=Z_hat, 
-                                                                                                                                    seedint=seed_value)  
+                                        mse_z = None
+                                        mse_z_nonRT = None
+                                        err_z = None
+                                        err_z_nonRT = None
+                                        # Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
+                                        #                                                                                             param_hat=Z_hat, 
+                                        #                                                                                             seedint=seed_value)  
                                         params_out["err_z_nonRT"] = err_z_nonRT
                                         params_out["err_z_RT"] = err_z
                                         params_out["mse_z_nonRT"] = mse_z_nonRT
