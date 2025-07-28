@@ -745,7 +745,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 mse_trial_m_batch_index = np.mean(rel_err**2)
                         else:                            
                             est_variance = result["variance_{}".format(param)]  
-                            weight = 1/est_variance
+                            weight = 1/np.asarray(est_variance)
                             if np.isnan(weight) or np.isinf(est_variance):
                                 ipdb.set_trace()
 
