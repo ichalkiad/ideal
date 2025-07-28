@@ -746,7 +746,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                         else:                            
                             est_variance = result["variance_{}".format(param)]  
                             weight = 1/np.asarray(est_variance)
-                            if np.isnan(weight) or np.isinf(est_variance):
+                            if np.any(np.isnan(weight)) or np.any(np.isinf(est_variance)):
                                 ipdb.set_trace()
 
                             theta = result[param]
