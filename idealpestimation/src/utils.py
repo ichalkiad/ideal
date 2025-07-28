@@ -738,6 +738,8 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 X_hat = np.asarray(theta).reshape((d, end-start), order="F")
                                 mse_nonrotated_trial_m_batch_index = None 
                                 err_nonrotated_trial_m_batch_index = None
+                                mse_trial_m_batch_index = None
+                                err_trial_m_batch_index = None
                                 # Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
                                 #     get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
                             else:
@@ -759,6 +761,8 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 Z_hat = np.asarray(theta).reshape((d, J), order="F")
                                 mse_nonrotated_trial_m_batch_index = None 
                                 err_nonrotated_trial_m_batch_index = None
+                                mse_trial_m_batch_index = None
+                                err_trial_m_batch_index = None
                                 # Rz, tz, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
                                 #     get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
                             else:
