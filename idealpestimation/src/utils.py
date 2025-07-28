@@ -740,6 +740,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 err_nonrotated_trial_m_batch_index = None
                                 mse_trial_m_batch_index = None
                                 err_trial_m_batch_index = None
+                                # comment for aggregation plotting scripts
                                 # Rx, tx, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
                                 #     get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seedint)
                             else:
@@ -751,8 +752,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                             est_variance = result["variance_{}".format(param)]  
                             weight = 1/np.asarray(est_variance)
                             if np.any(np.isnan(weight)) or np.any(np.isinf(est_variance)):
-                                ipdb.set_trace()
-
+                                raise NotImplementedError("Perhaps estimation issue with: {}/{}".format(DIR_read, estim))
                             theta = result[param]
                             all_weights.append(weight)
                             all_estimates.append(theta)
@@ -763,6 +763,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 err_nonrotated_trial_m_batch_index = None
                                 mse_trial_m_batch_index = None
                                 err_trial_m_batch_index = None
+                                # comment for aggregation plotting scripts
                                 # Rz, tz, mse_trial_m_batch_index, mse_nonrotated_trial_m_batch_index, err_trial_m_batch_index, err_nonrotated_trial_m_batch_index =\
                                 #     get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seedint)
                             else:
@@ -796,9 +797,9 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
             all_weights_sum = np.sum(all_weights, axis=0)
             try:
                 all_weights_norm = all_weights/all_weights_sum
+                assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
             except:
-                ipdb.set_trace()
-            assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
+                raise AttributeError("Investigate D-MLE?")            
             # element-wise multiplication
             weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
             params_out[param] = weighted_estimate

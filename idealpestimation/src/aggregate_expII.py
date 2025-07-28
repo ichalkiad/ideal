@@ -379,7 +379,7 @@ if __name__ == "__main__":
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
-                            if not pathlib.Path(readinfile).exists():   ###################################### remove not
+                            if pathlib.Path(readinfile).exists(): 
                                 precomputed_errors = True
                                 ffop = open(readinfile, mode="r")
                                 reader = jsonlines.Reader(ffop)
@@ -431,32 +431,34 @@ if __name__ == "__main__":
                                         all_estimates = np.stack(all_estimates)
                                         if param not in ["Z", "Phi", "alpha"]:
                                             all_estimates = all_estimates.flatten()
-                                        if param in ["sigma_e", "gamma"]:
-                                            print(trial_path)
-                                            print(all_estimates)
-                                            print(np.asarray(np.percentile(all_estimates, 50, method="lower")))
-                                            ipdb.set_trace()
                                         if len(np.nonzero(np.diff(all_estimates))[0]) > 1:
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # compute variance over columns
                                                 column_variances = np.var(all_estimates, ddof=1, axis=0)
+                                                column_variances[np.argwhere(abs(column_variances)<1e-14)] = 1
+                                                weights = 1/column_variances
+                                                if np.any(np.isnan(weights)) or np.any(np.isinf(weights)):
+                                                    raise NotImplementedError("Perhaps estimation issue with: {}/{}".format(DIR_read, estim))
                                                 # sum acrocs each coordinate's weight
-                                                all_weights_sum = np.sum(column_variances, axis=0)
-                                                all_weights_norm = column_variances/all_weights_sum
-                                                assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
+                                                all_weights_sum = np.sum(weights, axis=0)
+                                                try:
+                                                    all_weights_norm = weights/all_weights_sum
+                                                    assert np.allclose(np.sum(all_weights_norm, axis=0), np.ones(all_weights_sum.shape))
+                                                except:
+                                                    raise NotImplementedError("Perhaps estimation issue with: {}/{}".format(DIR_read, estim))                                                
                                                 # element-wise multiplication
                                                 weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)
                                             else:
                                                 # gamma, sigma_e: get median
-                                                weighted_estimate = huber_weighted_mean(all_estimates, delta=1.345, tol=1e-6, max_iter=100) #np.asarray(np.percentile(all_estimates, 50, method="lower"))
+                                                weighted_estimate = np.asarray(np.percentile(all_estimates, 50, method="lower"))
                                         else:
                                             if param in ["Z", "Phi", "alpha"]:
                                                 # same estimate, set uniform weighting
                                                 all_weights_norm = 1/len(all_estimates)     
                                                 weighted_estimate = np.sum(all_weights_norm*all_estimates, axis=0)    
                                             else:
-                                                weighted_estimate = np.asarray([all_estimates[0]])                                            
-                                        params_out[param] = weighted_estimate.tolist()                            
+                                                weighted_estimate = np.asarray([all_estimates[0]])
+                                        params_out[param] = weighted_estimate.tolist()                              
                             for param in parameter_names:
                                 if param == "X":       
                                     if not precomputed_errors:          
