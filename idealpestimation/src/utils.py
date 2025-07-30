@@ -770,7 +770,7 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
                                 rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - theta)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                 err_trial_m_batch_index = rel_err
                                 mse_trial_m_batch_index = np.mean(rel_err**2)
-            
+                        break # keep first line of results
             sq_error_dict[param].append(mse_trial_m_batch_index)
             if param in ["X", "Z", "Phi"]:
                 sq_error_nonrotated_dict[param].append(mse_nonrotated_trial_m_batch_index)

@@ -81,7 +81,7 @@ if __name__ == "__main__":
     
     optimisation_method = "L-BFGS-B"
     dst_func = lambda x, y: np.sum((x-y)**2)
-    niter = 20
+    niter = 10
     penalty_weight_Z = 0.0
     constant_Z = 0.0
     retries = 30
