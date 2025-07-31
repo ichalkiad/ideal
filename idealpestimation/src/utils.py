@@ -3120,11 +3120,11 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
     if not elementwise:
         gridpoints_num_alpha_beta = gridpoints_num**2
     else:
-        gridpoints_num_alpha_beta = gridpoints_num*6 #2
+        gridpoints_num_alpha_beta = gridpoints_num*8 #2, 5,6 for some when large J
         if param in ["gamma"]:
-            gridpoints_num_alpha_beta = gridpoints_num*5 # *3 enough for most to converge, then 4 ok - for ICM-P, 5,6 for icm-d
+            gridpoints_num_alpha_beta = gridpoints_num*6 # *3 enough for most to converge, then 4 ok - for ICM-P, 5,6 for icm-d
         if param in ["sigma_e"]: # for ICM-D
-            gridpoints_num_alpha_beta = gridpoints_num*5  # 3 ok for most, then 4 , 6 for icm-d
+            gridpoints_num_alpha_beta = gridpoints_num*6  # 3 ok for most, then 4 , 6 for icm-d
     xx_ = None
 
     if param == "alpha":
