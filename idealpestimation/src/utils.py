@@ -722,6 +722,9 @@ def combine_estimate_variance_rule(DIR_out, J, K, d, parameter_names, sq_error_d
             for estim in estimates_names:
                 with jsonlines.open("{}/{}".format(DIR_read, estim), mode="r") as f: 
                     for result in f.iter(type=dict, skip_invalid=True):
+                        
+                        ipdb.set_trace()
+
                         if result["mle_estimation_status"] is False or \
                             result["variance_estimation_status"] is None or\
                                 result["variance_estimation_status"] is False or result["local theta"] is None:
