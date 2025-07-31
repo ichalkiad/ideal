@@ -299,9 +299,6 @@ def estimate_mle(args):
                 prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, 
                 prior_scale_sigmae, param_positions_dict_theta, rng, batchsize, theta_true)   
 
-    max_full_restarts = 2
-    max_partial_restarts = 3
-    full_restarts = 0
     estimated_thetas = []
     estimation_success = False
     converged = estimation_success
@@ -312,6 +309,9 @@ def estimate_mle(args):
     # Checking for convergence logic: Check coordinatewise for convergence. If not converged in some coordinate: do partial restart up to a fixed number of times.
     # Continue with optimisation. If some coordinate hadn't converged by the time we scan full vector Theta: do a full restart.
     while ((L is not None and l < L)) and (not full_vec_converged):    
+        max_full_restarts = 2
+        max_partial_restarts = 3
+        full_restarts = 0
         while full_restarts < max_full_restarts and (not converged):
             
             estimation_success = True
@@ -476,7 +476,7 @@ def estimate_mle(args):
         print("Convergence: {}".format(full_vec_converged)) 
 
     mle = theta_curr.copy()
-    if estimation_success and result["variance_status"]:
+    if full_vec_converged or (estimation_success and result["variance_status"]):
         params_hat = optimisation_dict2paramvectors(mle, param_positions_dict_theta, J, N, d, parameter_names)
         variance_hat = optimisation_dict2paramvectors(variance_local_vec, param_positions_dict_theta, J, N, d, parameter_names) 
         grid_and_optim_outcome = dict()
@@ -515,6 +515,7 @@ def estimate_mle(args):
         grid_and_optim_outcome["param_positions_dict"] = param_positions_dict_theta
         grid_and_optim_outcome["mle_estimation_status"] = estimation_success
         grid_and_optim_outcome["variance_estimation_status"] = var_estimation_success
+        grid_and_optim_outcome["n_iteration"] = l
         if full_vec_converged:
             grid_and_optim_outcome["full_vec_convergence"] = "tol"
         else:
@@ -561,6 +562,7 @@ def estimate_mle(args):
         grid_and_optim_outcome["mle_estimation_status"] = result.success
         grid_and_optim_outcome["variance_estimation_status"] = None
         grid_and_optim_outcome["full_vec_convergence"] = None
+        grid_and_optim_outcome["n_iteration"] = l
 
 
     out_file = "{}/estimationallresult_dataset_{}_{}.jsonl".format(DIR_out, from_row, to_row)
