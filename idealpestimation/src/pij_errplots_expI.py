@@ -9,7 +9,7 @@ import pandas as pd
 from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save, rank_and_plot_solutions, \
                                                             print_threadpool_info, jsonlines, combine_estimate_variance_rule, \
                                                                 optimisation_dict2params, clean_up_data_matrix, get_data_tempering_variance_combined_solution,\
-                                                                get_min_achievable_mse_under_rotation_trnsl, go
+                                                                get_min_achievable_mse_under_rotation_trnsl, go, p_ij_arg_numbafast
 from plotly.subplots import make_subplots
 
 if __name__ == "__main__":
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     M = 10
     batchsize = 1504 # 50k
     d = 2
-    parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
+    parameter_names = ["Z", "alpha"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
     dir_out = "{}/rsspaper_expI/".format(dataspace)
@@ -62,9 +62,6 @@ if __name__ == "__main__":
                 elif param == "sigma_e":
                     param_positions_dict[param] = (k, k + 1)                                
                     k += 1    
-            ram_avg_allsigma_fig = go.Figure()
-            cpu_avg_allsigma_fig = go.Figure()
-            time_allsigma_fig = make_subplots(specs=[[{"secondary_y": True}]])
             param_allsigma_err_fig = {}
             for param in parameter_names:
                 if param in ["X", "Z"]:
@@ -72,32 +69,17 @@ if __name__ == "__main__":
                 param_allsigma_err_fig[param] = go.Figure()
             for sigma_e in sigma_es:
                 param_err_fig = {}
-                param_sqerr_fig = {}
                 for param in parameter_names:
                     if param in ["X", "Z"]:
                         param_err_fig["{}_RT".format(param)] = go.Figure()
-                        param_sqerr_fig["{}_RT".format(param)] = go.Figure()
                     param_err_fig[param] = go.Figure()
-                    param_sqerr_fig[param] = go.Figure()
-                time_fig = make_subplots(specs=[[{"secondary_y": True}]])
-                ram_fig_max = go.Figure()
-                cpu_fig_max = go.Figure()
-                ram_fig_avg = go.Figure()
-                cpu_fig_avg = go.Figure()
                 for algo in algorithms:
                     res_path = "{}/data_K{}_J{}_sigmae{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""))
-                    theta_err = {}
-                    theta_sqerr = {}
-                    theta_err_RT = {}
-                    theta_sqerr_RT = {}
+                    pijsumi_err = {}
+                    pijsumi_err_RT = {}
                     for param in parameter_names:
-                        theta_err[param] = []
-                        theta_sqerr[param] = []
-                        theta_err_RT[param] = []
-                        theta_sqerr_RT[param] = []
-                    ram = {"max":[], "avg":[]}
-                    cpu_util = {"max":[], "avg":[]}
-                    runtimes = []
+                        pijsumi_err[param] = []
+                        pijsumi_err_RT[param] = []
                     dataloglik = []
                     estimation_sq_error_per_trial_per_batch = dict()
                     estimation_sq_error_per_trial_per_batch_nonRT = dict()
@@ -110,7 +92,14 @@ if __name__ == "__main__":
                             for result in f.iter(type=dict, skip_invalid=True):
                                 for param in parameter_names:
                                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
-                        
+                        ipdb.set_trace()
+                        with open("{}/{}/Utilities.pickle".format(res_path, trial), "rb") as f:
+                            pijs_true = pickle.load(f)
+                        # sum over i and sort over j in decreasing order
+                        sum_over_users = pijs_true.sum(axis=0)
+                        sort_most2least_liked = np.argsort(sum_over_users)[::-1]
+                        sum_over_users_sorted = sum_over_users[sort_most2least_liked]
+
                         if algo == "mle":
                             trial_path = "{}/{}/{}/".format(res_path, trial, batchsize)
                         elif algo == "ca":
@@ -130,23 +119,26 @@ if __name__ == "__main__":
 
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
-                                    dataloglik.append(result["logfullposterior"])
-                                    theta_err["X"].append(result["err_x_nonRT"])
-                                    theta_err["Z"].append(result["err_z_nonRT"])
-                                    theta_err_RT["X"].append(result["err_x_RT"])
-                                    theta_err_RT["Z"].append(result["err_z_RT"])
-                                    theta_sqerr["X"].append(result["mse_x_nonRT"])
-                                    theta_sqerr["Z"].append(result["mse_z_nonRT"])
-                                    theta_sqerr_RT["X"].append(result["mse_x_RT"])
-                                    theta_sqerr_RT["Z"].append(result["mse_z_RT"])                                    
-                                    param_positions_dict_ca = result["param_positions_dict"]                                                                 
-                            with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
-                                for result in f.iter(type=dict, skip_invalid=True):     
-                                    runtimes.append(result["wall_duration"]) # in seconds
-                                    cpu_util["avg"].append(result["avg_total_cpu_util"])
-                                    cpu_util["max"].append(result["max_total_cpu_util"])
-                                    ram["avg"].append(result["avg_total_ram_residentsetsize_MB"]/1000)
-                                    ram["max"].append(result["max_total_ram_residentsetsize_MB"]/1000)
+                                    dataloglik.append(result["logfullposterior"])                    
+                                    param_positions_dict_ca = result["param_positions_dict"]      
+                                    X_hat = np.asarray(result["X"]).reshape((d, K), order="F")
+                                    Z_hat = np.asarray(result["Z"]).reshape((d, J), order="F")
+                            alpha_true = theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]]
+                            beta_true = theta_true[param_positions_dict["beta"][0]:param_positions_dict["beta"][1]]
+                            gamma_true = theta_true[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]]
+                            alpha_hat = alpha_true
+                            beta_hat = beta_true
+                            gamma_hat = gamma_true
+
+
+                            pijs_est = p_ij_arg_numbafast(X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K)
+                            sum_over_users_est = pijs_est.sum(axis=0)
+                            sum_over_users_est_sorted = sum_over_users_est[sort_most2least_liked]
+                            err = (sum_over_users_est_sorted-sum_over_users_sorted)/sum_over_users_sorted
+                            err_avg = np.mean(err)
+
+
+
                         elif algo == "icmp":         
                             readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
@@ -178,8 +170,7 @@ if __name__ == "__main__":
                                                 mse_x = result["mse_x_RT"]
                                             theta_err_RT[param].append(err_x)
                                             theta_err[param].append(err_x_nonRT)
-                                            theta_sqerr_RT[param].append(mse_x)
-                                            theta_sqerr[param].append(mse_x_nonRT)
+                                            
                                         elif param == "Z":      
                                             if not precomputed_errors:                                       
                                                 Z_true = np.asarray(param_true).reshape((d, J), order="F")
@@ -198,19 +189,11 @@ if __name__ == "__main__":
                                                 mse_z = result["mse_z_RT"]                 
                                             theta_err_RT[param].append(err_z)
                                             theta_err[param].append(err_z_nonRT)
-                                            theta_sqerr_RT[param].append(mse_z)
-                                            theta_sqerr[param].append(mse_z_nonRT)    
-                                        elif param in ["gamma", "delta", "sigma_e"]:
-                                            # scalars
-                                            rel_err = (param_true - param_hat)/param_true
-                                            rel_se = rel_err**2
-                                            theta_err[param].append(rel_err[0])
-                                            theta_sqerr[param].append(rel_se[0])
-                                        else:
+                                            
+                                        elif param in ["alpha"]:
                                             rel_err = (np.asarray(param_true) - np.asarray(param_hat))/np.asarray(param_true)
                                             sq_err = rel_err**2            
                                             theta_err[param].append(float(np.mean(rel_err)))    
-                                            theta_sqerr[param].append(float(np.mean(sq_err)))
                                     if not precomputed_errors:
                                         # save updated file
                                         out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
@@ -219,14 +202,7 @@ if __name__ == "__main__":
                                             writer.write(result)
                                     # only consider the best solution
                                     break
-                            with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
-                                for result in f.iter(type=dict, skip_invalid=True):     
-                                    runtimes.append(result["wall_duration"]/60) # in minutes
-                                    cpu_util["avg"].append(result["avg_total_cpu_util"])
-                                    cpu_util["max"].append(result["max_total_cpu_util"])
-                                    ram["avg"].append(result["avg_total_ram_residentsetsize_MB"]/1000)
-                                    ram["max"].append(result["max_total_ram_residentsetsize_MB"]/1000)
-                                    break
+                            
                         elif algo == "mle":
                             m = trial
                             estimation_sq_error_per_trial_per_batch[m] = dict()
@@ -282,8 +258,6 @@ if __name__ == "__main__":
                                         mse_x = params_out["mse_x_RT"]
                                     theta_err_RT[param].append(err_x)
                                     theta_err[param].append(err_x_nonRT)
-                                    theta_sqerr_RT[param].append(mse_x)
-                                    theta_sqerr[param].append(mse_x_nonRT)
                                 elif param == "Z":
                                     if not precomputed_errors:     
                                         param_hat = params_out[param].reshape((d*J,), order="F").tolist()     
@@ -308,8 +282,6 @@ if __name__ == "__main__":
                                         mse_z = params_out["mse_z_RT"]                 
                                     theta_err_RT[param].append(err_z)
                                     theta_err[param].append(err_z_nonRT)
-                                    theta_sqerr_RT[param].append(mse_z)
-                                    theta_sqerr[param].append(mse_z_nonRT)    
                                 elif param in ["beta", "alpha"]:
                                     if not isinstance(params_out[param], list):
                                         param_hat = params_out[param].tolist()
@@ -318,14 +290,13 @@ if __name__ == "__main__":
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
                                     mse = np.mean(rel_err**2)  
                                     theta_err[param].append(float(np.mean(rel_err)))    
-                                    theta_sqerr[param].append(float(mse))
                                     params_out[param] = param_hat.copy()
                                 else:
                                     param_hat = params_out[param]
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
                                     mse = rel_err**2                                    
                                     theta_err[param].append(rel_err[0])
-                                    theta_sqerr[param].append(mse[0])
+
                             if not precomputed_errors:
                                 # save updated file
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
@@ -336,29 +307,6 @@ if __name__ == "__main__":
                                 reader.close()
                                 ffop.close()
                                 
-                            # for efficiency metrics in dmle: provide averages/max over all batches and make remark in paper   
-                            subdatasets_names = [file.name for file in pathlib.Path(trial_path).iterdir() if not file.is_file() and "dataset_" in file.name]      
-                            batch_runtimes = []
-                            batch_cpu_util_avg = []
-                            batch_cpu_util_max = []
-                            batch_ram_avg = []
-                            batch_ram_max = []
-                            for dataset_index in range(len(subdatasets_names)):                    
-                                subdataset_name = subdatasets_names[dataset_index]                        
-                                DIR_read = "{}/{}/estimation/".format(trial_path, subdataset_name)
-                                with jsonlines.open("{}/efficiency_metrics.jsonl".format(DIR_read), mode="r") as f: 
-                                    for result in f.iter(type=dict, skip_invalid=True):     
-                                        batch_runtimes.append(result["wall_duration"]) # in seconds
-                                        batch_cpu_util_avg.append(result["avg_total_cpu_util"])
-                                        batch_cpu_util_max.append(result["max_total_cpu_util"])
-                                        batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"]/1000)
-                                        batch_ram_max.append(result["max_total_ram_residentsetsize_MB"]/1000)
-                                        break
-                            runtimes.append(np.mean(batch_runtimes)) # in seconds
-                            cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
-                            cpu_util["max"].append(np.mean(batch_cpu_util_max))
-                            ram["avg"].append(np.mean(batch_ram_avg))
-                            ram["max"].append(np.mean(batch_ram_max))
                         elif algo == "icmd":
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
@@ -461,8 +409,6 @@ if __name__ == "__main__":
                                         mse_x = params_out["mse_x_RT"]
                                     theta_err_RT[param].append(err_x)
                                     theta_err[param].append(err_x_nonRT)
-                                    theta_sqerr_RT[param].append(mse_x)
-                                    theta_sqerr[param].append(mse_x_nonRT)
                                 elif param == "Z":
                                     if not precomputed_errors:  
                                         Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
@@ -483,19 +429,12 @@ if __name__ == "__main__":
                                         mse_z_nonRT = params_out["mse_z_nonRT"]
                                         mse_z = params_out["mse_z_RT"]                                   
                                     theta_err_RT[param].append(err_z)
-                                    theta_err[param].append(err_z_nonRT)
-                                    theta_sqerr_RT[param].append(mse_z)
-                                    theta_sqerr[param].append(mse_z_nonRT)           
-                                elif param in ["beta", "alpha"]:
+                                    theta_err[param].append(err_z_nonRT)   
+                                elif param in ["alpha"]:
                                     rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
                                     mse = np.mean(rel_err**2)  
-                                    theta_err[param].append(float(np.mean(rel_err)))    
-                                    theta_sqerr[param].append(float(mse))
-                                else:
-                                    rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
-                                    mse = rel_err**2
-                                    theta_err[param].append(float(rel_err[0]))
-                                    theta_sqerr[param].append(float(mse[0]))      
+                                    theta_err[param].append(float(np.mean(rel_err)))
+                        
                             if not precomputed_errors:
                                 # save updated file
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
@@ -506,26 +445,6 @@ if __name__ == "__main__":
                                 reader.close()
                                 ffop.close()
 
-                            # for efficiency in icmd: provide averages/max over all batches and make remark in paper   
-                            batch_runtimes = []
-                            batch_cpu_util_avg = []
-                            batch_cpu_util_max = []
-                            batch_ram_avg = []
-                            batch_ram_max = []
-                            with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
-                                for result in f.iter(type=dict, skip_invalid=True):     
-                                    batch_runtimes.append(result["wall_duration"]/60) # in minutes
-                                    batch_cpu_util_avg.append(result["avg_total_cpu_util"])
-                                    batch_cpu_util_max.append(result["max_total_cpu_util"])
-                                    batch_ram_avg.append(result["avg_total_ram_residentsetsize_MB"]/1000)
-                                    batch_ram_max.append(result["max_total_ram_residentsetsize_MB"]/1000)
-                                    break
-                            runtimes.append(np.mean(batch_runtimes)) # in minutes
-                            cpu_util["avg"].append(np.mean(batch_cpu_util_avg))
-                            cpu_util["max"].append(np.mean(batch_cpu_util_max))
-                            ram["avg"].append(np.mean(batch_ram_avg))
-                            ram["max"].append(np.mean(batch_ram_max)) 
-                    
                     # add plots per algorithm
                     if algo == "ca":
                         plotname = "CA"
@@ -539,38 +458,7 @@ if __name__ == "__main__":
                     elif algo == "icmp":
                         plotname = "ICM-P"
                         sec_y = False
-                    time_fig.add_trace(go.Box(
-                        y=runtimes, showlegend=True, name=plotname,
-                        boxpoints='outliers', line=dict(color=colors[algo]),                                
-                    ), secondary_y=sec_y)
-                    time_allsigma_fig.add_trace(go.Box(
-                        y=runtimes, showlegend=True, name=r'{}\\\sigma_e^2={}'.format(plotname, sigma_e),
-                        boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
-                    ), secondary_y=sec_y)
-                    ram_fig_max.add_trace(go.Box(
-                        y=ram["max"], showlegend=True, name="{}-max".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
-                    ram_avg_allsigma_fig.add_trace(go.Box(
-                        y=ram["avg"], showlegend=True, name=r'{}-avg\\\sigma_e^2={}'.format(plotname, sigma_e),
-                        boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
-                    ))
-                    ram_fig_avg.add_trace(go.Box(
-                        y=ram["avg"], showlegend=True, name="{}-avg".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
-                    cpu_fig_max.add_trace(go.Box(
-                        y=cpu_util["max"], showlegend=True, name="{}-max".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
-                    cpu_avg_allsigma_fig.add_trace(go.Box(
-                        y=cpu_util["avg"], showlegend=True, name=r'{}-avg\\\sigma_e^2={}'.format(plotname, sigma_e),
-                        boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
-                    ))
-                    cpu_fig_avg.add_trace(go.Box(
-                        y=cpu_util["avg"], showlegend=True, name="{}-avg".format(plotname),
-                        boxpoints='outliers', line=dict(color=colors[algo])                          
-                    ))
+                    
                     for param in parameter_names:
                         if param in ["X", "Z"]:
                             param_allsigma_err_fig[param].add_trace(go.Box(
@@ -581,10 +469,7 @@ if __name__ == "__main__":
                                 y=theta_err[param], showlegend=True, name="{}".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
-                            param_sqerr_fig[param].add_trace(go.Box(
-                                y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
+                            
                             param_allsigma_err_fig["{}_RT".format(param)].add_trace(go.Box(
                                 y=theta_err_RT[param], showlegend=True, name=r'{}\\\sigma_e^2={}'.format(plotname, sigma_e),
                                 boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
@@ -593,71 +478,18 @@ if __name__ == "__main__":
                                 y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
-                            param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
-                                y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
+                           
                         else:
                             param_err_fig[param].add_trace(go.Box(
                                 y=theta_err[param], showlegend=True, name="{}".format(plotname),
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
-                            param_sqerr_fig[param].add_trace(go.Box(
-                                y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
+                            
                             param_allsigma_err_fig[param].add_trace(go.Box(
                                 y=theta_err[param], showlegend=True, name=r'{}\\\sigma_e^2={}'.format(plotname, sigma_e),
                                 boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                             ))
                 
-                # save figures per K, J, sigma_e
-                savename = "{}/time_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                time_fig.update_yaxes(title_text="Duration (in seconds), D-MLE, CA", secondary_y=True)
-                fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(time_fig, savename, xaxis_title="Estimation algorithm", yaxis_title="Duration (in minutes)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                savename = "{}/ram_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                savename = "{}/ram_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average RAM consumption (in GB)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                savename = "{}/cpu_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                savename = "{}/cpu_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False)
                 for param in parameter_names:
                     savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
                     if param in ["X", "Z"]:
@@ -683,57 +515,7 @@ if __name__ == "__main__":
                                         showgrid=False, showlegend=True, 
                                         print_png=False, print_html=True, 
                                         print_pdf=False) 
-                    if param in ["X", "Z"]:
-                        savename = "{}/rel_sqerr_RT_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
-                        fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
-                                        xaxis_title="Estimation algorithm", 
-                                        yaxis_title="Mean relative squared error (under rotation/scaling)", 
-                                        title="", showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                        fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
-                                        xaxis_title="Estimation algorithm", 
-                                        yaxis_title="Mean relative squared error (under rotation/scaling)", 
-                                        title="", showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                    savename = "{}/rel_sqerr_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", "")) 
-                    fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False) 
-                    fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative squared error", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-            savename = "{}/time_K{}_J{}_allsigmae.html".format(dir_out, K, J)    
-            time_allsigma_fig.update_yaxes(title_text="Duration (in seconds), D-MLE, CA", secondary_y=True)
-            fix_plot_layout_and_save(time_allsigma_fig, savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Duration (in minutes)", title="", 
-                                    showgrid=False, showlegend=False, 
-                                    print_png=True, print_html=False, 
-                                    print_pdf=False)     
-            fix_plot_layout_and_save(time_allsigma_fig, savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Duration (in minutes)", title="", 
-                                    showgrid=False, showlegend=True, 
-                                    print_png=False, print_html=True, 
-                                    print_pdf=False) 
-            savename = "{}/ram_avg_K{}_J{}_allsigmae.html".format(dir_out, K, J)    
-            fix_plot_layout_and_save(ram_avg_allsigma_fig, savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Average RAM consumption (in GB)", title="", 
-                                    showgrid=False, showlegend=False, 
-                                    print_png=True, print_html=False, 
-                                    print_pdf=False) 
-            fix_plot_layout_and_save(ram_avg_allsigma_fig, savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Average RAM consumption (in GB)", title="", 
-                                    showgrid=False, showlegend=True, 
-                                    print_png=False, print_html=True, 
-                                    print_pdf=False) 
-            savename = "{}/cpu_avg_K{}_J{}_allsigmae.html".format(dir_out, K, J)    
-            fix_plot_layout_and_save(cpu_avg_allsigma_fig, savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
-                                    showgrid=False, showlegend=False, 
-                                    print_png=True, print_html=False, 
-                                    print_pdf=False) 
-            fix_plot_layout_and_save(cpu_avg_allsigma_fig, savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Maximum CPU utilisation (% usage of 1 core))", title="", 
-                                    showgrid=False, showlegend=True, 
-                                    print_png=False, print_html=True, 
-                                    print_pdf=False) 
+                    
             for param in parameter_names:
                 savename = "{}/rel_err_{}_K{}_J{}_allsigmae.html".format(dir_out, param, K, J)    
                 if param in ["X", "Z"]:
