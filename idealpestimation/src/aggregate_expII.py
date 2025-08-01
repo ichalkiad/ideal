@@ -150,7 +150,7 @@ if __name__ == "__main__":
                             with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
                                 Y = pickle.load(f)
                             Y = Y.astype(np.int8).reshape((K, J), order="F")   
-                            _, _, _, theta_true_ca, _, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+                            _, K_new, J_new, theta_true_ca, _, _ , k_idx, j_idx = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
 
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    

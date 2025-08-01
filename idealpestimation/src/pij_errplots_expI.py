@@ -113,24 +113,25 @@ if __name__ == "__main__":
                         if algo == "ca":   
                             # only assess ideal points for X, Z                         
                             # load data    
-                            # with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
-                            #     Y = pickle.load(f)
-                            # Y = Y.astype(np.int8).reshape((K, J), order="F")   
-                            # _, _, _, theta_true_ca, _, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
-
+                            with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
+                                Y = pickle.load(f)
+                            Y = Y.astype(np.int8).reshape((K, J), order="F")   
+                            _, K_new, J_new, theta_true_ca, _, _ , k_idx, j_idx = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+                            if len(j_idx) > 0:
+                                raise NotImplementedError("Drop ground truth columns when comparing...no J dropping at the moment though, check!")
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
                                     dataloglik.append(result["logfullposterior"])                    
                                     param_positions_dict_ca = result["param_positions_dict"]      
-                                    X_hat = np.asarray(result["X"]).reshape((d, K), order="F")
-                                    Z_hat = np.asarray(result["Z"]).reshape((d, J), order="F")
+                                    X_hat = np.asarray(result["X"]).reshape((d, K_new), order="F")
+                                    Z_hat = np.asarray(result["Z"]).reshape((d, J_new), order="F")
                             alpha_true = theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]]
                             beta_true = theta_true[param_positions_dict["beta"][0]:param_positions_dict["beta"][1]]
                             gamma_true = theta_true[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]]
                             alpha_hat = alpha_true
                             beta_hat = beta_true
                             gamma_hat = gamma_true
-
+                            
                             ipdb.set_trace()
 
                             pijs_est = p_ij_arg_numbafast(X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K)

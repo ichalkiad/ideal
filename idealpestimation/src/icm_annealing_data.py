@@ -186,7 +186,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchs
                         theta_true[param_positions_dict_init[param][0]:param_positions_dict_init[param][1]] = result[param] 
 
 
-            # Y, K, J, theta_true, param_positions_dict, parameter_space_dim = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+            # Y, K, J, theta_true, param_positions_dict, parameter_space_dim, _, _ = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
             
 
             theta_true_per_m.append(theta_true)

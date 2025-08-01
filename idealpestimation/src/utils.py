@@ -4679,7 +4679,7 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
             ii += 1
        
 
-    return Y_new, K_new, J_new, np.asarray(theta_true_new), param_positions_dict_new, parameter_space_dim_new
+    return Y_new, K_new, J_new, np.asarray(theta_true_new), param_positions_dict_new, parameter_space_dim_new, k_idx, j_idx
 
 ####################### CA #############################
 
