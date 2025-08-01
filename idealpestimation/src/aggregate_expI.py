@@ -152,7 +152,8 @@ if __name__ == "__main__":
                             precomputed_errors = False
                             if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
                                 precomputed_errors = True
-                                readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)             
+                                readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)    
+                                print("ICM-P - loaded precomputed errors.")
                             with jsonlines.open(readinfile, mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
                                     dataloglik.append(result["logfullposterior"])                                    

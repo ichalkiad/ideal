@@ -30,7 +30,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["icmp", "icmd", "ca", "mle"]
+    algorithms = ["ca"]  # ["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -92,6 +92,7 @@ if __name__ == "__main__":
                             for result in f.iter(type=dict, skip_invalid=True):
                                 for param in parameter_names:
                                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+                        
                         ipdb.set_trace()
                         with open("{}/{}/Utilities.pickle".format(res_path, trial), "rb") as f:
                             pijs_true = pickle.load(f)
@@ -130,6 +131,7 @@ if __name__ == "__main__":
                             beta_hat = beta_true
                             gamma_hat = gamma_true
 
+                            ipdb.set_trace()
 
                             pijs_est = p_ij_arg_numbafast(X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K)
                             sum_over_users_est = pijs_est.sum(axis=0)
