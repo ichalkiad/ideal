@@ -24,7 +24,7 @@ if __name__ == "__main__":
     M = 10
     batchsize = 1504 # 50k
     d = 2
-    parameter_names = ["Z", "alpha"]
+    parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
     dir_out = "{}/rsspaper_expI/".format(dataspace)
