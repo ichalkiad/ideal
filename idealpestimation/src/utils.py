@@ -4602,7 +4602,7 @@ def log_conditional_posterior_sigma_e(sigma_e, Y, theta, J, K, d, parameter_name
 
 ####################### CA #############################
 
-def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict):
+def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict, verify=True):
 
     # uninformative users 
     k_idx = np.argwhere(np.all(Y<1, axis=1))
@@ -4663,20 +4663,20 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
             k += 1
 
     print("Dropped {} users, {} lead users, new parameter space size: {}.".format(K-K_new, J-J_new, parameter_space_dim_new))
-
-    i = 0
-    ii = 0
-    theta_true = theta_true.tolist()
-    while i < len(theta_true):
-        target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
-        if vector_index_in_param_matrix in k_idx.flatten().tolist():            
-            i += 1            
-        elif vector_index_in_param_matrix in j_idx.flatten().tolist():
-            i += 1
-        else:            
-            assert np.allclose(theta_true[i], theta_true_new[ii])
-            i += 1
-            ii += 1
+    if verify:
+        i = 0
+        ii = 0
+        theta_true = theta_true.tolist()
+        while i < len(theta_true):
+            target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
+            if vector_index_in_param_matrix in k_idx.flatten().tolist():            
+                i += 1            
+            elif vector_index_in_param_matrix in j_idx.flatten().tolist():
+                i += 1
+            else:            
+                assert np.allclose(theta_true[i], theta_true_new[ii])
+                i += 1
+                ii += 1
        
 
     return Y_new, K_new, J_new, np.asarray(theta_true_new), param_positions_dict_new, parameter_space_dim_new, k_idx, j_idx

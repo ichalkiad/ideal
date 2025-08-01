@@ -12,6 +12,39 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                                 get_min_achievable_mse_under_rotation_trnsl, go, p_ij_arg_numbafast
 from plotly.subplots import make_subplots
 
+def get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K, sort_most2least_liked, 
+                        pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, 
+                        pij_sumi_median_RT, theta_err, theta_err_RT, seed_value):
+
+    pijs_est = p_ij_arg_numbafast(X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K)
+    sum_over_users_est = pijs_est.sum(axis=0)
+    sum_over_users_est_sorted = sum_over_users_est[sort_most2least_liked]
+    err = (sum_over_users_est_sorted-sum_over_users_sorted)/sum_over_users_sorted
+    err_pijsumi_median = np.percentile(err, q=50, method="lower")
+    pij_err.append(err)                            
+    pij_sumi_mean.append(np.mean(err))
+    pij_sumi_median.append(err_pijsumi_median)
+    theta_err["Z"].append((Z_hat[sort_most2least_liked]-Z_true[sort_most2least_liked])/Z_true[sort_most2least_liked])
+    # RT
+    Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seed_value)            
+    Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seed_value) 
+    reconstructedX = X_hat @ Rx + tx
+    reconstructedZ = Z_hat @ Rz + tz
+    pijs_est = p_ij_arg_numbafast(reconstructedX, reconstructedZ, alpha_hat, beta_hat, gamma_hat, K)
+    sum_over_users_est = pijs_est.sum(axis=0)
+    sum_over_users_est_sorted = sum_over_users_est[sort_most2least_liked]
+    err = (sum_over_users_est_sorted-sum_over_users_sorted)/sum_over_users_sorted
+    err_pijsumi_median = np.percentile(err, q=50, method="lower")
+    pij_err_RT.append(err)
+    pij_sumi_mean_RT.append(np.mean(err))
+    pij_sumi_median_RT.append(err_pijsumi_median)
+    theta_err_RT["Z"].append((reconstructedZ[sort_most2least_liked]-Z_true[sort_most2least_liked])/Z_true[sort_most2least_liked])
+
+    return pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT
+
+
+
+
 if __name__ == "__main__":
 
     seed_value = 8125
@@ -62,25 +95,30 @@ if __name__ == "__main__":
                 elif param == "sigma_e":
                     param_positions_dict[param] = (k, k + 1)                                
                     k += 1    
-            param_allsigma_err_fig = {}
-            for param in parameter_names:
-                if param in ["X", "Z"]:
-                    param_allsigma_err_fig["{}_RT".format(param)] = go.Figure()
-                param_allsigma_err_fig[param] = go.Figure()
+
             for sigma_e in sigma_es:
-                param_err_fig = {}
-                for param in parameter_names:
-                    if param in ["X", "Z"]:
-                        param_err_fig["{}_RT".format(param)] = go.Figure()
-                    param_err_fig[param] = go.Figure()
+                param_pijmean_fig = go.Figure()
+                param_pijmean_fig_RT = go.Figure()
+                z_fig = go.Figure()
+                z_fig_RT = go.Figure()
+                alpha_fig = go.Figure()
+                alpha_fig_RT = go.Figure()                
                 for algo in algorithms:
                     res_path = "{}/data_K{}_J{}_sigmae{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""))
-                    pijsumi_err = {}
-                    pijsumi_err_RT = {}
-                    for param in parameter_names:
-                        pijsumi_err[param] = []
-                        pijsumi_err_RT[param] = []
-                    dataloglik = []
+                    # boxplots for all J
+                    pij_err = []
+                    pij_err_RT = []
+                    # avg, median sumpij
+                    pij_sumi_mean = []
+                    pij_sumi_median = []
+                    pij_sumi_mean_RT = []
+                    pij_sumi_median_RT = []
+                    theta_err = {}
+                    theta_err_RT = {}
+                    for param in ["Z", "alpha"]:
+                        theta_err[param] = []
+                        theta_err_RT[param] = []
+                    
                     estimation_sq_error_per_trial_per_batch = dict()
                     estimation_sq_error_per_trial_per_batch_nonRT = dict()
                     estimation_error_per_trial_per_batch = dict()
@@ -116,93 +154,61 @@ if __name__ == "__main__":
                             with open("{}/{}/Y.pickle".format(res_path, trial), "rb") as f:
                                 Y = pickle.load(f)
                             Y = Y.astype(np.int8).reshape((K, J), order="F")   
-                            _, K_new, J_new, theta_true_ca, _, _ , k_idx, j_idx = clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_positions_dict)
+                            _, K_new, J_new, theta_true_ca, _, _ , k_idx, j_idx = clean_up_data_matrix(Y, K, J, d, theta_true, 
+                                                                                                    parameter_names, param_positions_dict, verify=False)
                             if len(j_idx) > 0:
                                 raise NotImplementedError("Drop ground truth columns when comparing...no J dropping at the moment though, check!")
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                    
-                                    dataloglik.append(result["logfullposterior"])                    
                                     param_positions_dict_ca = result["param_positions_dict"]      
                                     X_hat = np.asarray(result["X"]).reshape((d, K_new), order="F")
                                     Z_hat = np.asarray(result["Z"]).reshape((d, J_new), order="F")
+                            # only for CA since estimation does not return these parameters!
                             alpha_true = theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]]
                             beta_true = theta_true[param_positions_dict["beta"][0]:param_positions_dict["beta"][1]]
                             gamma_true = theta_true[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]]
                             alpha_hat = alpha_true
                             beta_hat = beta_true
-                            gamma_hat = gamma_true
-                            
-                            ipdb.set_trace()
+                            gamma_hat = gamma_true                          
 
-                            pijs_est = p_ij_arg_numbafast(X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K)
-                            sum_over_users_est = pijs_est.sum(axis=0)
-                            sum_over_users_est_sorted = sum_over_users_est[sort_most2least_liked]
-                            err = (sum_over_users_est_sorted-sum_over_users_sorted)/sum_over_users_sorted
-                            err_avg = np.mean(err)
-
+                            pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                                                                                                                    gamma_hat, K_new, sort_most2least_liked, 
+                                                                                                                    pij_err, pij_err_RT, pij_sumi_mean, 
+                                                                                                                    pij_sumi_mean_RT, pij_sumi_median, 
+                                                                                                                    pij_sumi_median_RT, theta_err, 
+                                                                                                                    theta_err_RT, seed_value)
 
 
                         elif algo == "icmp":         
                             readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
-                            if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
-                                precomputed_errors = True
-                                readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)             
+                            # if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
+                            #     precomputed_errors = True
+                            #     readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)             
                             with jsonlines.open(readinfile, mode="r") as f: 
-                                for result in f.iter(type=dict, skip_invalid=True):                                    
-                                    dataloglik.append(result["logfullposterior"])                                    
-                                    param_positions_dict = result["param_positions_dict"]                                         
-                                    for param in parameter_names:                                        
-                                        param_true = theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
-                                        param_hat = result[param]                                        
-                                        if param == "X":                                                                
-                                            if not precomputed_errors:
-                                                X_true = np.asarray(param_true).reshape((d, K), order="F")
-                                                X_hat = np.asarray(param_hat).reshape((d, K), order="F")
-                                                Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
-                                                                                                                                            param_hat=X_hat, 
-                                                                                                                                            seedint=seed_value)
-                                                result["err_x_nonRT"] = err_x_nonRT
-                                                result["err_x_RT"] = err_x
-                                                result["mse_x_nonRT"] = mse_x_nonRT
-                                                result["mse_x_RT"] = mse_x
-                                            else:
-                                                err_x_nonRT = result["err_x_nonRT"]
-                                                err_x = result["err_x_RT"]
-                                                mse_x_nonRT = result["mse_x_nonRT"]
-                                                mse_x = result["mse_x_RT"]
-                                            theta_err_RT[param].append(err_x)
-                                            theta_err[param].append(err_x_nonRT)
-                                            
-                                        elif param == "Z":      
-                                            if not precomputed_errors:                                       
-                                                Z_true = np.asarray(param_true).reshape((d, J), order="F")
-                                                Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
-                                                Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
-                                                                                                                                            param_hat=Z_hat, 
-                                                                                                                                            seedint=seed_value)
-                                                result["err_z_nonRT"] = err_z_nonRT
-                                                result["err_z_RT"] = err_z
-                                                result["mse_z_nonRT"] = mse_z_nonRT
-                                                result["mse_z_RT"] = mse_z        
-                                            else:        
-                                                err_z_nonRT = result["err_z_nonRT"]
-                                                err_z = result["err_z_RT"]
-                                                mse_z_nonRT = result["mse_z_nonRT"]
-                                                mse_z = result["mse_z_RT"]                 
-                                            theta_err_RT[param].append(err_z)
-                                            theta_err[param].append(err_z_nonRT)
-                                            
-                                        elif param in ["alpha"]:
-                                            rel_err = (np.asarray(param_true) - np.asarray(param_hat))/np.asarray(param_true)
-                                            sq_err = rel_err**2            
-                                            theta_err[param].append(float(np.mean(rel_err)))    
-                                    if not precomputed_errors:
-                                        # save updated file
-                                        out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
-                                        with open(out_file, 'a') as f:         
-                                            writer = jsonlines.Writer(f)
-                                            writer.write(result)
+                                for result in f.iter(type=dict, skip_invalid=True):                                                                        
+                                    param_positions_dict = result["param_positions_dict"]         
+
+                                    X_hat = np.asarray(result["X"]).reshape((d, K), order="F")
+                                    Z_hat = np.asarray(result["Z"]).reshape((d, J), order="F")
+                                    alpha_hat = np.asarray(result["alpha"])
+                                    beta_hat = np.asarray(result["beta"])
+                                    gamma_hat = np.asarray(result["gamma"])
+                                    pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                                                                                                                    gamma_hat, K, sort_most2least_liked, 
+                                                                                                                    pij_err, pij_err_RT, pij_sumi_mean, 
+                                                                                                                    pij_sumi_mean_RT, pij_sumi_median, 
+                                                                                                                    pij_sumi_median_RT, theta_err, 
+                                                                                                                    theta_err_RT, seed_value)
+   
+                                    # if not precomputed_errors:
+                                    #     # save updated file
+                                    #     out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
+                                    #     with open(out_file, 'a') as f:         
+                                    #         writer = jsonlines.Writer(f)
+                                    #         writer.write(result)
                                     # only consider the best solution
                                     break
                             
@@ -220,7 +226,7 @@ if __name__ == "__main__":
                             data_location = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
-                            if pathlib.Path(readinfile).exists():
+                            if False: #pathlib.Path(readinfile).exists():
                                 precomputed_errors = True
                                 ffop = open(readinfile, mode="r")
                                 reader = jsonlines.Reader(ffop)
@@ -236,85 +242,35 @@ if __name__ == "__main__":
                                                                     estimation_error_per_trial_per_batch[m], 
                                                                     estimation_error_per_trial_per_batch_nonRT[m],
                                                                     theta_true, param_positions_dict, seedint=seed_value)    
-                            for param in parameter_names:
-                                if param == "X":   
-                                    if not precomputed_errors:      
-                                        param_hat = params_out[param].reshape((d*K,), order="F").tolist()     
-                                        X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
-                                        X_hat = np.asarray(param_hat).reshape((d, K), order="F")
-                                        # mse_x = None
-                                        # mse_x_nonRT = None
-                                        # err_x = None
-                                        # err_x_nonRT = None
-                                        Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, 
-                                                                                                                                    param_hat=X_hat, 
-                                                                                                                                    seedint=seed_value)
-                                        params_out["err_x_nonRT"] = err_x_nonRT
-                                        params_out["err_x_RT"] = err_x
-                                        params_out["mse_x_nonRT"] = mse_x_nonRT
-                                        params_out["mse_x_RT"] = mse_x
-                                        params_out[param] = param_hat.copy()
-                                    else:
-                                        err_x_nonRT = params_out["err_x_nonRT"]
-                                        err_x = params_out["err_x_RT"]
-                                        mse_x_nonRT = params_out["mse_x_nonRT"]
-                                        mse_x = params_out["mse_x_RT"]
-                                    theta_err_RT[param].append(err_x)
-                                    theta_err[param].append(err_x_nonRT)
-                                elif param == "Z":
-                                    if not precomputed_errors:     
-                                        param_hat = params_out[param].reshape((d*J,), order="F").tolist()     
-                                        Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
-                                        Z_hat = np.asarray(param_hat).reshape((d, J), order="F")
-                                        # mse_z = None
-                                        # mse_z_nonRT = None
-                                        # err_z = None
-                                        # err_z_nonRT = None
-                                        Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, 
-                                                                                                                                    param_hat=Z_hat, 
-                                                                                                                                    seedint=seed_value)  
-                                        params_out["err_z_nonRT"] = err_z_nonRT
-                                        params_out["err_z_RT"] = err_z
-                                        params_out["mse_z_nonRT"] = mse_z_nonRT
-                                        params_out["mse_z_RT"] = mse_z 
-                                        params_out[param] = param_hat.copy()
-                                    else:
-                                        err_z_nonRT = params_out["err_z_nonRT"]
-                                        err_z = params_out["err_z_RT"]
-                                        mse_z_nonRT = params_out["mse_z_nonRT"]
-                                        mse_z = params_out["mse_z_RT"]                 
-                                    theta_err_RT[param].append(err_z)
-                                    theta_err[param].append(err_z_nonRT)
-                                elif param in ["beta", "alpha"]:
-                                    if not isinstance(params_out[param], list):
-                                        param_hat = params_out[param].tolist()
-                                    else:
-                                        param_hat = params_out[param]
-                                    rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
-                                    mse = np.mean(rel_err**2)  
-                                    theta_err[param].append(float(np.mean(rel_err)))    
-                                    params_out[param] = param_hat.copy()
-                                else:
-                                    param_hat = params_out[param]
-                                    rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - param_hat)/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]
-                                    mse = rel_err**2                                    
-                                    theta_err[param].append(rel_err[0])
-
-                            if not precomputed_errors:
-                                # save updated file
-                                out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
-                                with open(out_file, 'a') as f:         
-                                    writer = jsonlines.Writer(f)
-                                    writer.write(params_out)
-                            else:
-                                reader.close()
-                                ffop.close()
+                            X_hat = np.asarray(params_out["X"]).reshape((d, K), order="F")
+                            Z_hat = np.asarray(params_out["Z"]).reshape((d, J), order="F")
+                            alpha_hat = np.asarray(params_out["alpha"])
+                            beta_hat = np.asarray(params_out["beta"])
+                            gamma_hat = np.asarray(params_out["gamma"])
+                            pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                                                                                                            gamma_hat, K, sort_most2least_liked, 
+                                                                                                            pij_err, pij_err_RT, pij_sumi_mean, 
+                                                                                                            pij_sumi_mean_RT, pij_sumi_median, 
+                                                                                                            pij_sumi_median_RT, theta_err, 
+                                                                                                            theta_err_RT, seed_value)
+                            
+                            
+                            # if not precomputed_errors:
+                            #     # save updated file
+                            #     out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
+                            #     with open(out_file, 'a') as f:         
+                            #         writer = jsonlines.Writer(f)
+                            #         writer.write(params_out)
+                            # else:
+                            #     reader.close()
+                            #     ffop.close()
                                 
                         elif algo == "icmd":
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
-                            if pathlib.Path(readinfile).exists():
+                            if False: #pathlib.Path(readinfile).exists():
                                 precomputed_errors = True
                                 ffop = open(readinfile, mode="r")
                                 reader = jsonlines.Reader(ffop)
@@ -390,54 +346,19 @@ if __name__ == "__main__":
                                             else:
                                                 weighted_estimate = np.asarray([all_estimates[0]])
                                         params_out[param] = weighted_estimate.tolist()                            
-                            for param in parameter_names:
-                                if param == "X":       
-                                    if not precomputed_errors:          
-                                        X_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, K), order="F")
-                                        X_hat = np.asarray(params_out[param]).reshape((d, K), order="F")
-                                        # mse_x = None
-                                        # mse_x_nonRT = None
-                                        # err_x = None
-                                        # err_x_nonRT = None
-                                        Rx, tx, mse_x, mse_x_nonRT, err_x, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, 
-                                                                                                                                    seedint=seed_value)
-                                        params_out["err_x_nonRT"] = err_x_nonRT
-                                        params_out["err_x_RT"] = err_x
-                                        params_out["mse_x_nonRT"] = mse_x_nonRT
-                                        params_out["mse_x_RT"] = mse_x      
-                                    else:
-                                        err_x_nonRT = params_out["err_x_nonRT"]
-                                        err_x = params_out["err_x_RT"]
-                                        mse_x_nonRT = params_out["mse_x_nonRT"]
-                                        mse_x = params_out["mse_x_RT"]
-                                    theta_err_RT[param].append(err_x)
-                                    theta_err[param].append(err_x_nonRT)
-                                elif param == "Z":
-                                    if not precomputed_errors:  
-                                        Z_true = np.asarray(theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]).reshape((d, J), order="F")
-                                        Z_hat = np.asarray(params_out[param]).reshape((d, J), order="F")
-                                        # mse_z = None
-                                        # mse_z_nonRT = None
-                                        # err_z = None
-                                        # err_z_nonRT = None
-                                        Rz, tz, mse_z, mse_z_nonRT, err_z, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, 
-                                                                                                                                    seedint=seed_value)
-                                        params_out["err_z_nonRT"] = err_z_nonRT
-                                        params_out["err_z_RT"] = err_z
-                                        params_out["mse_z_nonRT"] = mse_z_nonRT
-                                        params_out["mse_z_RT"] = mse_z      
-                                    else:
-                                        err_z_nonRT = params_out["err_z_nonRT"]
-                                        err_z = params_out["err_z_RT"]
-                                        mse_z_nonRT = params_out["mse_z_nonRT"]
-                                        mse_z = params_out["mse_z_RT"]                                   
-                                    theta_err_RT[param].append(err_z)
-                                    theta_err[param].append(err_z_nonRT)   
-                                elif param in ["alpha"]:
-                                    rel_err = (theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] - params_out[param])/theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]]     
-                                    mse = np.mean(rel_err**2)  
-                                    theta_err[param].append(float(np.mean(rel_err)))
-                        
+                            
+                            X_hat = np.asarray(params_out["X"]).reshape((d, K), order="F")
+                            Z_hat = np.asarray(params_out["Z"]).reshape((d, J), order="F")
+                            alpha_hat = np.asarray(params_out["alpha"])
+                            beta_hat = np.asarray(params_out["beta"])
+                            gamma_hat = np.asarray(params_out["gamma"])
+                            pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                                                                                                            gamma_hat, K, sort_most2least_liked, 
+                                                                                                            pij_err, pij_err_RT, pij_sumi_mean, 
+                                                                                                            pij_sumi_mean_RT, pij_sumi_median, 
+                                                                                                            pij_sumi_median_RT, theta_err, 
+                                                                                                            theta_err_RT, seed_value)
                             if not precomputed_errors:
                                 # save updated file
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
@@ -445,8 +366,9 @@ if __name__ == "__main__":
                                     writer = jsonlines.Writer(f)
                                     writer.write(params_out)
                             else:
-                                reader.close()
-                                ffop.close()
+                                pass
+                                # reader.close()
+                                # ffop.close()
 
                     # add plots per algorithm
                     if algo == "ca":
@@ -462,86 +384,102 @@ if __name__ == "__main__":
                         plotname = "ICM-P"
                         sec_y = False
                     
-                    for param in parameter_names:
-                        if param in ["X", "Z"]:
-                            param_allsigma_err_fig[param].add_trace(go.Box(
-                                y=theta_err[param], showlegend=True, name=r'{}\\\sigma_e^2={}'.format(plotname, sigma_e),
-                                boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
-                            ))
-                            param_err_fig[param].add_trace(go.Box(
-                                y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                    algo_leadusers_boxplots = go.Figure()
+                    pij_err_alltrials = np.stack(pij_err)
+                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
+                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
+                    for jidx in range(len(pij_err_alltrials.shape[1])):
+                        algo_leadusers_boxplots.add_trace(go.Box(
+                                y=pij_err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
-                            
-                            param_allsigma_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                                y=theta_err_RT[param], showlegend=True, name=r'{}\\\sigma_e^2={}'.format(plotname, sigma_e),
-                                boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
-                            ))
-                            param_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                                y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                           
-                        else:
-                            param_err_fig[param].add_trace(go.Box(
-                                y=theta_err[param], showlegend=True, name="{}".format(plotname),
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
-                            ))
-                            
-                            param_allsigma_err_fig[param].add_trace(go.Box(
-                                y=theta_err[param], showlegend=True, name=r'{}\\\sigma_e^2={}'.format(plotname, sigma_e),
-                                boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
-                            ))
-                
-                for param in parameter_names:
-                    savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))    
-                    if param in ["X", "Z"]:
-                        savename = "{}/rel_err_RT_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))
-                        fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
-                                            savename, xaxis_title="Estimation algorithm", 
-                                            yaxis_title="Mean relative error (under rotation/scaling)", 
-                                            title="", showgrid=False, showlegend=False, 
-                                            print_png=True, print_html=False, 
-                                            print_pdf=False) 
-                        fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
-                                            savename, xaxis_title="Estimation algorithm", 
-                                            yaxis_title="Mean relative error (under rotation/scaling)", 
-                                            title="", showgrid=False, showlegend=True, 
-                                            print_png=False, print_html=True, 
-                                            print_pdf=False) 
-                    savename = "{}/rel_err_{}_K{}_J{}_sigmae_{}.html".format(dir_out, param, K, J, str(sigma_e).replace(".", ""))
-                    fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
-                                        showgrid=False, showlegend=False, 
-                                        print_png=True, print_html=False, 
-                                        print_pdf=False)    
-                    fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Estimation algorithm", yaxis_title="Mean relative error", title="", 
-                                        showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
-                                        print_pdf=False) 
-                    
-            for param in parameter_names:
-                savename = "{}/rel_err_{}_K{}_J{}_allsigmae.html".format(dir_out, param, K, J)    
-                if param in ["X", "Z"]:
-                    savename = "{}/rel_err_RT_{}_K{}_J{}_allsigmae.html".format(dir_out, param, K, J)
-                    fix_plot_layout_and_save(param_allsigma_err_fig["{}_RT".format(param)], 
-                                        savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', 
-                                        yaxis_title="Mean relative error (under rotation/scaling)", 
+                    savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Relative error", 
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
-                    fix_plot_layout_and_save(param_allsigma_err_fig["{}_RT".format(param)], 
-                                        savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', 
-                                        yaxis_title="Mean relative error (under rotation/scaling)", 
-                                        title="", showgrid=False, showlegend=True, 
-                                        print_png=False, print_html=True, 
+                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                                                        name="Average", showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                                                        name="Median", showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                    
+                    algo_leadusers_boxplots_Z = go.Figure()
+                    err_alltrials = np.stack(theta_err["Z"])
+                    for jidx in range(len(err_alltrials.shape[1])):
+                        algo_leadusers_boxplots_Z.add_trace(go.Box(
+                                y=err_alltrials[:, jidx], showlegend=False,
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                    savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Lead user ideal points relative error", 
+                                        title="", showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False)
+
+
+                    # RT
+                    algo_leadusers_boxplots = go.Figure()
+                    pij_err_alltrials = np.stack(pij_err_RT)
+                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
+                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
+                    for jidx in range(len(pij_err_alltrials.shape[1])):
+                        algo_leadusers_boxplots.add_trace(go.Box(
+                                y=pij_err_alltrials[:, jidx], showlegend=False,
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                    savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Relative error (under rotation/scaling)", 
+                                        title="", showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=False, 
                                         print_pdf=False) 
-                savename = "{}/rel_err_{}_K{}_J{}_allsigmae.html".format(dir_out, param, K, J)
-                fix_plot_layout_and_save(param_allsigma_err_fig[param], savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Mean relative error", title="", 
-                                    showgrid=False, showlegend=False, 
-                                    print_png=True, print_html=False, 
-                                    print_pdf=False)    
-                fix_plot_layout_and_save(param_allsigma_err_fig[param], savename, xaxis_title=r'Estimation algorithm, $\sigma_e^2$', yaxis_title="Mean relative error", title="", 
-                                    showgrid=False, showlegend=True, 
-                                    print_png=False, print_html=True, 
-                                    print_pdf=False) 
-                
+                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                                                        name="Average", showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                                                        name="Median", showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                    
+                    algo_leadusers_boxplots_Z = go.Figure()
+                    err_alltrials = np.stack(theta_err_RT["Z"])
+                    for jidx in range(len(err_alltrials.shape[1])):
+                        algo_leadusers_boxplots_Z.add_trace(go.Box(
+                                y=err_alltrials[:, jidx], showlegend=False,
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                    savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Lead user ideal points relative error (under rotation/scaling)", 
+                                        title="", showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False)
+
+
+                    if algo != "ca":
+                        algo_leadusers_boxplots_alpha = go.Figure()
+                        err_alltrials = np.stack(theta_err["alpha"])
+                        for jidx in range(len(err_alltrials.shape[1])):
+                            algo_leadusers_boxplots_alpha.add_trace(go.Box(
+                                    y=err_alltrials[:, jidx], showlegend=False,
+                                    boxpoints='outliers', line=dict(color=colors[algo])                          
+                                ))
+                        savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                        fix_plot_layout_and_save(algo_leadusers_boxplots_alpha, 
+                                            savename, xaxis_title="Lead users rank (most to least liked)", 
+                                            yaxis_title="Lead user popularity relative error", 
+                                            title="", showgrid=False, showlegend=False, 
+                                            print_png=True, print_html=False, 
+                                            print_pdf=False)
+
+
+                    
+
+
+                    
+                    
+
+                    
