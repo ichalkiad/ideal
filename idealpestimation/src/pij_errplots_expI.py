@@ -189,7 +189,9 @@ if __name__ == "__main__":
                             precomputed_errors = False
                             # if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
                             #     precomputed_errors = True
-                            #     readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)             
+                            #     readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)           
+                            X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
+                            Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
                             with jsonlines.open(readinfile, mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                                                        
                                     param_positions_dict = result["param_positions_dict"]         
@@ -200,7 +202,7 @@ if __name__ == "__main__":
                                     beta_hat = np.asarray(result["beta"])
                                     gamma_hat = np.asarray(result["gamma"])
                                     pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true,X_hat, Z_hat, alpha_hat, beta_hat, 
+                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, 
                                                                                                                     gamma_hat, K, sort_most2least_liked, 
                                                                                                                     pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                                     pij_sumi_mean_RT, pij_sumi_median, 
@@ -246,6 +248,8 @@ if __name__ == "__main__":
                                                                     estimation_error_per_trial_per_batch[m], 
                                                                     estimation_error_per_trial_per_batch_nonRT[m],
                                                                     theta_true, param_positions_dict, seedint=seed_value)    
+                            X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
+                            Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
                             X_hat = np.asarray(params_out["X"]).reshape((d, K), order="F")
                             Z_hat = np.asarray(params_out["Z"]).reshape((d, J), order="F")
                             alpha_hat = np.asarray(params_out["alpha"])
@@ -351,6 +355,8 @@ if __name__ == "__main__":
                                                 weighted_estimate = np.asarray([all_estimates[0]])
                                         params_out[param] = weighted_estimate.tolist()                            
                             
+                            X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
+                            Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
                             X_hat = np.asarray(params_out["X"]).reshape((d, K), order="F")
                             Z_hat = np.asarray(params_out["Z"]).reshape((d, J), order="F")
                             alpha_hat = np.asarray(params_out["alpha"])
