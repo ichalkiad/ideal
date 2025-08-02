@@ -12,7 +12,7 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                                 get_min_achievable_mse_under_rotation_trnsl, go, p_ij_arg_numbafast
 from plotly.subplots import make_subplots
 
-def get_polarisation_data(X_true, Z_true, alpha_true, X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K, sort_most2least_liked, 
+def get_polarisation_data(sum_over_users_sorted, X_true, Z_true, alpha_true, X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K, sort_most2least_liked, 
                         pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, 
                         pij_sumi_median_RT, theta_err, theta_err_RT, seed_value):
 
@@ -183,7 +183,7 @@ if __name__ == "__main__":
                                         pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = pickle.load(f)                  
                             else:
                                 pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, None, X_hat, 
+                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(sum_over_users_sorted, X_true, Z_true, None, X_hat, 
                                                                                                                     Z_hat, alpha_hat, beta_hat, 
                                                                                                                     gamma_hat, K_new, sort_most2least_liked, 
                                                                                                                     pij_err, pij_err_RT, pij_sumi_mean, 
@@ -227,7 +227,7 @@ if __name__ == "__main__":
                                         # only consider the best solution
                                         break
                                 pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                        pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                        pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(sum_over_users_sorted, X_true, Z_true, alpha_true, X_hat, 
                                                                                                                         Z_hat, alpha_hat, beta_hat, 
                                                                                                                         gamma_hat, K, sort_most2least_liked, 
                                                                                                                         pij_err, pij_err_RT, pij_sumi_mean, 
@@ -282,7 +282,7 @@ if __name__ == "__main__":
                                         pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = pickle.load(f)                  
                             else:
                                 pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(sum_over_users_sorted, X_true, Z_true, alpha_true, X_hat, 
                                                                                                                 Z_hat, alpha_hat, beta_hat, 
                                                                                                                 gamma_hat, K, sort_most2least_liked, 
                                                                                                                 pij_err, pij_err_RT, pij_sumi_mean, 
@@ -399,7 +399,7 @@ if __name__ == "__main__":
                                         pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = pickle.load(f)                  
                             else:
                                 pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(sum_over_users_sorted, X_true, Z_true, alpha_true, X_hat, 
                                                                                                             Z_hat, alpha_hat, beta_hat, 
                                                                                                             gamma_hat, K, sort_most2least_liked, 
                                                                                                             pij_err, pij_err_RT, pij_sumi_mean, 

@@ -561,7 +561,7 @@ if __name__ == "__main__":
                                         pij_sumi_median, pij_sumi_median_RT, theta_err_sortedJ, theta_err_sortedJ_RT = pickle.load(f)                  
                             else:
                                 pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                pij_sumi_median, pij_sumi_median_RT, theta_err_sortedJ, theta_err_sortedJ_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                pij_sumi_median, pij_sumi_median_RT, theta_err_sortedJ, theta_err_sortedJ_RT = get_polarisation_data(sum_over_users_sorted, X_true, Z_true, alpha_true, X_hat, 
                                                                                                             Z_hat, alpha_hat, beta_hat, 
                                                                                                             gamma_hat, K, sort_most2least_liked, 
                                                                                                             pij_err, pij_err_RT, pij_sumi_mean, 
