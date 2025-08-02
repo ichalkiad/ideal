@@ -405,9 +405,9 @@ if __name__ == "__main__":
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
                     param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="Average", showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
                     param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="Median", showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[algo])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
                     err_alltrials = np.stack(theta_err["Z"])
@@ -443,9 +443,9 @@ if __name__ == "__main__":
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
                     param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="Average", showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
                     param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="Median", showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[algo])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
                     err_alltrials = np.stack(theta_err_RT["Z"])
@@ -478,6 +478,21 @@ if __name__ == "__main__":
                                             title="", showgrid=False, showlegend=False, 
                                             print_png=True, print_html=False, 
                                             print_pdf=False)
+                savename = "{}/pij_sumi_sortedleadusers_err_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+                fix_plot_layout_and_save(param_pijmean_fig, 
+                                    savename, xaxis_title="Lead users rank (most to least liked)", 
+                                    yaxis_title=r"$Lead user total utility relative error (p_{\cdot j})$", 
+                                    title="", showgrid=False, showlegend=True, 
+                                    print_png=True, print_html=False, 
+                                    print_pdf=False)
+                savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+                fix_plot_layout_and_save(param_pijmean_fig_RT, 
+                                    savename, xaxis_title="Lead users rank (most to least liked)", 
+                                    yaxis_title=r"$Lead user total utility relative error under rotation/scaling (p_{\cdot j})$", 
+                                    title="", showgrid=False, showlegend=True, 
+                                    print_png=True, print_html=True, 
+                                    print_pdf=False)
+                
 
 
                     
