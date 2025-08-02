@@ -131,7 +131,6 @@ if __name__ == "__main__":
                                 for param in parameter_names:
                                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
                         
-                        ipdb.set_trace()
                         with open("{}/{}/Utilities.pickle".format(res_path, trial), "rb") as f:
                             pijs_true = pickle.load(f)
                         # sum over i and sort over j in decreasing order
@@ -384,6 +383,8 @@ if __name__ == "__main__":
                         plotname = "ICM-P"
                         sec_y = False
                     
+                    ipdb.set_trace()
+
                     algo_leadusers_boxplots = go.Figure()
                     pij_err_alltrials = np.stack(pij_err)
                     pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
