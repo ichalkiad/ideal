@@ -599,7 +599,7 @@ if __name__ == "__main__":
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -610,16 +610,16 @@ if __name__ == "__main__":
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
                     param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[K])))
                     param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[K])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
                     err_alltrials = np.stack(theta_err_sortedJ["Z"])
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -639,7 +639,7 @@ if __name__ == "__main__":
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -650,16 +650,16 @@ if __name__ == "__main__":
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
                     param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[K])))
                     param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
-                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[K])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
                     err_alltrials = np.stack(theta_err_sortedJ_RT["Z"])
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -677,7 +677,7 @@ if __name__ == "__main__":
                         for jidx in range(err_alltrials.shape[1]):
                             algo_leadusers_boxplots_alpha.add_trace(go.Box(
                                     y=err_alltrials[:, jidx], showlegend=False,
-                                    boxpoints='outliers', line=dict(color=colors[algo])                          
+                                    boxpoints='outliers', line=dict(color=colors[K])                          
                                 ))
                         algo_leadusers_boxplots_alpha.update_xaxes(showticklabels=False)
                         savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
