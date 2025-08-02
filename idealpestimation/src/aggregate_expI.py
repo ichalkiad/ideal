@@ -547,7 +547,7 @@ if __name__ == "__main__":
                     #     boxpoints='outliers', line=dict(color=colors[algo]),                                
                     # ), secondary_y=sec_y)
                     time_allsigma_fig.add_trace(go.Box(
-                        y=runtimes, showlegend=True, name=r"${}\\ \sigma_e^2={}$".format(plotname, sigma_e),
+                        y=runtimes, showlegend=True, name=r"${{{plotname}}}, \sigma_e^2={{{sigma_e}}}$".format(plotname=plotname, sigma_e=sigma_e),
                         boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                     ), secondary_y=sec_y)
                     # ram_fig_max.add_trace(go.Box(
@@ -555,7 +555,7 @@ if __name__ == "__main__":
                     #     boxpoints='outliers', line=dict(color=colors[algo])                          
                     # ))
                     ram_avg_allsigma_fig.add_trace(go.Box(
-                        y=ram["avg"], showlegend=True, name=r"${}-avg\\ \sigma_e^2={}$".format(plotname, sigma_e),
+                        y=ram["avg"], showlegend=True, name=r"${{{plotname}}}-avg, \sigma_e^2={{{sigma_e}}}$".format(plotname=plotname, sigma_e=sigma_e),
                         boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                     ))
                     # ram_fig_avg.add_trace(go.Box(
@@ -567,7 +567,7 @@ if __name__ == "__main__":
                     #     boxpoints='outliers', line=dict(color=colors[algo])                          
                     # ))
                     cpu_avg_allsigma_fig.add_trace(go.Box(
-                        y=cpu_util["avg"], showlegend=True, name=r"${}-avg\\ \sigma_e^2={}$".format(plotname, sigma_e),
+                        y=cpu_util["avg"], showlegend=True, name=r"${{{plotname}}}-avg, \sigma_e^2={{{sigma_e}}}$".format(plotname=plotname, sigma_e=sigma_e),
                         boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                     ))
                     # cpu_fig_avg.add_trace(go.Box(
