@@ -66,7 +66,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expI/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["ca"]  # ["icmp", "icmd", "ca", "mle"]
+    algorithms = ["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         for J in Js:
@@ -397,6 +397,7 @@ if __name__ == "__main__":
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
+                    algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
@@ -416,6 +417,7 @@ if __name__ == "__main__":
                                 y=err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
+                    algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
@@ -435,6 +437,7 @@ if __name__ == "__main__":
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
+                    algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
@@ -454,6 +457,7 @@ if __name__ == "__main__":
                                 y=err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
                             ))
+                    algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
@@ -471,6 +475,7 @@ if __name__ == "__main__":
                                     y=err_alltrials[:, jidx], showlegend=False,
                                     boxpoints='outliers', line=dict(color=colors[algo])                          
                                 ))
+                        algo_leadusers_boxplots_alpha.update_xaxes(showticklabels=False)
                         savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                         fix_plot_layout_and_save(algo_leadusers_boxplots_alpha, 
                                             savename, xaxis_title="Lead users rank (most to least liked)", 
@@ -481,14 +486,14 @@ if __name__ == "__main__":
                 savename = "{}/pij_sumi_sortedleadusers_err_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
                 fix_plot_layout_and_save(param_pijmean_fig, 
                                     savename, xaxis_title="Lead users rank (most to least liked)", 
-                                    yaxis_title=r"$Lead user total utility relative error (p_{\cdot j})$", 
+                                    yaxis_title=r"$\text{Lead user total utility relative error }(p_{\cdot j})$", 
                                     title="", showgrid=False, showlegend=True, 
-                                    print_png=True, print_html=False, 
+                                    print_png=True, print_html=True, 
                                     print_pdf=False)
                 savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
                 fix_plot_layout_and_save(param_pijmean_fig_RT, 
                                     savename, xaxis_title="Lead users rank (most to least liked)", 
-                                    yaxis_title=r"$Lead user total utility relative error under rotation/scaling (p_{\cdot j})$", 
+                                    yaxis_title=r"${Lead user total utility relative error under rotation/scaling }(p_{\cdot j})$", 
                                     title="", showgrid=False, showlegend=True, 
                                     print_png=True, print_html=True, 
                                     print_pdf=False)
