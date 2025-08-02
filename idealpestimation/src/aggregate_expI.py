@@ -555,7 +555,7 @@ if __name__ == "__main__":
                     #     boxpoints='outliers', line=dict(color=colors[algo])                          
                     # ))
                     ram_avg_allsigma_fig.add_trace(go.Box(
-                        y=ram["avg"], showlegend=True, name=r"${}\text{-avg}\\ \sigma_e^2={}$".format(plotname, sigma_e),
+                        y=ram["avg"], showlegend=True, name=r"${}-avg\\ \sigma_e^2={}$".format(plotname, sigma_e),
                         boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                     ))
                     # ram_fig_avg.add_trace(go.Box(
@@ -567,7 +567,7 @@ if __name__ == "__main__":
                     #     boxpoints='outliers', line=dict(color=colors[algo])                          
                     # ))
                     cpu_avg_allsigma_fig.add_trace(go.Box(
-                        y=cpu_util["avg"], showlegend=True, name=r"${}\text{-avg}\\ \sigma_e^2={}$".format(plotname, sigma_e),
+                        y=cpu_util["avg"], showlegend=True, name=r"${}-avg\\ \sigma_e^2={}$".format(plotname, sigma_e),
                         boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                     ))
                     # cpu_fig_avg.add_trace(go.Box(
