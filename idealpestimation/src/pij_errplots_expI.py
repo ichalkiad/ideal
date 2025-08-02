@@ -12,7 +12,7 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                                 get_min_achievable_mse_under_rotation_trnsl, go, p_ij_arg_numbafast
 from plotly.subplots import make_subplots
 
-def get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K, sort_most2least_liked, 
+def get_polarisation_data(X_true, Z_true, alpha_true, X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K, sort_most2least_liked, 
                         pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, 
                         pij_sumi_median_RT, theta_err, theta_err_RT, seed_value):
 
@@ -27,6 +27,8 @@ def get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, gam
     Z_hat_flat = Z_hat.reshape((Z_hat.shape[0]*Z_hat.shape[1],), order="F")
     Z_true_flat = Z_true.reshape((Z_true.shape[0]*Z_true.shape[1],), order="F")
     theta_err["Z"].append((Z_hat_flat[sort_most2least_liked]-Z_true_flat[sort_most2least_liked])/Z_true_flat[sort_most2least_liked])
+    if alpha_true is not None:
+        theta_err["alpha"].append((alpha_hat[sort_most2least_liked]-alpha_true[sort_most2least_liked])/alpha_true[sort_most2least_liked])
     # RT
     Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seed_value)            
     Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seed_value) 
@@ -176,7 +178,8 @@ if __name__ == "__main__":
                             gamma_hat = gamma_true                          
 
                             pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, 
+                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, None, X_hat, 
+                                                                                                                    Z_hat, alpha_hat, beta_hat, 
                                                                                                                     gamma_hat, K_new, sort_most2least_liked, 
                                                                                                                     pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                                     pij_sumi_mean_RT, pij_sumi_median, 
@@ -192,6 +195,7 @@ if __name__ == "__main__":
                             #     readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)           
                             X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
                             Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
+                            alpha_true = np.asarray(theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]])
                             with jsonlines.open(readinfile, mode="r") as f: 
                                 for result in f.iter(type=dict, skip_invalid=True):                                                                        
                                     param_positions_dict = result["param_positions_dict"]         
@@ -202,7 +206,8 @@ if __name__ == "__main__":
                                     beta_hat = np.asarray(result["beta"])
                                     gamma_hat = np.asarray(result["gamma"])
                                     pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, 
+                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                                                                                                    Z_hat, alpha_hat, beta_hat, 
                                                                                                                     gamma_hat, K, sort_most2least_liked, 
                                                                                                                     pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                                     pij_sumi_mean_RT, pij_sumi_median, 
@@ -250,13 +255,15 @@ if __name__ == "__main__":
                                                                     theta_true, param_positions_dict, seedint=seed_value)    
                             X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
                             Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
+                            alpha_true = np.asarray(theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]])
                             X_hat = np.asarray(params_out["X"]).reshape((d, K), order="F")
                             Z_hat = np.asarray(params_out["Z"]).reshape((d, J), order="F")
                             alpha_hat = np.asarray(params_out["alpha"])
                             beta_hat = np.asarray(params_out["beta"])
                             gamma_hat = np.asarray(params_out["gamma"])
                             pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                                                                                            Z_hat, alpha_hat, beta_hat, 
                                                                                                             gamma_hat, K, sort_most2least_liked, 
                                                                                                             pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                             pij_sumi_mean_RT, pij_sumi_median, 
@@ -357,13 +364,15 @@ if __name__ == "__main__":
                             
                             X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
                             Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
+                            alpha_true = np.asarray(theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]])  
                             X_hat = np.asarray(params_out["X"]).reshape((d, K), order="F")
                             Z_hat = np.asarray(params_out["Z"]).reshape((d, J), order="F")
                             alpha_hat = np.asarray(params_out["alpha"])
                             beta_hat = np.asarray(params_out["beta"])
                             gamma_hat = np.asarray(params_out["gamma"])
                             pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true,X_hat, Z_hat, alpha_hat, beta_hat, 
+                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                                                                                            Z_hat, alpha_hat, beta_hat, 
                                                                                                             gamma_hat, K, sort_most2least_liked, 
                                                                                                             pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                             pij_sumi_mean_RT, pij_sumi_median, 
