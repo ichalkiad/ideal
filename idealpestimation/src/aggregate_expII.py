@@ -10,6 +10,7 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                             print_threadpool_info, jsonlines, combine_estimate_variance_rule, \
                                                                 optimisation_dict2params, clean_up_data_matrix, get_data_tempering_variance_combined_solution,\
                                                                 get_min_achievable_mse_under_rotation_trnsl, go
+from idealpestimation.src.pij_errplots_expI import get_polarisation_data
 from plotly.subplots import make_subplots
 
 
@@ -61,6 +62,13 @@ if __name__ == "__main__":
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
     dir_out = "{}/rsspaper_expII/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
+
+    param_pijmean_fig = go.Figure()
+    param_pijmean_fig_RT = go.Figure()
+    z_fig = go.Figure()
+    z_fig_RT = go.Figure()
+    alpha_fig = go.Figure()
+    alpha_fig_RT = go.Figure() 
 
     algorithms = ["icmd"]
     colors = {Ks[0]:"Crimson", Ks[1]:"ForestGreen", Ks[2]:"Maroon"}
@@ -127,6 +135,19 @@ if __name__ == "__main__":
             for sigma_e in sigma_es:                
                 for algo in algorithms:
                     res_path = "{}/data_K{}_J{}_sigmae{}/".format(dir_in, K, J, str(sigma_e).replace(".", ""))                    
+                    # boxplots for all J
+                    pij_err = []
+                    pij_err_RT = []
+                    # avg, median sumpij
+                    pij_sumi_mean = []
+                    pij_sumi_median = []
+                    pij_sumi_mean_RT = []
+                    pij_sumi_median_RT = []
+                    theta_err_sortedJ = {}
+                    theta_err_sortedJ_RT = {}
+                    for param in ["Z", "alpha"]:
+                        theta_err_sortedJ[param] = []
+                        theta_err_sortedJ_RT[param] = []
                     for trial in range(M):              
                         theta_true = np.zeros((parameter_space_dim,))
                         # load true param vector - same over all trials but store in each trial folder for convenience
@@ -134,6 +155,12 @@ if __name__ == "__main__":
                             for result in f.iter(type=dict, skip_invalid=True):
                                 for param in parameter_names:
                                     theta_true[param_positions_dict[param][0]:param_positions_dict[param][1]] = result[param] 
+                        with open("{}/{}/Utilities.pickle".format(res_path, trial), "rb") as f:
+                            pijs_true = pickle.load(f)
+                        # sum over i and sort over j in decreasing order
+                        sum_over_users = pijs_true.sum(axis=0)
+                        sort_most2least_liked = np.argsort(sum_over_users)[::-1]
+                        sum_over_users_sorted = sum_over_users[sort_most2least_liked]
                         
                         if algo == "mle":
                             trial_path = "{}/{}/{}/".format(res_path, trial, batchsize)
@@ -377,6 +404,9 @@ if __name__ == "__main__":
                             ram["max"].append(np.mean(batch_ram_max))
                         elif algo == "icmd":
                             DIR_base = trial_path
+                            X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
+                            Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
+                            alpha_true = np.asarray(theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]])  
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
                             if pathlib.Path(readinfile).exists(): 
@@ -518,6 +548,29 @@ if __name__ == "__main__":
                                 reader.close()
                                 ffop.close()
 
+                          
+                            X_hat = np.asarray(params_out["X"]).reshape((d, K), order="F")
+                            Z_hat = np.asarray(params_out["Z"]).reshape((d, J), order="F")
+                            alpha_hat = np.asarray(params_out["alpha"])
+                            beta_hat = np.asarray(params_out["beta"])
+                            gamma_hat = np.asarray(params_out["gamma"])
+                            loadpath = "{}/{}/pij_plottingdata_{}.pickle".format(res_path, trial, algo)
+                            if pathlib.Path(loadpath).exists():
+                                with open(loadpath, "rb") as f:
+                                    pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                        pij_sumi_median, pij_sumi_median_RT, theta_err_sortedJ, theta_err_sortedJ_RT = pickle.load(f)                  
+                            else:
+                                pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                pij_sumi_median, pij_sumi_median_RT, theta_err_sortedJ, theta_err_sortedJ_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                                                                                            Z_hat, alpha_hat, beta_hat, 
+                                                                                                            gamma_hat, K, sort_most2least_liked, 
+                                                                                                            pij_err, pij_err_RT, pij_sumi_mean, 
+                                                                                                            pij_sumi_mean_RT, pij_sumi_median, 
+                                                                                                            pij_sumi_median_RT, theta_err_sortedJ, 
+                                                                                                            theta_err_sortedJ_RT, seed_value)
+                                with open(loadpath, "wb") as f:
+                                    pickle.dump((pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, pij_sumi_median_RT, theta_err_sortedJ, theta_err_sortedJ_RT), f)
+                            
                             # for efficiency in icmd: provide averages/max over all batches and make remark in paper   
                             batch_runtimes = []
                             batch_cpu_util_avg = []
@@ -538,6 +591,102 @@ if __name__ == "__main__":
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max)) 
                     
+
+                    algo_leadusers_boxplots = go.Figure()
+                    pij_err_alltrials = np.stack(pij_err)
+                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
+                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
+                    for jidx in range(pij_err_alltrials.shape[1]):
+                        algo_leadusers_boxplots.add_trace(go.Box(
+                                y=pij_err_alltrials[:, jidx], showlegend=False,
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                    algo_leadusers_boxplots.update_xaxes(showticklabels=False)
+                    savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Relative error", 
+                                        title="", showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False) 
+                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
+                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
+                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                    
+                    algo_leadusers_boxplots_Z = go.Figure()
+                    err_alltrials = np.stack(theta_err_sortedJ["Z"])
+                    for jidx in range(err_alltrials.shape[1]):
+                        algo_leadusers_boxplots_Z.add_trace(go.Box(
+                                y=err_alltrials[:, jidx], showlegend=False,
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                    algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
+                    savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Lead user ideal points relative error", 
+                                        title="", showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False)
+
+
+                    # RT
+                    algo_leadusers_boxplots = go.Figure()
+                    pij_err_alltrials = np.stack(pij_err_RT)
+                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
+                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
+                    for jidx in range(pij_err_alltrials.shape[1]):
+                        algo_leadusers_boxplots.add_trace(go.Box(
+                                y=pij_err_alltrials[:, jidx], showlegend=False,
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                    algo_leadusers_boxplots.update_xaxes(showticklabels=False)
+                    savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Relative error (under rotation/scaling)", 
+                                        title="", showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False) 
+                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
+                                                        name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
+                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
+                                                        name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[algo])))
+                    
+                    algo_leadusers_boxplots_Z = go.Figure()
+                    err_alltrials = np.stack(theta_err_sortedJ_RT["Z"])
+                    for jidx in range(err_alltrials.shape[1]):
+                        algo_leadusers_boxplots_Z.add_trace(go.Box(
+                                y=err_alltrials[:, jidx], showlegend=False,
+                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                            ))
+                    algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
+                    savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
+                                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                                        yaxis_title="Lead user ideal points relative error (under rotation/scaling)", 
+                                        title="", showgrid=False, showlegend=False, 
+                                        print_png=True, print_html=False, 
+                                        print_pdf=False)
+
+
+                    if algo != "ca":
+                        algo_leadusers_boxplots_alpha = go.Figure()
+                        err_alltrials = np.stack(theta_err_sortedJ["alpha"])
+                        for jidx in range(err_alltrials.shape[1]):
+                            algo_leadusers_boxplots_alpha.add_trace(go.Box(
+                                    y=err_alltrials[:, jidx], showlegend=False,
+                                    boxpoints='outliers', line=dict(color=colors[algo])                          
+                                ))
+                        algo_leadusers_boxplots_alpha.update_xaxes(showticklabels=False)
+                        savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                        fix_plot_layout_and_save(algo_leadusers_boxplots_alpha, 
+                                            savename, xaxis_title="Lead users rank (most to least liked)", 
+                                            yaxis_title="Lead user popularity relative error", 
+                                            title="", showgrid=False, showlegend=False, 
+                                            print_png=True, print_html=False, 
+                                            print_pdf=False)
         
         if K == 10000:
             plotname = "10,000"
@@ -691,4 +840,17 @@ if __name__ == "__main__":
                             print_png=False, print_html=True, 
                             print_pdf=False) 
 
-                       
+    savename = "{}/pij_sumi_sortedleadusers_err_allK_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+    fix_plot_layout_and_save(param_pijmean_fig, 
+                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                        yaxis_title=r"$\text{Lead user total utility relative error }(p_{\cdot j})$", 
+                        title="", showgrid=False, showlegend=True, 
+                        print_png=True, print_html=True, 
+                        print_pdf=False)
+    savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+    fix_plot_layout_and_save(param_pijmean_fig_RT, 
+                        savename, xaxis_title="Lead users rank (most to least liked)", 
+                        yaxis_title=r"${Lead user total utility relative error under rotation/scaling }(p_{\cdot j})$", 
+                        title="", showgrid=False, showlegend=True, 
+                        print_png=True, print_html=True, 
+                        print_pdf=False)
