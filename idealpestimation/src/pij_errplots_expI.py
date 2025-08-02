@@ -175,17 +175,23 @@ if __name__ == "__main__":
                             gamma_true = theta_true_ca[param_positions_dict_ca["gamma"][0]:param_positions_dict_ca["gamma"][1]]
                             alpha_hat = alpha_true
                             beta_hat = beta_true
-                            gamma_hat = gamma_true                          
-
-                            pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, None, X_hat, 
+                            gamma_hat = gamma_true      
+                            loadpath = "{}/{}/pij_plottingdata_{}.pickle".format(res_path, trial, algo)
+                            if pathlib.Path(loadpath).exists():
+                                with open(loadpath, "rb") as f:
+                                    pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                        pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = pickle.load(f)                  
+                            else:
+                                pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, None, X_hat, 
                                                                                                                     Z_hat, alpha_hat, beta_hat, 
                                                                                                                     gamma_hat, K_new, sort_most2least_liked, 
                                                                                                                     pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                                     pij_sumi_mean_RT, pij_sumi_median, 
                                                                                                                     pij_sumi_median_RT, theta_err, 
                                                                                                                     theta_err_RT, seed_value)
-
+                                with open(loadpath, "wb") as f:
+                                    pickle.dump((pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT), f)
 
                         elif algo == "icmp":         
                             readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
@@ -196,32 +202,40 @@ if __name__ == "__main__":
                             X_true = np.asarray(theta_true[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K), order="F")
                             Z_true = np.asarray(theta_true[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J), order="F")  
                             alpha_true = np.asarray(theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]])
-                            with jsonlines.open(readinfile, mode="r") as f: 
-                                for result in f.iter(type=dict, skip_invalid=True):                                                                        
-                                    param_positions_dict = result["param_positions_dict"]         
-
-                                    X_hat = np.asarray(result["X"]).reshape((d, K), order="F")
-                                    Z_hat = np.asarray(result["Z"]).reshape((d, J), order="F")
-                                    alpha_hat = np.asarray(result["alpha"])
-                                    beta_hat = np.asarray(result["beta"])
-                                    gamma_hat = np.asarray(result["gamma"])
+                            loadpath = "{}/{}/pij_plottingdata_{}.pickle".format(res_path, trial, algo)
+                            if pathlib.Path(loadpath).exists():
+                                with open(loadpath, "rb") as f:
                                     pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
-                                                                                                                    Z_hat, alpha_hat, beta_hat, 
-                                                                                                                    gamma_hat, K, sort_most2least_liked, 
-                                                                                                                    pij_err, pij_err_RT, pij_sumi_mean, 
-                                                                                                                    pij_sumi_mean_RT, pij_sumi_median, 
-                                                                                                                    pij_sumi_median_RT, theta_err, 
-                                                                                                                    theta_err_RT, seed_value)
-   
-                                    # if not precomputed_errors:
-                                    #     # save updated file
-                                    #     out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
-                                    #     with open(out_file, 'a') as f:         
-                                    #         writer = jsonlines.Writer(f)
-                                    #         writer.write(result)
-                                    # only consider the best solution
-                                    break
+                                        pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = pickle.load(f)                  
+                            else:
+                                with jsonlines.open(readinfile, mode="r") as f: 
+                                    for result in f.iter(type=dict, skip_invalid=True):                                                                        
+                                        param_positions_dict = result["param_positions_dict"]         
+
+                                        X_hat = np.asarray(result["X"]).reshape((d, K), order="F")
+                                        Z_hat = np.asarray(result["Z"]).reshape((d, J), order="F")
+                                        alpha_hat = np.asarray(result["alpha"])
+                                        beta_hat = np.asarray(result["beta"])
+                                        gamma_hat = np.asarray(result["gamma"])
+                                            
+                                        # if not precomputed_errors:
+                                        #     # save updated file
+                                        #     out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
+                                        #     with open(out_file, 'a') as f:         
+                                        #         writer = jsonlines.Writer(f)
+                                        #         writer.write(result)
+                                        # only consider the best solution
+                                        break
+                                pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                        pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                                                                                                        Z_hat, alpha_hat, beta_hat, 
+                                                                                                                        gamma_hat, K, sort_most2least_liked, 
+                                                                                                                        pij_err, pij_err_RT, pij_sumi_mean, 
+                                                                                                                        pij_sumi_mean_RT, pij_sumi_median, 
+                                                                                                                        pij_sumi_median_RT, theta_err, 
+                                                                                                                        theta_err_RT, seed_value)
+                                with open(loadpath, "wb") as f:
+                                    pickle.dump((pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT), f)
                             
                         elif algo == "mle":
                             m = trial
@@ -261,14 +275,22 @@ if __name__ == "__main__":
                             alpha_hat = np.asarray(params_out["alpha"])
                             beta_hat = np.asarray(params_out["beta"])
                             gamma_hat = np.asarray(params_out["gamma"])
-                            pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
-                                                                                                            Z_hat, alpha_hat, beta_hat, 
-                                                                                                            gamma_hat, K, sort_most2least_liked, 
-                                                                                                            pij_err, pij_err_RT, pij_sumi_mean, 
-                                                                                                            pij_sumi_mean_RT, pij_sumi_median, 
-                                                                                                            pij_sumi_median_RT, theta_err, 
-                                                                                                            theta_err_RT, seed_value)
+                            loadpath = "{}/{}/pij_plottingdata_{}.pickle".format(res_path, trial, algo)
+                            if pathlib.Path(loadpath).exists():
+                                with open(loadpath, "rb") as f:
+                                    pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                        pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = pickle.load(f)                  
+                            else:
+                                pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                                                                                                                Z_hat, alpha_hat, beta_hat, 
+                                                                                                                gamma_hat, K, sort_most2least_liked, 
+                                                                                                                pij_err, pij_err_RT, pij_sumi_mean, 
+                                                                                                                pij_sumi_mean_RT, pij_sumi_median, 
+                                                                                                                pij_sumi_median_RT, theta_err, 
+                                                                                                                theta_err_RT, seed_value)
+                                with open(loadpath, "wb") as f:
+                                    pickle.dump((pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT), f)
                             
                             
                             # if not precomputed_errors:
@@ -370,14 +392,23 @@ if __name__ == "__main__":
                             alpha_hat = np.asarray(params_out["alpha"])
                             beta_hat = np.asarray(params_out["beta"])
                             gamma_hat = np.asarray(params_out["gamma"])
-                            pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
+                            loadpath = "{}/{}/pij_plottingdata_{}.pickle".format(res_path, trial, algo)
+                            if pathlib.Path(loadpath).exists():
+                                with open(loadpath, "rb") as f:
+                                    pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                        pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = pickle.load(f)                  
+                            else:
+                                pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
+                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, alpha_true, X_hat, 
                                                                                                             Z_hat, alpha_hat, beta_hat, 
                                                                                                             gamma_hat, K, sort_most2least_liked, 
                                                                                                             pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                             pij_sumi_mean_RT, pij_sumi_median, 
                                                                                                             pij_sumi_median_RT, theta_err, 
                                                                                                             theta_err_RT, seed_value)
+                                with open(loadpath, "wb") as f:
+                                    pickle.dump((pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT), f)
+                            
                             if not precomputed_errors:
                                 # save updated file
                                 out_file = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
