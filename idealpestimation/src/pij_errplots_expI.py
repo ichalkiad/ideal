@@ -12,7 +12,7 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                                 get_min_achievable_mse_under_rotation_trnsl, go, p_ij_arg_numbafast
 from plotly.subplots import make_subplots
 
-def get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K, sort_most2least_liked, 
+def get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, gamma_hat, K, sort_most2least_liked, 
                         pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, 
                         pij_sumi_median_RT, theta_err, theta_err_RT, seed_value):
 
@@ -155,6 +155,8 @@ if __name__ == "__main__":
                             Y = Y.astype(np.int8).reshape((K, J), order="F")   
                             _, K_new, J_new, theta_true_ca, _, _ , k_idx, j_idx = clean_up_data_matrix(Y, K, J, d, theta_true, 
                                                                                                     parameter_names, param_positions_dict, verify=False)
+                            X_true = np.asarray(theta_true_ca[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K_new), order="F")
+                            Z_true = np.asarray(theta_true_ca[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J_new), order="F")
                             if len(j_idx) > 0:
                                 raise NotImplementedError("Drop ground truth columns when comparing...no J dropping at the moment though, check!")
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
@@ -171,7 +173,7 @@ if __name__ == "__main__":
                             gamma_hat = gamma_true                          
 
                             pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                                pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, 
                                                                                                                     gamma_hat, K_new, sort_most2least_liked, 
                                                                                                                     pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                                     pij_sumi_mean_RT, pij_sumi_median, 
