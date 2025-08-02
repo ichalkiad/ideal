@@ -155,8 +155,6 @@ if __name__ == "__main__":
                             Y = Y.astype(np.int8).reshape((K, J), order="F")   
                             _, K_new, J_new, theta_true_ca, _, _ , k_idx, j_idx = clean_up_data_matrix(Y, K, J, d, theta_true, 
                                                                                                     parameter_names, param_positions_dict, verify=False)
-                            X_true = np.asarray(theta_true_ca[param_positions_dict["X"][0]:param_positions_dict["X"][1]]).reshape((d, K_new), order="F")
-                            Z_true = np.asarray(theta_true_ca[param_positions_dict["Z"][0]:param_positions_dict["Z"][1]]).reshape((d, J_new), order="F")
                             if len(j_idx) > 0:
                                 raise NotImplementedError("Drop ground truth columns when comparing...no J dropping at the moment though, check!")
                             with jsonlines.open("{}/params_out_global_theta_hat.jsonl".format(trial_path), mode="r") as f: 
@@ -164,10 +162,12 @@ if __name__ == "__main__":
                                     param_positions_dict_ca = result["param_positions_dict"]      
                                     X_hat = np.asarray(result["X"]).reshape((d, K_new), order="F")
                                     Z_hat = np.asarray(result["Z"]).reshape((d, J_new), order="F")
+                            X_true = np.asarray(theta_true_ca[param_positions_dict_ca["X"][0]:param_positions_dict_ca["X"][1]]).reshape((d, K_new), order="F")
+                            Z_true = np.asarray(theta_true_ca[param_positions_dict_ca["Z"][0]:param_positions_dict_ca["Z"][1]]).reshape((d, J_new), order="F")
                             # only for CA since estimation does not return these parameters!
-                            alpha_true = theta_true[param_positions_dict["alpha"][0]:param_positions_dict["alpha"][1]]
-                            beta_true = theta_true[param_positions_dict["beta"][0]:param_positions_dict["beta"][1]]
-                            gamma_true = theta_true[param_positions_dict["gamma"][0]:param_positions_dict["gamma"][1]]
+                            alpha_true = theta_true_ca[param_positions_dict_ca["alpha"][0]:param_positions_dict_ca["alpha"][1]]
+                            beta_true = theta_true_ca[param_positions_dict_ca["beta"][0]:param_positions_dict_ca["beta"][1]]
+                            gamma_true = theta_true_ca[param_positions_dict_ca["gamma"][0]:param_positions_dict_ca["gamma"][1]]
                             alpha_hat = alpha_true
                             beta_hat = beta_true
                             gamma_hat = gamma_true                          
