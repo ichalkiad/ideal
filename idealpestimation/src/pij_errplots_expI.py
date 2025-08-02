@@ -387,14 +387,12 @@ if __name__ == "__main__":
                     elif algo == "icmp":
                         plotname = "ICM-P"
                         sec_y = False
-                    
-                    ipdb.set_trace()
-
+                
                     algo_leadusers_boxplots = go.Figure()
                     pij_err_alltrials = np.stack(pij_err)
                     pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
                     pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
-                    for jidx in range(len(pij_err_alltrials.shape[1])):
+                    for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
@@ -406,14 +404,14 @@ if __name__ == "__main__":
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
-                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
                                                         name="Average", showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
-                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                    param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
                                                         name="Median", showlegend=True, opacity=1, line=dict(color=colors[algo])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
                     err_alltrials = np.stack(theta_err["Z"])
-                    for jidx in range(len(err_alltrials.shape[1])):
+                    for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
@@ -432,7 +430,7 @@ if __name__ == "__main__":
                     pij_err_alltrials = np.stack(pij_err_RT)
                     pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
                     pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
-                    for jidx in range(len(pij_err_alltrials.shape[1])):
+                    for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
@@ -444,14 +442,14 @@ if __name__ == "__main__":
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
-                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
                                                         name="Average", showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
-                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, len(pij_err_alltrials.shape[1])),
+                    param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
                                                         name="Median", showlegend=True, opacity=1, line=dict(color=colors[algo])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
                     err_alltrials = np.stack(theta_err_RT["Z"])
-                    for jidx in range(len(err_alltrials.shape[1])):
+                    for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[algo])                          
@@ -468,7 +466,7 @@ if __name__ == "__main__":
                     if algo != "ca":
                         algo_leadusers_boxplots_alpha = go.Figure()
                         err_alltrials = np.stack(theta_err["alpha"])
-                        for jidx in range(len(err_alltrials.shape[1])):
+                        for jidx in range(err_alltrials.shape[1]):
                             algo_leadusers_boxplots_alpha.add_trace(go.Box(
                                     y=err_alltrials[:, jidx], showlegend=False,
                                     boxpoints='outliers', line=dict(color=colors[algo])                          
