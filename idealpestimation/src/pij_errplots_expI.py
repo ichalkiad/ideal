@@ -24,7 +24,9 @@ def get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, gam
     pij_err.append(err)                            
     pij_sumi_mean.append(np.mean(err))
     pij_sumi_median.append(err_pijsumi_median)
-    theta_err["Z"].append((Z_hat[sort_most2least_liked]-Z_true[sort_most2least_liked])/Z_true[sort_most2least_liked])
+    Z_hat_flat = Z_hat.reshape((Z_hat.shape[0]*Z_hat.shape[1],), order="F")
+    Z_true_flat = Z_true.reshape((Z_true.shape[0]*Z_true.shape[1],), order="F")
+    theta_err["Z"].append((Z_hat_flat[sort_most2least_liked]-Z_true_flat[sort_most2least_liked])/Z_true_flat[sort_most2least_liked])
     # RT
     Rx, tx, mse_x_RT, mse_x_nonRT, err_x_RT, err_x_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=X_true, param_hat=X_hat, seedint=seed_value)            
     Rz, tz, mse_z_RT, mse_z_nonRT, err_z_RT, err_z_nonRT = get_min_achievable_mse_under_rotation_trnsl(param_true=Z_true, param_hat=Z_hat, seedint=seed_value) 
@@ -38,7 +40,8 @@ def get_polarisation_data(X_true, Z_true, X_hat, Z_hat, alpha_hat, beta_hat, gam
     pij_err_RT.append(err)
     pij_sumi_mean_RT.append(np.mean(err))
     pij_sumi_median_RT.append(err_pijsumi_median)
-    theta_err_RT["Z"].append((reconstructedZ[sort_most2least_liked]-Z_true[sort_most2least_liked])/Z_true[sort_most2least_liked])
+    reconstructedZ_flat = reconstructedZ.reshape((reconstructedZ.shape[0]*reconstructedZ.shape[1],), order="F")    
+    theta_err_RT["Z"].append((reconstructedZ_flat[sort_most2least_liked]-Z_true_flat[sort_most2least_liked])/Z_true_flat[sort_most2least_liked])
 
     return pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT
 
@@ -197,7 +200,7 @@ if __name__ == "__main__":
                                     beta_hat = np.asarray(result["beta"])
                                     gamma_hat = np.asarray(result["gamma"])
                                     pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                                    pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true,X_hat, Z_hat, alpha_hat, beta_hat, 
                                                                                                                     gamma_hat, K, sort_most2least_liked, 
                                                                                                                     pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                                     pij_sumi_mean_RT, pij_sumi_median, 
@@ -354,7 +357,7 @@ if __name__ == "__main__":
                             beta_hat = np.asarray(params_out["beta"])
                             gamma_hat = np.asarray(params_out["gamma"])
                             pij_err, pij_err_RT, pij_sumi_mean, pij_sumi_mean_RT, \
-                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_hat, Z_hat, alpha_hat, beta_hat, 
+                            pij_sumi_median, pij_sumi_median_RT, theta_err, theta_err_RT = get_polarisation_data(X_true, Z_true,X_hat, Z_hat, alpha_hat, beta_hat, 
                                                                                                             gamma_hat, K, sort_most2least_liked, 
                                                                                                             pij_err, pij_err_RT, pij_sumi_mean, 
                                                                                                             pij_sumi_mean_RT, pij_sumi_median, 
