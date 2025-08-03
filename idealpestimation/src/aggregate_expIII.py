@@ -30,7 +30,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expIII/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["icmp", "icmd", "ca", "mle"]
+    algorithms = ["icmp", "ca", "mle"]  #"icmd",
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         ram_avg_alljsigma_fig = go.Figure()
