@@ -591,7 +591,7 @@ if __name__ == "__main__":
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max)) 
                     
-                    parameter_space_dim = (K+J)*d + J + K + 2
+                    
                     algo_leadusers_boxplots = go.Figure()
                     pij_err_alltrials = np.stack(pij_err)/parameter_space_dim
                     pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)/parameter_space_dim
@@ -720,28 +720,28 @@ if __name__ == "__main__":
         for param in parameter_names:
             if param in ["X", "Z"]:
                 param_err_fig[param].add_trace(go.Box(
-                    y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                    y=theta_err[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig[param].add_trace(go.Box(
-                    y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
+                    y=theta_sqerr[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                    y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
+                    y=theta_err_RT[param]/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
-                    y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
+                    y=theta_sqerr_RT[param]/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
             else:
                 param_err_fig[param].add_trace(go.Box(
-                    y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                    y=theta_err[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig[param].add_trace(go.Box(
-                    y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
+                    y=theta_sqerr[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 
@@ -792,9 +792,9 @@ if __name__ == "__main__":
                             print_png=False, print_html=True, 
                             print_pdf=False)
     for param in parameter_names:
-        savename = "{}/rel_err_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))    
+        savename = "{}/rel_err_{}_J{}_sigmae_{}_norm_dim.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))    
         if param in ["X", "Z"]:
-            savename = "{}/rel_err_RT_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))
+            savename = "{}/rel_err_RT_{}_J{}_sigmae_{}_norm_dim.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))
             fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
                                 savename, xaxis_title="Users sample size", 
                                 yaxis_title="Mean relative error (under rotation/scaling)", 
@@ -807,7 +807,7 @@ if __name__ == "__main__":
                                 title="", showgrid=False, showlegend=True, 
                                 print_png=False, print_html=True, 
                                 print_pdf=False) 
-        savename = "{}/rel_err_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))
+        savename = "{}/rel_err_{}_J{}_sigmae_{}_norm_dim.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))
         fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative error", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
@@ -817,7 +817,7 @@ if __name__ == "__main__":
                             print_png=False, print_html=True, 
                             print_pdf=False) 
         if param in ["X", "Z"]:
-            savename = "{}/rel_sqerr_RT_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", "")) 
+            savename = "{}/rel_sqerr_RT_{}_J{}_sigmae_{}_norm_dim.html".format(dir_out, param, J, str(sigma_e).replace(".", "")) 
             fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
                             xaxis_title="Users sample size", 
                             yaxis_title="Mean relative squared error (under rotation/scaling)", 
@@ -830,7 +830,7 @@ if __name__ == "__main__":
                             title="", showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
                             print_pdf=False) 
-        savename = "{}/rel_sqerr_{}_J{}_sigmae_{}.html".format(dir_out, param, J, str(sigma_e).replace(".", "")) 
+        savename = "{}/rel_sqerr_{}_J{}_sigmae_{}_norm_dim.html".format(dir_out, param, J, str(sigma_e).replace(".", "")) 
         fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative squared error", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
