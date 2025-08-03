@@ -720,28 +720,28 @@ if __name__ == "__main__":
         for param in parameter_names:
             if param in ["X", "Z"]:
                 param_err_fig[param].add_trace(go.Box(
-                    y=theta_err[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
+                    y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig[param].add_trace(go.Box(
-                    y=theta_sqerr[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
+                    y=np.asarray(theta_sqerr[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                    y=theta_err_RT[param]/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
+                    y=np.asarray(theta_err_RT[param])/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
-                    y=theta_sqerr_RT[param]/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
+                    y=np.asarray(theta_sqerr_RT[param])/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
             else:
                 param_err_fig[param].add_trace(go.Box(
-                    y=theta_err[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
+                    y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig[param].add_trace(go.Box(
-                    y=theta_sqerr[param]/parameter_space_dim, showlegend=True, name="{}".format(plotname),
+                    y=np.asarray(theta_sqerr[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                     boxpoints='outliers', line=dict(color=colors[K])                          
                 ))
                 
