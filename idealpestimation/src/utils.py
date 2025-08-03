@@ -2239,6 +2239,8 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             print("Convergence rank&plot: {}".format(theta_set[-1]))
             oneconv = oneconv or theta_set[-1]
             print(oneconv)
+        else:
+            oneconv = True
         theta = theta_set[0]
         _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
         computed_logfullposterior.append(posterior[0])
