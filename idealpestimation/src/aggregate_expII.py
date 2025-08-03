@@ -591,18 +591,18 @@ if __name__ == "__main__":
                             ram["avg"].append(np.mean(batch_ram_avg))
                             ram["max"].append(np.mean(batch_ram_max)) 
                     
-
+                    parameter_space_dim = (K+J)*d + J + K + 2
                     algo_leadusers_boxplots = go.Figure()
-                    pij_err_alltrials = np.stack(pij_err)
-                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
-                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
+                    pij_err_alltrials = np.stack(pij_err)/parameter_space_dim
+                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)/parameter_space_dim
+                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)/parameter_space_dim
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
-                    savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
                                         yaxis_title="Relative error", 
@@ -615,14 +615,14 @@ if __name__ == "__main__":
                                                         name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[K])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
-                    err_alltrials = np.stack(theta_err_sortedJ["Z"])
+                    err_alltrials = np.stack(theta_err_sortedJ["Z"])/parameter_space_dim
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
-                    savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
                                         yaxis_title="Lead user ideal points relative error", 
@@ -633,16 +633,16 @@ if __name__ == "__main__":
 
                     # RT
                     algo_leadusers_boxplots = go.Figure()
-                    pij_err_alltrials = np.stack(pij_err_RT)
-                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)
-                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)
+                    pij_err_alltrials = np.stack(pij_err_RT)/parameter_space_dim
+                    pij_err_alltrials_mean = np.mean(pij_err_alltrials, axis=0)/parameter_space_dim
+                    pij_err_alltrials_median = np.percentile(pij_err_alltrials, q=50, axis=0)/parameter_space_dim
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
-                    savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
                                         yaxis_title="Relative error (under rotation/scaling)", 
@@ -655,14 +655,14 @@ if __name__ == "__main__":
                                                         name="{}-Median".format(algo), showlegend=True, opacity=1, line=dict(color=colors[K])))
                     
                     algo_leadusers_boxplots_Z = go.Figure()
-                    err_alltrials = np.stack(theta_err_sortedJ_RT["Z"])
+                    err_alltrials = np.stack(theta_err_sortedJ_RT["Z"])/parameter_space_dim
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
                                 boxpoints='outliers', line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
-                    savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                    savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
                                         yaxis_title="Lead user ideal points relative error (under rotation/scaling)", 
@@ -673,14 +673,14 @@ if __name__ == "__main__":
 
                     if algo != "ca":
                         algo_leadusers_boxplots_alpha = go.Figure()
-                        err_alltrials = np.stack(theta_err_sortedJ["alpha"])
+                        err_alltrials = np.stack(theta_err_sortedJ["alpha"])/parameter_space_dim
                         for jidx in range(err_alltrials.shape[1]):
                             algo_leadusers_boxplots_alpha.add_trace(go.Box(
                                     y=err_alltrials[:, jidx], showlegend=False,
                                     boxpoints='outliers', line=dict(color=colors[K])                          
                                 ))
                         algo_leadusers_boxplots_alpha.update_xaxes(showticklabels=False)
-                        savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
+                        savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                         fix_plot_layout_and_save(algo_leadusers_boxplots_alpha, 
                                             savename, xaxis_title="Lead users rank (most to least liked)", 
                                             yaxis_title="Lead user popularity relative error", 
@@ -840,14 +840,14 @@ if __name__ == "__main__":
                             print_png=False, print_html=True, 
                             print_pdf=False) 
 
-    savename = "{}/pij_sumi_sortedleadusers_err_allK_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+    savename = "{}/pij_sumi_sortedleadusers_err_allK_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
     fix_plot_layout_and_save(param_pijmean_fig, 
                         savename, xaxis_title="Lead users rank (most to least liked)", 
                         yaxis_title=r"$\text{Lead user total utility relative error }(p_{\cdot j})$", 
                         title="", showgrid=False, showlegend=True, 
                         print_png=True, print_html=True, 
                         print_pdf=False)
-    savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+    savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
     fix_plot_layout_and_save(param_pijmean_fig_RT, 
                         savename, xaxis_title="Lead users rank (most to least liked)", 
                         yaxis_title=r"${Lead user total utility relative error under rotation/scaling }(p_{\cdot j})$", 
