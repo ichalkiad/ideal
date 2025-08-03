@@ -530,6 +530,7 @@ if __name__ == "__main__":
                                             print_png=True, print_html=False, 
                                             print_pdf=False)
                 savename = "{}/pij_sumi_sortedleadusers_err_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+                param_pijmean_fig.update_layout(legend=dict(orientation="h"))
                 fix_plot_layout_and_save(param_pijmean_fig, 
                                     savename, xaxis_title="Lead users rank (most to least liked)", 
                                     yaxis_title=r"$\text{Lead user total utility relative error }(p_{\cdot j})$", 
@@ -537,9 +538,10 @@ if __name__ == "__main__":
                                     print_png=True, print_html=True, 
                                     print_pdf=False)
                 savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
+                param_pijmean_fig_RT.update_layout(legend=dict(orientation="h"))
                 fix_plot_layout_and_save(param_pijmean_fig_RT, 
                                     savename, xaxis_title="Lead users rank (most to least liked)", 
-                                    yaxis_title=r"${Lead user total utility relative error under rotation/scaling }(p_{\cdot j})$", 
+                                    yaxis_title=r"$\text{Lead user total utility relative error under rotation/scaling }(p_{\cdot j})$", 
                                     title="", showgrid=False, showlegend=True, 
                                     print_png=True, print_html=True, 
                                     print_pdf=False)
