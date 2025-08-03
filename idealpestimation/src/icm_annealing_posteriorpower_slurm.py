@@ -131,7 +131,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
                     Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
                     z_rel_err = (Z_true_vec - Z_hat_vec)/Z_true_vec
                     z_sq_err = z_rel_err**2
-            thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err)))
+            thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err), solution[-1]))
 
         rank_and_plot_solutions(thetas_and_errors, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, 
                                 dst_func, param_positions_dict, DIR_out, args, seedint=seedint, get_RT_error=False)
