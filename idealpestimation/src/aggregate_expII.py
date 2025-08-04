@@ -60,7 +60,7 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expII/".format(dataspace)
+    dir_out = "{}/rsspaper_expIIpaperfigs/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     param_pijmean_fig = go.Figure()
@@ -645,7 +645,7 @@ if __name__ == "__main__":
                     savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
-                                        yaxis_title="Relative error (under rotation/scaling)", 
+                                        yaxis_title="Relative error (under rotation/translation)", 
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
                                         print_pdf=False) 
@@ -665,7 +665,7 @@ if __name__ == "__main__":
                     savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
                     fix_plot_layout_and_save(algo_leadusers_boxplots_Z, 
                                         savename, xaxis_title="Lead users rank (most to least liked)", 
-                                        yaxis_title="Lead user ideal points relative error (under rotation/scaling)", 
+                                        yaxis_title="Lead user ideal points relative error (under rotation/translation)", 
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
                                         print_pdf=False)
@@ -797,13 +797,13 @@ if __name__ == "__main__":
             savename = "{}/rel_err_RT_{}_J{}_sigmae_{}_norm_dim.html".format(dir_out, param, J, str(sigma_e).replace(".", ""))
             fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
                                 savename, xaxis_title="Users sample size", 
-                                yaxis_title="Mean relative error (under rotation/scaling)", 
+                                yaxis_title="Mean relative error (under rotation/translation)", 
                                 title="", showgrid=False, showlegend=False, 
                                 print_png=True, print_html=False, 
                                 print_pdf=False) 
             fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
                                 savename, xaxis_title="Users sample size", 
-                                yaxis_title="Mean relative error (under rotation/scaling)", 
+                                yaxis_title="Mean relative error (under rotation/translation)", 
                                 title="", showgrid=False, showlegend=True, 
                                 print_png=False, print_html=True, 
                                 print_pdf=False) 
@@ -820,13 +820,13 @@ if __name__ == "__main__":
             savename = "{}/rel_sqerr_RT_{}_J{}_sigmae_{}_norm_dim.html".format(dir_out, param, J, str(sigma_e).replace(".", "")) 
             fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
                             xaxis_title="Users sample size", 
-                            yaxis_title="Mean relative squared error (under rotation/scaling)", 
+                            yaxis_title="Mean relative squared error (under rotation/translation)", 
                             title="", showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
                             print_pdf=False) 
             fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
                             xaxis_title="Users sample size", 
-                            yaxis_title="Mean relative squared error (under rotation/scaling)", 
+                            yaxis_title="Mean relative squared error (under rotation/translation)", 
                             title="", showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
                             print_pdf=False) 
@@ -850,7 +850,7 @@ if __name__ == "__main__":
     savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
     fix_plot_layout_and_save(param_pijmean_fig_RT, 
                         savename, xaxis_title="Lead users rank (most to least liked)", 
-                        yaxis_title=r"${Lead user total utility relative error under rotation/scaling }(p_{\cdot j})$", 
+                        yaxis_title=r"${Lead user total utility relative error under rotation/translation }(p_{\cdot j})$", 
                         title="", showgrid=False, showlegend=True, 
                         print_png=True, print_html=True, 
                         print_pdf=False)
