@@ -303,7 +303,7 @@ if __name__ == "__main__":
     sigma_es = [1, 3, 5]
     batchsize = {50: 604, 500: 64, 1000: 34}
     dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIIIupd/"
-    dir_out = "/mnt/hdd2/ioannischalkiadakis/"
+    dir_out = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIIIupd/"
     get_slurm_experiment_csvs("III", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
     sys.exit()
 

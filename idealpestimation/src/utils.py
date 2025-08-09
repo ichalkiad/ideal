@@ -44,11 +44,11 @@ def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir
             for J in Js:
                 if exper == "III":
                     if J==50:
-                        sigma_es_ = [0.01]
+                        sigma_es_ = [sigma_es[0]]
                     elif J==500:
-                        sigma_es_ = [0.5]
+                        sigma_es_ = [sigma_es[1]]
                     elif J==1000:
-                        sigma_es_ = [5.0]
+                        sigma_es_ = [sigma_es[2]]
                     else:
                         sigma_es_ = []
                         continue
