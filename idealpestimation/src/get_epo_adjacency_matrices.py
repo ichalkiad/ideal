@@ -12,7 +12,7 @@ import jsonlines
 import numpy as np
 import random
 from idealpestimation.src.utils import pickle, connect_to_epo_db, check_sqlite_database, get_table_columns, \
-                                    get_row_count, execute_create_sql, build_sparse_adjacency_matrix, print_matrix_info, save_matrix
+                                    get_row_count, execute_create_sql, build_sparse_adjacency_matrix, print_matrix_info, save_matrix, export_table_to_csv
 
 
 if __name__ == "__main__":
@@ -32,18 +32,21 @@ if __name__ == "__main__":
     # databases = ["netherlands_2023_anonymized_reproducibility.db"]
     
     for database in databases:
-    
+        
+        nameparts = database.split("_")
         dbconn = connect_to_epo_db("{}/{}".format(database_path, database))
         # check_sqlite_database(dbconn, "{}/{}".format(database_path, database), sample_rows=3)
-        columns = get_table_columns(dbconn, table_name="mp_follower_graph")
-        print(columns)
-        
-        adjacency_matrix, node_to_index_start, index_to_node_start, \
-            node_to_index_end, index_to_node_end = build_sparse_adjacency_matrix(dbconn, table_name="mp_follower_graph", 
-                                                                                start_col='follower_pseudo_id', end_col='mp_pseudo_id', 
-                                                                                weighted=False, weight_col=None, directed=True)
+        columns = get_table_columns(dbconn, table_name="mp_party")
+        # print(columns)
+        csv_path = "{}/parties_lead_users_{}_{}.csv".format(DIR_out, nameparts[0], nameparts[1])
+        export_table_to_csv(conn=dbconn, table_name="mp_party", csv_path=csv_path)
+        # columns = get_table_columns(dbconn, table_name="mp_follower_graph")
+        # print(columns)
+        # adjacency_matrix, node_to_index_start, index_to_node_start, \
+        #     node_to_index_end, index_to_node_end = build_sparse_adjacency_matrix(dbconn, table_name="mp_follower_graph", 
+        #                                                                         start_col='follower_pseudo_id', end_col='mp_pseudo_id', 
+        #                                                                         weighted=False, weight_col=None, directed=True)
 
-        print_matrix_info(adjacency_matrix)
-        nameparts = database.split("_")
-        filename = "{}/Y_{}_{}".format(DIR_out, nameparts[0], nameparts[1])
-        save_matrix(adjacency_matrix, node_to_index_start, index_to_node_start, node_to_index_end, index_to_node_end, filename)
+        # print_matrix_info(adjacency_matrix)        
+        # filename = "{}/Y_{}_{}".format(DIR_out, nameparts[0], nameparts[1])
+        # save_matrix(adjacency_matrix, node_to_index_start, index_to_node_start, node_to_index_end, index_to_node_end, filename)

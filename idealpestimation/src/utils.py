@@ -1323,7 +1323,6 @@ def negative_loglik(theta, Y, J, K, d, parameter_names, dst_func, param_position
         pij_arg = p_ij_arg_numbafast(X, Z, alpha, beta, gamma, K)     
     else:
         pij_arg = p_ij_arg(None, None, theta, J, K, d, parameter_names, dst_func, param_positions_dict)  
-    
     philogcdf = norm.logcdf(pij_arg, loc=errloc, scale=errscale)
     log_one_minus_cdf = log_complement_from_log_cdf_vec(philogcdf, pij_arg, mean=errloc, variance=errscale)
     nll = np.sum(Y*philogcdf + (1-Y)*log_one_minus_cdf)
@@ -2215,7 +2214,7 @@ def parse_timedelta_string(time_str):
 
 def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, Y, J, K, d, parameter_names, dst_func, 
                             param_positions_dict, DIR_out, args, data_tempering=False, row_start=None, row_end=None, 
-                            seedint=1234, get_RT_error=False, plot_solutions=True):
+                            seedint=1234, get_RT_error=False, plot_solutions=True, compute_posterior=True):
 
     if efficiency_measures is not None:
         wall_duration, avg_total_cpu_util, max_total_cpu_util, avg_total_ram_residentsetsize_MB, max_total_ram_residentsetsize_MB,\
@@ -2242,11 +2241,15 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
         else:
             oneconv = True
         theta = theta_set[0]
-        _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
-        computed_logfullposterior.append(posterior[0])
-    # sort in increasing order, i.e. from worst to best solution
-    sorted_idx = np.argsort(np.asarray(computed_logfullposterior))
-    sorted_idx_lst = sorted_idx.tolist()  
+        if compute_posterior:
+            _, posterior = log_full_posterior(Y, theta.copy(), param_positions_dict, args)
+            computed_logfullposterior.append(posterior[0])
+    if compute_posterior:
+        # sort in increasing order, i.e. from worst to best solution
+        sorted_idx = np.argsort(np.asarray(computed_logfullposterior))
+        sorted_idx_lst = sorted_idx.tolist()  
+    else:
+        sorted_idx_lst = np.arange(0, len(estimated_thetas), 1).tolist()  
     # save in the order of best to worst solution
     best2worst = list(reversed(sorted_idx_lst))    
     theta_list = []
@@ -2275,11 +2278,15 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
             err_z_RT = estimated_thetas[i][6]
             err_x_nonRT = estimated_thetas[i][7]
             err_z_nonRT = estimated_thetas[i][8]
-        logposterior = computed_logfullposterior[i]
-        posterior_list.append(logposterior)
+        if compute_posterior:
+            logposterior = computed_logfullposterior[i]
+            posterior_list.append(logposterior)
         
         params_out = dict()
-        params_out["logfullposterior"] = logposterior
+        if compute_posterior:
+            params_out["logfullposterior"] = logposterior
+        else:
+            params_out["logfullposterior"] = None
         params_out["mse_x_RT"] = mse_x_RT
         params_out["mse_z_RT"] = mse_z_RT
         params_out["mse_x_nonRT"] = mse_x_nonRT
@@ -2344,7 +2351,7 @@ def rank_and_plot_solutions(estimated_thetas, elapsedtime, efficiency_measures, 
                         "max_processes": max_processes})
     
 
-    if plot_solutions:
+    if plot_solutions and compute_posterior:
         # 2D projection of solutions
         # raw_symbols = SymbolValidator().values    
         theta_matrix = np.asarray(theta_list)
@@ -4619,70 +4626,72 @@ def clean_up_data_matrix(Y, K, J, d, theta_true, parameter_names, param_position
 
     K_new = K - len(k_idx.flatten())
     J_new = J - len(j_idx.flatten())
-    
     parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
-    param_positions_dict_new = dict()     
-    theta_true_new = []    
-    params_out_init = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
-    k = 0
-    for param in parameter_names:
-        if param == "X":
-            param_positions_dict_new[param] = (k, k + K_new*d)                                       
-            X_new = np.delete(params_out_init["X"], k_idx, 1)
-            Xvec = X_new.reshape((d*K_new,), order="F").tolist()        
-            theta_true_new.extend(Xvec)            
-            k += K_new*d
-        elif param in ["Z"]:
-            param_positions_dict_new[param] = (k, k + J_new*d)                                            
-            Z_new = np.delete(params_out_init["Z"], j_idx, 1)
-            Zvec = Z_new.reshape((d*J_new,), order="F").tolist()        
-            theta_true_new.extend(Zvec)            
-            k += J_new*d
-        elif param in ["Phi"]:            
-            param_positions_dict_new[param] = (k, k + J_new*d)                                            
-            Phi_new = np.delete(params_out_init["Phi"], j_idx, 1)
-            Phivec = Phi_new.reshape((d*J_new,), order="F").tolist()        
-            theta_true_new.extend(Phivec)            
-            k += J_new*d
-        elif param == "beta":
-            param_positions_dict_new[param] = (k, k + K_new)                                               
-            beta_new = np.delete(params_out_init["beta"], k_idx, 0)            
-            theta_true_new.extend(beta_new.tolist())            
-            k += K_new
-        elif param == "alpha":
-            param_positions_dict_new[param] = (k, k + J_new)                                                   
-            alpha_new = np.delete(params_out_init["alpha"], j_idx, 0)            
-            theta_true_new.extend(alpha_new.tolist())            
-            k += J_new
-        elif param == "gamma":
-            param_positions_dict_new[param] = (k, k + 1)                                
-            theta_true_new.append(params_out_init["gamma"][0])            
-            k += 1
-        elif param == "delta":
-            param_positions_dict_new[param] = (k, k + 1)                  
-            theta_true_new.append(params_out_init["delta"][0])                          
-            k += 1
-        elif param == "sigma_e":
-            param_positions_dict_new[param] = (k, k + 1)
-            theta_true_new.append(params_out_init["sigma_e"][0])                                            
-            k += 1
 
-    print("Dropped {} users, {} lead users, new parameter space size: {}.".format(K-K_new, J-J_new, parameter_space_dim_new))
-    if verify:
-        i = 0
-        ii = 0
-        theta_true = theta_true.tolist()
-        while i < len(theta_true):
-            target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
-            if vector_index_in_param_matrix in k_idx.flatten().tolist():            
-                i += 1            
-            elif vector_index_in_param_matrix in j_idx.flatten().tolist():
-                i += 1
-            else:            
-                assert np.allclose(theta_true[i], theta_true_new[ii])
-                i += 1
-                ii += 1
-       
+    if theta_true is not None:        
+        param_positions_dict_new = dict()     
+        theta_true_new = []    
+        params_out_init = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)
+        k = 0
+        for param in parameter_names:
+            if param == "X":
+                param_positions_dict_new[param] = (k, k + K_new*d)                                       
+                X_new = np.delete(params_out_init["X"], k_idx, 1)
+                Xvec = X_new.reshape((d*K_new,), order="F").tolist()        
+                theta_true_new.extend(Xvec)            
+                k += K_new*d
+            elif param in ["Z"]:
+                param_positions_dict_new[param] = (k, k + J_new*d)                                            
+                Z_new = np.delete(params_out_init["Z"], j_idx, 1)
+                Zvec = Z_new.reshape((d*J_new,), order="F").tolist()        
+                theta_true_new.extend(Zvec)            
+                k += J_new*d
+            elif param in ["Phi"]:            
+                param_positions_dict_new[param] = (k, k + J_new*d)                                            
+                Phi_new = np.delete(params_out_init["Phi"], j_idx, 1)
+                Phivec = Phi_new.reshape((d*J_new,), order="F").tolist()        
+                theta_true_new.extend(Phivec)            
+                k += J_new*d
+            elif param == "beta":
+                param_positions_dict_new[param] = (k, k + K_new)                                               
+                beta_new = np.delete(params_out_init["beta"], k_idx, 0)            
+                theta_true_new.extend(beta_new.tolist())            
+                k += K_new
+            elif param == "alpha":
+                param_positions_dict_new[param] = (k, k + J_new)                                                   
+                alpha_new = np.delete(params_out_init["alpha"], j_idx, 0)            
+                theta_true_new.extend(alpha_new.tolist())            
+                k += J_new
+            elif param == "gamma":
+                param_positions_dict_new[param] = (k, k + 1)                                
+                theta_true_new.append(params_out_init["gamma"][0])            
+                k += 1
+            elif param == "delta":
+                param_positions_dict_new[param] = (k, k + 1)                  
+                theta_true_new.append(params_out_init["delta"][0])                          
+                k += 1
+            elif param == "sigma_e":
+                param_positions_dict_new[param] = (k, k + 1)
+                theta_true_new.append(params_out_init["sigma_e"][0])                                            
+                k += 1
+
+        print("Dropped {} users, {} lead users, new parameter space size: {}.".format(K-K_new, J-J_new, parameter_space_dim_new))
+        if verify:
+            i = 0
+            ii = 0
+            theta_true = theta_true.tolist()
+            while i < len(theta_true):
+                target_param, vector_index_in_param_matrix, vector_coordinate = get_parameter_name_and_vector_coordinate(param_positions_dict, i=i, d=d)
+                if vector_index_in_param_matrix in k_idx.flatten().tolist():            
+                    i += 1            
+                elif vector_index_in_param_matrix in j_idx.flatten().tolist():
+                    i += 1
+                else:            
+                    assert np.allclose(theta_true[i], theta_true_new[ii])
+                    i += 1
+                    ii += 1
+    else:
+        return Y_new, K_new, J_new, None, None, parameter_space_dim_new, k_idx, j_idx
 
     return Y_new, K_new, J_new, np.asarray(theta_true_new), param_positions_dict_new, parameter_space_dim_new, k_idx, j_idx
 
@@ -4720,9 +4729,12 @@ def check_sqlite_database(dbconn, db_path, sample_rows=3):
             return
         print(f"Database: {db_path}")
         print("=" * 70)
+        print(tables)
         
-        for table_tuple in tables:
+        for table_tuple in tables:            
             table_name = table_tuple[0]
+            if table_name not in ['mp_party']:  #'party_mapping', 'party_ches2023', 'party_gps2019', 
+                continue
             print(f"\nTable: {table_name}")
             print("-" * 50)
             cursor.execute(f"PRAGMA table_info({table_name});")
@@ -4787,8 +4799,6 @@ def check_sqlite_database(dbconn, db_path, sample_rows=3):
         if dbconn:
             dbconn.close()
 
-
-
 def get_table_columns(dbconn, table_name="mp_follower_graph"):
     """
     Get column names and types for a given table.
@@ -4807,7 +4817,6 @@ def get_row_count(dbconn, table_name):
     cursor.execute(f"SELECT stat FROM sqlite_stat1 WHERE tbl='{table_name}';")
     return cursor.fetchone()[0]
 
-
 def execute_create_sql(dbconnection, command):
     
     try:
@@ -4815,6 +4824,21 @@ def execute_create_sql(dbconnection, command):
         c.execute(command)
     except Error as e:
         print(e)
+
+
+def export_table_to_csv(conn, table_name, csv_path, **kwargs):
+    
+    try:       
+        df = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)        
+        df.to_csv(csv_path, index=False, **kwargs)       
+        print(f"Successfully exported {table_name} to {csv_path}")
+        print(f"Exported {len(df)} rows with {len(df.columns)} columns")
+        print(f"Columns: {list(df.columns)}")
+        return df        
+    except sqlite3.Error as e:
+        print(f"SQLite error: {e}")
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 def build_sparse_adjacency_matrix(dbconn, table_name, start_col, end_col, 
@@ -4957,16 +4981,18 @@ def save_matrix(adjacency_matrix, node_to_index_start, index_to_node_start, node
             index_to_node_end=index_to_node_end)
     print(f"Node mappings saved to {filename}_mappings.npz")
 
-def load_matrix(self, filename):
+def load_matrix(filename, K, J):
     """Load sparse adjacency matrix from file."""
     try:
-        self.adjacency_matrix = sparse.load_npz(f"{filename}.npz")
+        adjacency_matrix = sparse.load_npz(f"{filename}.npz")
         # Load node mappings
-        mappings = np.load(f"{filename}_mappings.npz", allow_pickle=True)
-        self.node_to_index = mappings['node_to_index'].item()
-        self.index_to_node = mappings['index_to_node'].item()
+        mappings = np.load("{}_K{}_J{}_mappings.npz".format(filename, K, J), allow_pickle=True)        
+        node_to_index_start = mappings['node_to_index_start'].item()
+        index_to_node_start = mappings['index_to_node_start'].item()
+        node_to_index_end = mappings['node_to_index_end'].item()
+        index_to_node_end = mappings['index_to_node_end'].item()
         print(f"Matrix and mappings loaded from {filename}")
-        return True
+        return mappings, node_to_index_start, index_to_node_start, node_to_index_end, index_to_node_end, adjacency_matrix
     except Exception as e:
         print(f"Error loading matrix: {e}")
         return False
