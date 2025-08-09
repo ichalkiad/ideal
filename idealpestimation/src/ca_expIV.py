@@ -49,6 +49,31 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             engine='sklearn',
             random_state=seedint
         )
+     
+        
+        rows_all_le_1 = np.array((Y.max(axis=1) < 1).toarray().ravel())
+        k_idx = np.argwhere(rows_all_le_1).ravel()
+        cols_all_le_1 = np.array((Y.max(axis=0) < 1).toarray().ravel())
+        j_idx = np.argwhere(cols_all_le_1).ravel()
+        if len(j_idx) > 0:
+            Y_new = Y[:, j_idx]
+        else:
+            Y_new = Y
+        if len(k_idx) > 0:
+            Y_new = Y_new[k_idx, :]
+        
+        K_new = K - len(k_idx.flatten())
+        J_new = J - len(j_idx.flatten())
+        parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
+        Y = Y_new
+        Y = Y.todense()
+        if country == "us":
+            y_idx_subsample = np.random.choice(np.arange(0, Y.shape[0]), size=int(np.round(0.5*Y.shape[0])))            
+            Y = Y[y_idx_subsample, :]
+            K = Y.shape[0]
+            # note that if Users IDs are needed, they must be stored here and retrieved when needed - subsampling changes order
+            parameter_space_dim = (K+J)*d + J + K + 2
+            print(Y.shape)
 
         param_positions_dict = dict()            
         k = 0
@@ -77,24 +102,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
             elif param == "sigma_e":
                 param_positions_dict[param] = (k, k + 1)                                
                 k += 1
-       
-        
-        rows_all_le_1 = np.array((Y.max(axis=1) < 1).toarray().ravel())
-        k_idx = np.argwhere(rows_all_le_1).ravel()
-        cols_all_le_1 = np.array((Y.max(axis=0) < 1).toarray().ravel())
-        j_idx = np.argwhere(cols_all_le_1).ravel()
-        if len(j_idx) > 0:
-            Y_new = Y[:, j_idx]
-        else:
-            Y_new = Y
-        if len(k_idx) > 0:
-            Y_new = Y_new[k_idx, :]
-        
-        K_new = K - len(k_idx.flatten())
-        J_new = J - len(j_idx.flatten())
-        parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
-        Y = Y_new
-                        
+
         args = (DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,                     
                 parameter_space_dim, None, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x, 
                 prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha, 
@@ -106,8 +114,7 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         print_threadpool_info()
         monitor = Monitor(interval=0.01, fastprogram=True)
         monitor.start()            
-        try:
-            Y = Y.todense()
+        try:            
             t_start = time.time()            
             theta_hat = do_correspondence_analysis(ca, Y, param_positions_dict, args, plot_online=plot_online, seedint=seedint)
             t_end = time.time()
@@ -138,7 +145,7 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries = ["finland", "france", "germany", "netherlands", "poland", "uk", "us"]
+    countries = ["us"]  #"finland", "france", "germany", "netherlands", "poland", "uk", 
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
     for year in [2023]: #2020
