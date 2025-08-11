@@ -3136,7 +3136,7 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
         if param in ["sigma_e"]: # for ICM-D
             gridpoints_num_alpha_beta = gridpoints_num*4  # 3 ok for most, then 4 , 6 for icm-d
         if param in ["alpha"]:   #for expIII
-            gridpoints_num_alpha_beta = gridpoints_num
+            gridpoints_num_alpha_beta = 20  #gridpoints_num
     xx_ = None
 
     if param == "alpha":
