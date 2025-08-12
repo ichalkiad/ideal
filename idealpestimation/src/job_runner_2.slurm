@@ -8,7 +8,7 @@
 #SBATCH --nodes=1          
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1  ############################  2 for CA, 3 for ICM-P on cpu_p1, 1 on prepost
-#SBATCH --array=2,3,4,5,6,7,8,10   # expI ca, icm-p  # 0-1649 expI icm-d, mle   , expIII: ca, icmp 0-29, mle: 0-4659,
+#SBATCH --array=4-4   # expI ca, icm-p  # 0-1649 expI icm-d, mle   , expIII: ca, icmp 0-29, mle: 0-4659,
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL
