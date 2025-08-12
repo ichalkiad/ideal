@@ -280,7 +280,7 @@ if __name__ == "__main__":
     tempering_steps = [0.1, 1]
     tempering_rate = [0.1]
 
-    niter = 200 #100, 300
+    niter = 300 #100, 300
     max_restarts = 5 # 2,3 ,5
     max_partial_restarts = 10 #4 ,5, 10
     max_halving = 2 # not applicable in data annealing
