@@ -258,7 +258,7 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 30  #50,  80 for quite a few
+    gridpoints_num = 50  #50,  80 for quite a few
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -280,7 +280,7 @@ if __name__ == "__main__":
     tempering_steps = [0.1, 1]
     tempering_rate = [0.1]
 
-    niter = 300 #100, 300
+    niter = 400 #100, 300
     max_restarts = 5 # 2,3 ,5
     max_partial_restarts = 10 #4 ,5, 10
     max_halving = 2 # not applicable in data annealing
