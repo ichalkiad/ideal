@@ -20,7 +20,8 @@ if __name__ == "__main__":
 
     Ks = [10000]
     Js = [50, 500, 1000]
-    sigma_es = [0.01, 0.5, 5.0]
+    sigma_es = [1, 3, 5]
+    # batchsize = {50: 604, 500: 64, 1000: 34}
     M = 10
     batchsizes = [604, 64, 34]
     d = 2
@@ -30,7 +31,7 @@ if __name__ == "__main__":
     dir_out = "{}/rsspaper_expIII/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
-    algorithms = ["ca", "mle"]  #"icmd", "icmp",
+    algorithms = ["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
     for K in Ks:
         ram_avg_alljsigma_fig = go.Figure()

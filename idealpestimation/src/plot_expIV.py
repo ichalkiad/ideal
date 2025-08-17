@@ -31,7 +31,22 @@ def create_density_overlay_plot(data=None, x_col='dimension_1', y_col='dimension
     for user_type in data[user_type_col].unique():
         subset = data[data[user_type_col] == user_type]
         
-        if user_type != "User":
+        # if user_type == "User":
+        #     fig.add_trace(go.Scatter(
+        #         x=subset[x_col],
+        #         y=subset[y_col],
+        #         mode='markers',
+        #         name=user_type,
+        #         marker=dict(
+        #             symbol=symbols.get(user_type, 'circle'),
+        #             size=8,
+        #             color=colors.get(user_type, '#2E86AB'),
+        #             opacity=0.6,
+        #             line=dict(width=1, color='white')
+        #         )
+        #     ))
+        
+        if user_type == "Party":
             fig.add_trace(go.Scatter(
                 x=subset[x_col],
                 y=subset[y_col],
@@ -39,7 +54,7 @@ def create_density_overlay_plot(data=None, x_col='dimension_1', y_col='dimension
                 name=user_type,
                 marker=dict(
                     symbol=symbols.get(user_type, 'circle'),
-                    size=8,
+                    size=10,
                     color=colors.get(user_type, '#2E86AB'),
                     opacity=0.8,
                     line=dict(width=1, color='white')
@@ -141,7 +156,10 @@ if __name__ == "__main__":
                 "dim2": np.concatenate([X_hat[:, 1], Z_hat[:, 1], party_ideal_points_est[:, 1]]),
                 "user_type": ['User'] * K + ['Lead User'] * J + ["Party"] * party_ideal_points_est.shape[0],
                 'user_id': range(K+J+party_ideal_points_est.shape[0])
-            })            
+            })   
+            # ipdb.set_trace()
+            # data = data.drop_duplicates(subset=['dim1', 'dim2'], keep='first').reset_index(drop=True)         
+            # ipdb.set_trace()
             fig = create_density_overlay_plot(data=data, x_col='dim1', y_col='dim2', user_type_col='user_type', title='')
     
 
