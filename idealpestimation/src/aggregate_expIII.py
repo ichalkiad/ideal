@@ -36,7 +36,7 @@ if __name__ == "__main__":
     for K in Ks:
         ram_avg_alljsigma_fig = go.Figure()
         cpu_avg_alljsigma_fig = go.Figure()
-        time_alljsigma_fig = go.Figure()
+        time_alljsigma_fig = make_subplots(specs=[[{"secondary_y": True}]])
         param_alljsigma_err_fig = {}
         for param in parameter_names:
             if param in ["X", "Z"]:
