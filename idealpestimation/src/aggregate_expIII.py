@@ -549,7 +549,7 @@ if __name__ == "__main__":
                     boxpoints='outliers', line=dict(color=colors[algo]),                                
                 ), secondary_y=sec_y)
                 time_alljsigma_fig.add_trace(go.Box(
-                    y=runtimes, showlegend=True, name=r'{}\\\J={},sigma_e^2={}'.format(plotname, J, sigma_e),
+                    y=runtimes, showlegend=True, name=r'{} '.format(plotname) + r'$J={},\sigma_e^2={}$'.format(J, sigma_e),
                     boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                 ), secondary_y=sec_y)
                 ram_fig_max.add_trace(go.Box(
@@ -557,7 +557,7 @@ if __name__ == "__main__":
                     boxpoints='outliers', line=dict(color=colors[algo])                          
                 ))
                 ram_avg_alljsigma_fig.add_trace(go.Box(
-                    y=ram["avg"], showlegend=True, name=r'{}-avg\\\J={},sigma_e^2={}'.format(plotname, J, sigma_e),
+                    y=ram["avg"], showlegend=True, name=r'{}-avg '.format(plotname) + r'$J={},sigma_e^2={}$'.format(J, sigma_e),
                     boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                 ))
                 ram_fig_avg.add_trace(go.Box(
@@ -569,7 +569,7 @@ if __name__ == "__main__":
                     boxpoints='outliers', line=dict(color=colors[algo])                          
                 ))
                 cpu_avg_alljsigma_fig.add_trace(go.Box(
-                    y=cpu_util["avg"], showlegend=True, name=r'{}-avg\\J={},\sigma_e^2={}'.format(plotname, J, sigma_e),
+                    y=cpu_util["avg"], showlegend=True, name=r'{}-avg '.format(plotname) + r'$J={},\sigma_e^2={}$'.format(J, sigma_e),
                     boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                 ))
                 cpu_fig_avg.add_trace(go.Box(
@@ -579,7 +579,7 @@ if __name__ == "__main__":
                 for param in parameter_names:
                     if param in ["X", "Z"]:
                         param_alljsigma_err_fig[param].add_trace(go.Box(
-                            y=theta_err[param], showlegend=True, name=r'{}\\J={},\sigma_e^2={}'.format(plotname, J, sigma_e),
+                            y=theta_err[param], showlegend=True, name=r'{} '.format(plotname) + r'$J={},\sigma_e^2={}$'.format(J, sigma_e),
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
                         param_err_fig[param].add_trace(go.Box(
@@ -591,7 +591,7 @@ if __name__ == "__main__":
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_alljsigma_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                            y=theta_err_RT[param], showlegend=True, name=r'{}\\J={},\sigma_e^2={}'.format(plotname, J, sigma_e),
+                            y=theta_err_RT[param], showlegend=True, name=r'{} '.format(plotname) + r'$J={},\sigma_e^2={}$'.format(J, sigma_e),
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
                         param_err_fig["{}_RT".format(param)].add_trace(go.Box(
@@ -612,7 +612,7 @@ if __name__ == "__main__":
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_alljsigma_err_fig[param].add_trace(go.Box(
-                            y=theta_err[param], showlegend=True, name=r'{}\\J={},\sigma_e^2={}'.format(plotname, J, sigma_e),
+                            y=theta_err[param], showlegend=True, name=r'{} '.format(plotname) + r'$J={},\sigma_e^2={}$'.format(J, sigma_e),
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
             
@@ -713,29 +713,29 @@ if __name__ == "__main__":
                                         print_pdf=False) 
         savename = "{}/time_K{}_J{}_alljsigmae.html".format(dir_out, K, J)    
         time_alljsigma_fig.update_yaxes(title_text="Duration (in seconds), D-MLE, CA", secondary_y=True)
-        fix_plot_layout_and_save(time_alljsigma_fig, savename, xaxis_title=r'Estimation algorithm, $J, \sigma_e^2$', yaxis_title="Duration (in minutes)", title="", 
+        fix_plot_layout_and_save(time_alljsigma_fig, savename, xaxis_title=r'$\text{Estimation algorithm, J, }\sigma_e^2$', yaxis_title="Duration (in minutes)", title="", 
                                 showgrid=False, showlegend=False, 
                                 print_png=True, print_html=False, 
                                 print_pdf=False)     
-        fix_plot_layout_and_save(time_alljsigma_fig, savename, xaxis_title=r'Estimation algorithm, $J, \sigma_e^2$', yaxis_title="Duration (in minutes)", title="", 
+        fix_plot_layout_and_save(time_alljsigma_fig, savename, xaxis_title=r'$\text{Estimation algorithm, J, }\sigma_e^2$', yaxis_title="Duration (in minutes)", title="", 
                                 showgrid=False, showlegend=True, 
                                 print_png=False, print_html=True, 
                                 print_pdf=False) 
         savename = "{}/ram_avg_K{}_J{}_allsigmae.html".format(dir_out, K, J)    
-        fix_plot_layout_and_save(ram_avg_alljsigma_fig, savename, xaxis_title=r'Estimation algorithm, $J, \sigma_e^2$', yaxis_title="Average RAM consumption (in GB)", title="", 
+        fix_plot_layout_and_save(ram_avg_alljsigma_fig, savename, xaxis_title=r'$\text{Estimation algorithm, J, }\sigma_e^2$', yaxis_title="Average RAM consumption (in GB)", title="", 
                                 showgrid=False, showlegend=False, 
                                 print_png=True, print_html=False, 
                                 print_pdf=False) 
-        fix_plot_layout_and_save(ram_avg_alljsigma_fig, savename, xaxis_title=r'Estimation algorithm, $J, \sigma_e^2$', yaxis_title="Average RAM consumption (in GB)", title="", 
+        fix_plot_layout_and_save(ram_avg_alljsigma_fig, savename, xaxis_title=r'$\text{Estimation algorithm, J, }\sigma_e^2$', yaxis_title="Average RAM consumption (in GB)", title="", 
                                 showgrid=False, showlegend=True, 
                                 print_png=False, print_html=True, 
                                 print_pdf=False) 
         savename = "{}/cpu_avg_K{}_J{}_allsigmae.html".format(dir_out, K, J)    
-        fix_plot_layout_and_save(cpu_avg_alljsigma_fig, savename, xaxis_title=r'Estimation algorithm, $J, \sigma_e^2$', yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+        fix_plot_layout_and_save(cpu_avg_alljsigma_fig, savename, xaxis_title=r'$\text{Estimation algorithm, J, }\sigma_e^2$', yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
                                 showgrid=False, showlegend=False, 
                                 print_png=True, print_html=False, 
                                 print_pdf=False) 
-        fix_plot_layout_and_save(cpu_avg_alljsigma_fig, savename, xaxis_title=r'Estimation algorithm, $J, \sigma_e^2$', yaxis_title="Maximum CPU utilisation (% usage of 1 core))", title="", 
+        fix_plot_layout_and_save(cpu_avg_alljsigma_fig, savename, xaxis_title=r'$\text{Estimation algorithm, J, }\sigma_e^2$', yaxis_title="Maximum CPU utilisation (% usage of 1 core))", title="", 
                                 showgrid=False, showlegend=True, 
                                 print_png=False, print_html=True, 
                                 print_pdf=False) 
@@ -744,24 +744,24 @@ if __name__ == "__main__":
             if param in ["X", "Z"]:
                 savename = "{}/rel_err_RT_{}_K{}_J{}_allsigmae.html".format(dir_out, param, K, J)
                 fix_plot_layout_and_save(param_alljsigma_err_fig["{}_RT".format(param)], 
-                                    savename, xaxis_title=r'Estimation algorithm, $J,\sigma_e^2$', 
+                                    savename, xaxis_title=r'$\text{Estimation algorithm, J,}\sigma_e^2$', 
                                     yaxis_title="Mean relative error (under rotation/scaling)", 
                                     title="", showgrid=False, showlegend=False, 
                                     print_png=True, print_html=False, 
                                     print_pdf=False) 
                 fix_plot_layout_and_save(param_alljsigma_err_fig["{}_RT".format(param)], 
-                                    savename, xaxis_title=r'Estimation algorithm, $J,\sigma_e^2$', 
+                                    savename, xaxis_title=r'$\text{Estimation algorithm, J,}\sigma_e^2$', 
                                     yaxis_title="Mean relative error (under rotation/scaling)", 
                                     title="", showgrid=False, showlegend=True, 
                                     print_png=False, print_html=True, 
                                     print_pdf=False) 
             savename = "{}/rel_err_{}_K{}_J{}_allsigmae.html".format(dir_out, param, K, J)
-            fix_plot_layout_and_save(param_alljsigma_err_fig[param], savename, xaxis_title=r'Estimation algorithm, $J,\sigma_e^2$', 
+            fix_plot_layout_and_save(param_alljsigma_err_fig[param], savename, xaxis_title=r'$\text{Estimation algorithm, J,}\sigma_e^2$', 
                                 yaxis_title="Mean relative error", title="", 
                                 showgrid=False, showlegend=False, 
                                 print_png=True, print_html=False, 
                                 print_pdf=False)    
-            fix_plot_layout_and_save(param_alljsigma_err_fig[param], savename, xaxis_title=r'Estimation algorithm, $J,\sigma_e^2$', 
+            fix_plot_layout_and_save(param_alljsigma_err_fig[param], savename, xaxis_title=r'$\text{Estimation algorithm, J,}\sigma_e^2$', 
                                 yaxis_title="Mean relative error", title="", 
                                 showgrid=False, showlegend=True, 
                                 print_png=False, print_html=True, 
