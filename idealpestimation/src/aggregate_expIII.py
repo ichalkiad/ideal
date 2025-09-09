@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expIII/".format(dataspace)
+    dir_out = "{}/rsspaper_expIII_normparameterspacesize/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     algorithms = ["icmp", "icmd", "ca", "mle"]
@@ -579,40 +579,40 @@ if __name__ == "__main__":
                 for param in parameter_names:
                     if param in ["X", "Z"]:
                         param_alljsigma_err_fig[param].add_trace(go.Box(
-                            y=theta_err[param], showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
+                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
                         param_err_fig[param].add_trace(go.Box(
-                            y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_sqerr_fig[param].add_trace(go.Box(
-                            y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
+                            y=np.asarray(theta_sqerr[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_alljsigma_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                            y=theta_err_RT[param], showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
+                            y=np.asarray(theta_err_RT[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
                         param_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                            y=theta_err_RT[param], showlegend=True, name="{}-RT".format(plotname),
+                            y=np.asarray(theta_err_RT[param])/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
-                            y=theta_sqerr_RT[param], showlegend=True, name="{}-RT".format(plotname),
+                            y=np.asarray(theta_sqerr_RT[param])/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                     else:
                         param_err_fig[param].add_trace(go.Box(
-                            y=theta_err[param], showlegend=True, name="{}".format(plotname),
+                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_sqerr_fig[param].add_trace(go.Box(
-                            y=theta_sqerr[param], showlegend=True, name="{}".format(plotname),
+                            y=np.asarray(theta_sqerr[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_alljsigma_err_fig[param].add_trace(go.Box(
-                            y=theta_err[param], showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
+                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
             
