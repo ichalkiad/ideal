@@ -549,7 +549,7 @@ if __name__ == "__main__":
                     boxpoints='outliers', line=dict(color=colors[algo]),                                
                 ), secondary_y=sec_y)
                 time_alljsigma_fig.add_trace(go.Box(
-                    y=runtimes, showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
+                    y=runtimes, showlegend=True, name=r"${{{plotname}}}, J={{{J}}},\sigma_e^2={{{sigma_e}}}$",
                     boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                 ), secondary_y=sec_y)
                 ram_fig_max.add_trace(go.Box(
@@ -557,7 +557,7 @@ if __name__ == "__main__":
                     boxpoints='outliers', line=dict(color=colors[algo])                          
                 ))
                 ram_avg_alljsigma_fig.add_trace(go.Box(
-                    y=ram["avg"], showlegend=True, name=r"${{{plotname}}}-avg, J={},sigma_e^2={}$".format(J, sigma_e),
+                    y=ram["avg"], showlegend=True, name=r"${{{plotname}}}-avg, J={{{J}}},\sigma_e^2={{{sigma_e}}}$",
                     boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                 ))
                 ram_fig_avg.add_trace(go.Box(
@@ -569,7 +569,7 @@ if __name__ == "__main__":
                     boxpoints='outliers', line=dict(color=colors[algo])                          
                 ))
                 cpu_avg_alljsigma_fig.add_trace(go.Box(
-                    y=cpu_util["avg"], showlegend=True, name=r"${{{plotname}}}-avg, J={},\sigma_e^2={}$".format(J, sigma_e),
+                    y=cpu_util["avg"], showlegend=True, name=r"${{{plotname}}}-avg, J={{{J}}},\sigma_e^2={{{sigma_e}}}$",
                     boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo]),                                
                 ))
                 cpu_fig_avg.add_trace(go.Box(
@@ -579,7 +579,7 @@ if __name__ == "__main__":
                 for param in parameter_names:
                     if param in ["X", "Z"]:
                         param_alljsigma_err_fig[param].add_trace(go.Box(
-                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
+                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={{{J}}},\sigma_e^2={{{sigma_e}}}$",
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
                         param_err_fig[param].add_trace(go.Box(
@@ -591,7 +591,7 @@ if __name__ == "__main__":
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_alljsigma_err_fig["{}_RT".format(param)].add_trace(go.Box(
-                            y=np.asarray(theta_err_RT[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
+                            y=np.asarray(theta_err_RT[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={{{J}}},\sigma_e^2={{{sigma_e}}}$",
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
                         param_err_fig["{}_RT".format(param)].add_trace(go.Box(
@@ -612,7 +612,7 @@ if __name__ == "__main__":
                             boxpoints='outliers', line=dict(color=colors[algo])                          
                         ))
                         param_alljsigma_err_fig[param].add_trace(go.Box(
-                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={},\sigma_e^2={}$".format(J, sigma_e),
+                            y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name=r"${{{plotname}}}, J={{{J}}},\sigma_e^2={{{sigma_e}}}$",
                             boxpoints='outliers', opacity=1-0.2*sigma_es.index(sigma_e), line=dict(color=colors[algo])                          
                         ))
             
