@@ -4733,13 +4733,16 @@ def check_sqlite_database(dbconn, db_path, sample_rows=3):
         
         for table_tuple in tables:            
             table_name = table_tuple[0]
-            if table_name not in ['mp_party']:  #'party_mapping', 'party_ches2023', 'party_gps2019', 
+            if table_name not in ['party_ches2023']: #'mp_party' , 'party_ches2023', 'affine_map_ches2023', 'affine_map_ches2019' : the estimated transform
                 continue
             print(f"\nTable: {table_name}")
             print("-" * 50)
             cursor.execute(f"PRAGMA table_info({table_name});")
             columns = cursor.fetchall()
             
+            print(columns)
+            ipdb.set_trace() 
+
             if columns:
                 print("Columns:")
                 column_names = []
@@ -4754,6 +4757,7 @@ def check_sqlite_database(dbconn, db_path, sample_rows=3):
             else:
                 print("  No columns found.")
             
+            ipdb.set_trace() 
             # cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
             # row_count = cursor.fetchone()[0]
             # print(f"  Rows: {row_count}")

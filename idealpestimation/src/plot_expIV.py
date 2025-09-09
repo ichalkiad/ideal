@@ -18,17 +18,18 @@ import plotly.graph_objects as go
 from idealpestimation.src.utils import pickle, \
                                         time, timedelta, \
                                             load_matrix
+import plotly.figure_factory as ff
+
 
 def create_density_overlay_plot(data=None, x_col='dimension_1', y_col='dimension_2', 
-                               user_type_col='user_type', title='2D Ideal Points with Density'):
+                               user_type_col='user_type', title='2D Ideal Points with Density', party_names=None):
        
-    fig = make_subplots(rows=1, cols=1)
-    
+    fig = go.Figure() #make_subplots(rows=1, cols=1)
+   
     # Add scatter points for each user type
-    colors = {'User': '#2E86AB', 'Main User': '#FFFF00', "Party": "#A23B72"}
+    colors = {'User': "#00F7FF", 'Main User': '#FFFF00', "Party": "#A23B72"}
     symbols = {'User': 'circle', 'Lead User': 'cross', "Party": "triangle-up"}
-    
-    for user_type in data[user_type_col].unique():
+    for user_type in ["User", "Lead User", "Party"]:
         subset = data[data[user_type_col] == user_type]
         
         # if user_type == "User":
@@ -47,44 +48,64 @@ def create_density_overlay_plot(data=None, x_col='dimension_1', y_col='dimension
         #     ))
         
         if user_type == "Party":
-            fig.add_trace(go.Scatter(
-                x=subset[x_col],
-                y=subset[y_col],
-                mode='markers',
-                name=user_type,
-                marker=dict(
-                    symbol=symbols.get(user_type, 'circle'),
-                    size=10,
-                    color=colors.get(user_type, '#2E86AB'),
-                    opacity=0.8,
-                    line=dict(width=1, color='white')
-                )
-            ))
+            for pidx in range(subset.shape[0]):
+                party_names = party_names if party_names is not None else ["Party_{}".format(i) for i in range(subset.shape[0])]
+                fig.add_trace(go.Scatter(
+                    x=[subset.iloc[pidx][x_col]],
+                    y=[subset.iloc[pidx][y_col]],
+                    mode='markers+text',
+                    name=party_names[pidx],
+                    text=party_names[pidx],
+                    textposition="top center",
+                    marker=dict(
+                        symbol=symbols.get(user_type, 'triangle-up'),
+                        size=15,
+                        color=colors.get(user_type, '#A23B72'),
+                        opacity=0.9,
+                        line=dict(width=1, color='white')
+                    )
+                ))
+            # fig.add_trace(go.Scatter(
+            #     x=subset[x_col],
+            #     y=subset[y_col],
+            #     mode='markers',
+            #     name=party_names,
+            #     marker=dict(
+            #         symbol=symbols.get(user_type, 'circle'),
+            #         size=10,
+            #         color=colors.get(user_type, '#2E86AB'),
+            #         opacity=0.8,
+            #         line=dict(width=1, color='white')
+            #     )
+            # ))
 
         if user_type == "User":
-            fig.add_trace(go.Histogram2dContour(
+            fig.add_trace(go.Histogram2d(
                 x=subset[x_col],
                 y=subset[y_col],
                 name=f'{user_type} Density',
-                colorscale=[[0, 'rgba(0,0,0,0)'], [1, colors.get(user_type, '#2E86AB')]],
-                showscale=False,
-                opacity=0.5,
-                line=dict(width=1, color=colors.get(user_type, '#2E86AB'))
+                colorscale=[[0, 'rgba(0,0,0,0)'], [1, colors.get(user_type, "#00F7FF")]],
+                showscale=True,
+                nbinsx=100,
+                # opacity=0.9
             ))
     
     # Add reference lines
     fig.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.4)
     fig.add_vline(x=0, line_dash="dot", line_color="gray", opacity=0.4)
     
+    
     # Update layout
     fig.update_layout(
         title=title,
-        xaxis_title="Latent dimension 1",
-        yaxis_title="Latent dimension 2",
+        xaxis_title=x_col,
+        yaxis_title=y_col,
         template='plotly_white',
         width=900,
         height=700,
-        font=dict(family="Arial", size=12)
+        font=dict(family="Arial", size=12),
+        legend=dict(
+                orientation="h")
     )
 
     ipdb.set_trace()
@@ -94,6 +115,7 @@ def create_density_overlay_plot(data=None, x_col='dimension_1', y_col='dimension
 
 if __name__ == "__main__":
     
+    # standardise resulting CA dimensions
     
     seed_value = 8125
     random.seed(seed_value)
@@ -104,7 +126,7 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries = ["finland", "france", "germany", "netherlands", "poland", "uk", "us"]
+    countries = ["france", "finland", "germany", "netherlands", "poland", "uk"] #, "us"]
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
     for year in [2020, 2023]:
@@ -126,11 +148,30 @@ if __name__ == "__main__":
                     node_to_index_end, index_to_node_end, _ = load_matrix("{}/Y_{}_{}".format(dataspace, country, year), K, J)      
             
             mp_mapping = pd.read_csv("{}/parties_lead_users_{}_{}.csv".format(dataspace, country, year))
-            all_parties = np.unique(mp_mapping.EPO_party_acronym.dropna().values).tolist()
+            # all_parties = np.unique(mp_mapping.EPO_party_acronym.dropna().values).tolist()
+            if year == 2020:
+                all_parties = np.unique(mp_mapping.CHES2019_party_acronym.dropna().values).tolist()
+            elif year == 2023:
+                all_parties = np.unique(mp_mapping.CHES2023_party_acronym.dropna().values).tolist()
+
             parties_politicians = dict()
             for party in all_parties:
-                parties_politicians[party] = mp_mapping.loc[mp_mapping.EPO_party_acronym==party, "mp_pseudo_id"].values.tolist()
-                       
+                if year == 2020:
+                    parties_politicians[party] = mp_mapping.loc[mp_mapping.CHES2019_party_acronym==party, "mp_pseudo_id"].values.tolist()
+                    linate_map_y = pd.read_csv("{}/y_party_ches2019_{}_{}.csv".format(dataspace, country, year)).drop(columns=['CHES2019_party_acronym', 
+                                                                                                                                "EPO_party_acronym",
+                                                                                                                                "eu_econ_require",
+                                                                                                                                "eu_political_require",
+                                                                                                                                "eu_googov_require",
+                                                                                                                                "lrecon_dissent"])
+                elif year == 2023:
+                    parties_politicians[party] = mp_mapping.loc[mp_mapping.CHES2023_party_acronym==party, "mp_pseudo_id"].values.tolist()   
+                    linate_map_y = pd.read_csv("{}/y_party_ches2023_{}_{}.csv".format(dataspace, country, year)).drop(columns=['CHES2023_party_acronym', 
+                                                                                                                                "EPO_party_acronym",
+                                                                                                                                "eu_econ_require",
+                                                                                                                                "eu_political_require",
+                                                                                                                                "eu_googov_require",
+                                                                                                                                "lrecon_dissent"])
             with jsonlines.open("{}/{}/estimation_CA_{}/params_out_global_theta_hat.jsonl".format(dataspace, country, year), mode="r") as f: 
                 for result in f.iter(type=dict, skip_invalid=True):                    
                     param_hat = result["X"]
@@ -138,7 +179,25 @@ if __name__ == "__main__":
                     param_hat = result["Z"]
                     Z_hat = np.asarray(param_hat).reshape((d, J), order="F").T                         
                     break
+
+            data = pd.DataFrame({
+                'latent_dimension_0': X_hat[:, 0],
+                'latent_dimension_1': X_hat[:, 1]})   
+
+            g = sn.jointplot(data=data, x='latent_dimension_0',y='latent_dimension_1',kind="hex")
+
+            color_dic = {'0':'blue','1':'red','2':'gold','3':'orange','4':'green',
+             '5':'violet','6':'cyan','7':'magenta','8':'brown','9':'gray'}
+            ipdb.set_trace()
             
+            # standardise dimensions X_hat, Z_hat, over columns
+            X_hat = (X_hat - np.mean(X_hat, axis=0)) / np.std(X_hat, axis=0)
+            Z_hat = (Z_hat - np.mean(Z_hat, axis=0)) / np.std(Z_hat, axis=0)
+            
+            y_map_tilde = linate_map_y.values.T
+            y_map_tilde = np.vstack([y_map_tilde, np.ones(y_map_tilde.shape[1])])
+            # ipdb.set_trace()
+
             # parties in order of appearance in all_parties
             party_ideal_points_est = np.zeros((len(all_parties), d))
             for party in all_parties:
@@ -151,16 +210,62 @@ if __name__ == "__main__":
                         continue
                 party_ideal_points_est[all_parties.index(party), :] = np.mean(np.stack(z_loc), axis=0)          
 
-            data = pd.DataFrame({
-                "dim1": np.concatenate([X_hat[:, 0], Z_hat[:, 0], party_ideal_points_est[:, 0]]),
-                "dim2": np.concatenate([X_hat[:, 1], Z_hat[:, 1], party_ideal_points_est[:, 1]]),
+            X_tilde_aff = party_ideal_points_est.T
+            X_tilde_aff = np.vstack([X_tilde_aff, np.ones(X_tilde_aff.shape[1])])
+            
+            # compute affine map, P = party_ideal_points_est.shape[0], M+1: y_map_tilde.shape[0], N = d = 2
+            # affine_map = np.linalg.lstsq(X_tilde.T, y_map_tilde.T, rcond=None)[0].T
+            # ipdb.set_trace()
+            affine_map = y_map_tilde @ X_tilde_aff.T @ np.linalg.inv(X_tilde_aff @ X_tilde_aff.T)
+
+            party_tilde = party_ideal_points_est.T
+            party_tilde = np.vstack([party_tilde, np.ones(party_tilde.shape[1])])
+            # M feature coord + 1 intercept coord  X  party_num
+            party_attitudinal_space = affine_map @ party_tilde
+
+            z_tilde = Z_hat.T
+            z_tilde = np.vstack([z_tilde, np.ones(z_tilde.shape[1])])
+            z_attitudinal_space = affine_map @ z_tilde
+
+            x_tilde = X_hat.T
+            x_tilde = np.vstack([x_tilde, np.ones(x_tilde.shape[1])])
+            x_attitudinal_space = affine_map @ x_tilde
+
+
+            # CHES2019:  0: 'lrecon', 2: 'antielite_salience', 33: 'civlib_laworder', 35: 'country', 41: 'lrgen', 53: 'people_vs_elite'
+            # CHES2023:  1: 'lrecon', 3: 'antielite_salience', 10: 'country'
+            if year == 2020:
+                selected_coords = [0, 2] # choose two CHES dimensions related to COVID-19 polarised debates, set dataframe names to the names of the coords
+            elif year == 2023:
+                selected_coords = [1, 3]
+            selected_coords_names = ['lrecon', 'antielite_salience']
+            
+            ipdb.set_trace()
+            
+            data_raw = pd.DataFrame({
+                selected_coords_names[0]: np.concatenate([X_hat[:, 0], Z_hat[:, 0], party_ideal_points_est[:, 0]]),
+                selected_coords_names[1]: np.concatenate([X_hat[:, 1], Z_hat[:, 1], party_ideal_points_est[:, 1]]),
                 "user_type": ['User'] * K + ['Lead User'] * J + ["Party"] * party_ideal_points_est.shape[0],
                 'user_id': range(K+J+party_ideal_points_est.shape[0])
             })   
+
+            data_attitudinal = pd.DataFrame({
+                selected_coords_names[0]: np.concatenate([x_attitudinal_space[selected_coords[0], :], z_attitudinal_space[selected_coords[0], :], 
+                                        party_attitudinal_space[selected_coords[0], :]]).flatten(),
+                selected_coords_names[1]: np.concatenate([x_attitudinal_space[selected_coords[1], :], z_attitudinal_space[selected_coords[1], :], 
+                                        party_attitudinal_space[selected_coords[1], :]]).flatten(),
+                "user_type": ['User'] * K + ['Lead User'] * J + ["Party"] * party_ideal_points_est.shape[0],
+                'user_id': range(K+J+party_ideal_points_est.shape[0])
+            })  
+
+
+            
             # ipdb.set_trace()
             # data = data.drop_duplicates(subset=['dim1', 'dim2'], keep='first').reset_index(drop=True)         
             # ipdb.set_trace()
-            fig = create_density_overlay_plot(data=data, x_col='dim1', y_col='dim2', user_type_col='user_type', title='')
+            fig = create_density_overlay_plot(data=data_attitudinal, x_col=selected_coords_names[0], 
+                                              y_col=selected_coords_names[1], user_type_col='user_type', 
+                                              title='', party_names=all_parties)
     
 
 
