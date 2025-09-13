@@ -591,7 +591,7 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
     
     # TODO: CHECK THE CORRECTNESS OF DIMENSIONS? ISSUE 1 OR 2 IS THE ATTITUDINAL DIMENSION?
     for k,row in group_attitudes.iterrows():
-        ax[2].plot(row[selected_coords_names_att[0]], row[selected_coords_names_att[1]],'o',mec='k',color=color_dic[row['k']])
+        ax[2].plot(row[selected_coords_names[0]], row[selected_coords_names[1]],'o',mec='k',color=color_dic[row['k']])
     ax[2].set_xlabel(selected_coords_names_att[0])
     ax[2].set_ylabel(selected_coords_names_att[1])
     ax[2].set_title('Group positions in attitudinal space')
@@ -606,7 +606,7 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
     source_attitudinal = attiembedding_model.transform(source_coords)
     target_attitudinal['k'] = target_attitudinal['entity'].map(pd.Series(index=df_ref_group['i'].values,data=df_ref_group['k'].values))
 
-    g = sn.jointplot(data=source_attitudinal.drop_duplicates(),x=selected_coords_names_att[0],y=selected_coords_names_att[1], kind="hex", gridsize=100)
+    g = sn.jointplot(data=source_attitudinal.drop_duplicates(),x=selected_coords_names[0],y=selected_coords_names[1], kind="hex", gridsize=100)
     print('jointplot created – axes:', g.ax_joint)
     ax = g.ax_joint
     print('axes object:', ax)
@@ -663,7 +663,7 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries = ["us", "poland", "netherlands", "uk", "france", "finland", "germany"]
+    countries = ["finland", "us", "poland", "netherlands", "uk", "france", "germany"]
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
     for year in [2023, 2020]:
@@ -693,12 +693,17 @@ if __name__ == "__main__":
 
             mappings, node_to_index_start, index_to_node_start, \
                     node_to_index_end, index_to_node_end, Y = load_matrix("{}/Y_{}_{}".format(dataspace, country, year), K, J)      
-            ideoembedding_model = IdeologicalEmbedding(n_latent_dimensions = 2, 
-                                                        in_degree_threshold = 10, 
-                                                        out_degree_threshold = 10)
+            
             try:
                 bipartite = pd.read_csv("{}/bipartite_{}_{}.csv".format(dataspace, country, year))
+                X_hat_df = pd.read_csv("{}/{}/X_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
+                Z_hat_df = pd.read_csv("{}/{}/Z_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
+                Z_hat = Z_hat_df.to_numpy()
+                X_hat = X_hat_df.to_numpy()
             except:                
+                ideoembedding_model = IdeologicalEmbedding(n_latent_dimensions = 2, 
+                                                        in_degree_threshold = 10, 
+                                                        out_degree_threshold = 10)
                 if country == "us":                   
                     # total followers per politician
                     rsum = np.sum(Y, axis=0)
@@ -730,18 +735,20 @@ if __name__ == "__main__":
                 print('num. of follower nodes j: '+ str(bipartite['j'].nunique()))
                 
                 bipartite.rename(columns={'i':'target','j':'source'},inplace=True)
-                bipartite.to_csv("{}/bipartite_{}_{}.csv".format(dataspace, country, year), index=False)
+                bipartite.to_csv("{}/{}/bipartite_{}_{}.csv".format(dataspace, country, country, year), index=False)
 
-            ideoembedding_model.fit(bipartite)
-            target_coords = ideoembedding_model.ideological_embedding_target_latent_dimensions_
-            print(len(target_coords))
-            target_coords.columns = selected_coords_names
-            source_coords = ideoembedding_model.ideological_embedding_source_latent_dimensions_
-            print(len(source_coords))
-            source_coords.columns = selected_coords_names
-            Z_hat_df = target_coords
-            Z_hat = target_coords.to_numpy()
-            X_hat_df = source_coords
+                ideoembedding_model.fit(bipartite)
+                target_coords = ideoembedding_model.ideological_embedding_target_latent_dimensions_
+                print(len(target_coords))
+                target_coords.columns = selected_coords_names
+                source_coords = ideoembedding_model.ideological_embedding_source_latent_dimensions_
+                print(len(source_coords))
+                source_coords.columns = selected_coords_names
+                Z_hat_df = target_coords
+                Z_hat_df.to_csv("{}/{}/Z_{}_{}.csv".format(dataspace, country, country, year))
+                Z_hat = target_coords.to_numpy()
+                X_hat_df = source_coords
+                X_hat_df.to_csv("{}/{}/X_{}_{}.csv".format(dataspace, country, country, year))
 
             mp_mapping = pd.read_csv("{}/parties_lead_users_{}_{}.csv".format(dataspace, country, year))
             if year == 2020:
