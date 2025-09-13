@@ -22,22 +22,23 @@ if __name__ == "__main__":
 
     database_path = "/mnt/hdd2/epodata/stage/20250416/anonymized_reproducibility/"
     # database_path = "/mnt/hdd2/ioannischalkiadakis/"
-    databases = ["france_2020_anonymized_reproducibility.db", "france_2023_anonymized_reproducibility.db",
+    databases = ["finland_2023_anonymized_reproducibility.db", "france_2020_anonymized_reproducibility.db", "france_2023_anonymized_reproducibility.db",
                 "germany_2020_anonymized_reproducibility.db", "germany_2023_anonymized_reproducibility.db",
                 "poland_2020_anonymized_reproducibility.db", "poland_2023_anonymized_reproducibility.db",
                 "netherlands_2020_anonymized_reproducibility.db", "netherlands_2023_anonymized_reproducibility.db",
                 "uk_2020_anonymized_reproducibility.db", "uk_2023_anonymized_reproducibility.db",
-                "finland_2020_anonymized_reproducibility.db", "finland_2023_anonymized_reproducibility.db",
+                "finland_2020_anonymized_reproducibility.db", 
                 "us_2023_anonymized_reproducibility.db"]
-    # databases = ["us_2023_anonymized_reproducibility.db"]
+    
+    databases = ["us_2023_anonymized_reproducibility.db"]
     
     for database in databases:
         
         nameparts = database.split("_")
         dbconn = connect_to_epo_db("{}/{}".format(database_path, database))
-        check_sqlite_database(dbconn, "{}/{}".format(database_path, database), sample_rows=3)
+        # check_sqlite_database(dbconn, "{}/{}".format(database_path, database), sample_rows=3)
         
-        sys.exit(0)
+        # sys.exit(0)
 
         if "us_2023" in database:
             columns = get_table_columns(dbconn, table_name='party_gps2019')
@@ -46,8 +47,8 @@ if __name__ == "__main__":
         elif "2023" in database:
             columns = get_table_columns(dbconn, table_name='party_ches2023')
             
-        # print(columns)
-        # ipdb.set_trace()
+        # # print(columns)
+        # # ipdb.set_trace()
         if "us_2023" in database:
             csv_path = "{}/y_party_gps2019_{}_{}.csv".format(DIR_out, nameparts[0], nameparts[1])
             export_table_to_csv(conn=dbconn, table_name="party_gps2019", csv_path=csv_path)
@@ -62,10 +63,10 @@ if __name__ == "__main__":
         # export_table_to_csv(conn=dbconn, table_name="mp_party", csv_path=csv_path)
         # columns = get_table_columns(dbconn, table_name="mp_follower_graph")
         # print(columns)
-        # adjacency_matrix, node_to_index_start, index_to_node_start, \
-        #     node_to_index_end, index_to_node_end = build_sparse_adjacency_matrix(dbconn, table_name="mp_follower_graph", 
-        #                                                                         start_col='follower_pseudo_id', end_col='mp_pseudo_id', 
-        #                                                                         weighted=False, weight_col=None, directed=True)
+        adjacency_matrix, node_to_index_start, index_to_node_start, \
+            node_to_index_end, index_to_node_end = build_sparse_adjacency_matrix(dbconn, table_name="mp_follower_graph", 
+                                                                                start_col='follower_pseudo_id', end_col='mp_pseudo_id', 
+                                                                                weighted=False, weight_col=None, directed=True)
 
         # print_matrix_info(adjacency_matrix)        
         # filename = "{}/Y_{}_{}".format(DIR_out, nameparts[0], nameparts[1])

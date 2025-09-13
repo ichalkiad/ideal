@@ -4733,7 +4733,7 @@ def check_sqlite_database(dbconn, db_path, sample_rows=3):
         
         for table_tuple in tables:            
             table_name = table_tuple[0]
-            if table_name not in ['party_ches2023']: #'mp_party' , 'party_ches2023', 'affine_map_ches2023', 'affine_map_ches2019' : the estimated transform
+            if table_name not in ['party_gps2019']: #'mp_party' , 'party_ches2023', 'affine_map_ches2023', 'affine_map_ches2019' : the estimated transform
                 continue
             print(f"\nTable: {table_name}")
             print("-" * 50)
@@ -4890,8 +4890,6 @@ def build_sparse_adjacency_matrix(dbconn, table_name, start_col, end_col,
     index_to_node_end = {i: node for i, node in enumerate(unique_nodes_end)}
     print(f"Found {num_nodes_end} unique end nodes")
     
-
-
     # Collect edges for sparse matrix construction
     print("Collecting edges for sparse matrix...")
     
@@ -4906,7 +4904,6 @@ def build_sparse_adjacency_matrix(dbconn, table_name, start_col, end_col,
     row_indices = []
     col_indices = []
     data = []
-    
     edge_count = 0
     for row in cursor.fetchall():
         start_node = row[0]

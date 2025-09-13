@@ -64,6 +64,13 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
         
         K_new = K - len(k_idx.flatten())
         J_new = J - len(j_idx.flatten())
+        # try:
+        #     assert K == K_new
+        #     assert J == J_new
+        # except:
+        #     print(country)        
+        # return 
+
         parameter_space_dim_new = (K_new+J_new)*d + J_new + K_new + 2
         Y = Y_new
         Y = Y.todense()
@@ -145,10 +152,10 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries = ["us"]  #"finland", "france", "germany", "netherlands", "poland", "uk", 
+    countries = ["finland", "france", "germany", "netherlands", "poland", "uk"] #["us"]
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
-    for year in [2023]: #2020
+    for year in [2023, 2020]: #2020
         for country in countries:
 
             datasets_names = [file.name for file in pathlib.Path(dataspace).iterdir() if file.is_file() and (country in file.name and str(year) in file.name and "mappings" in file.name)]
