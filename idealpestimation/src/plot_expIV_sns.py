@@ -22,6 +22,7 @@ from idealpestimation.src.utils import pickle, \
 import plotly.express as px
 from sklearn.base import BaseEstimator, TransformerMixin
 from typing import List, Optional
+from matplotlib.lines import Line2D
 
 
 
@@ -56,6 +57,7 @@ def allocate_followers(N: List[int], n_h: int, cap: int, threshold: Optional[int
         caps = np.minimum(N, cap)
         caps[census_mask] = 0  # exclude from proportional allocation
 
+
     if n_h <= 0:
         return m.astype(int).tolist()
 
@@ -89,10 +91,8 @@ def allocate_followers(N: List[int], n_h: int, cap: int, threshold: Optional[int
         for i in order[:remainder]:
             m_int[i] += 1
 
+
     return m_int.tolist()
-
-
-
 
 def diagnostics(N: List[int], m: List[int], cap: int, n_h: int, buckets: Optional[List[int]] = None, dirout: str = None):
     """
@@ -121,12 +121,34 @@ def diagnostics(N: List[int], m: List[int], cap: int, n_h: int, buckets: Optiona
     # Plot distribution of allocated vs original
     plt.figure(figsize=(8, 5))
     plt.hist(N, bins=30, alpha=0.5, label="Original follower counts")
+    plt.xlabel("Followers per followee")
+    plt.ylabel("Frequency")
+    plt.legend()
+    plt.title("Distribution of original followers")
+    # plt.show()
+    savename = "{}/{}_{}_distribution_orig_followers.png".format(dirout, country, year)    
+    plt.savefig(savename,
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
+    
+    plt.figure(figsize=(8, 5))  
+    plt.hist(m, bins=30, alpha=0.5, label="Allocated followers")
+    plt.xlabel("Followers per followee")
+    plt.ylabel("Frequency")
+    plt.legend()
+    plt.title("Distribution of allocated followers")
+    # plt.show()
+    savename = "{}/{}_{}_distribution_alloc_followers.png".format(dirout, country, year)    
+    # plt.show()
+
+    plt.figure(figsize=(8, 5))
+    plt.hist(N, bins=30, alpha=0.5, label="Original follower counts")
     plt.hist(m, bins=30, alpha=0.5, label="Allocated followers")
     plt.xlabel("Followers per followee")
     plt.ylabel("Frequency")
     plt.legend()
     plt.title("Distribution of original vs allocated followers")
-    # plt.show()
     savename = "{}/{}_{}_distribution_orig_vs_allocated_followers.png".format(dirout, country, year)    
     plt.savefig(savename,
             dpi=300,
@@ -189,10 +211,6 @@ def diagnostics(N: List[int], m: List[int], cap: int, n_h: int, buckets: Optiona
                 if np.any(w_b > 0):
                     ess_b = (w_b.sum())**2 / (w_b**2).sum()
                     print(f"  ESS for bucket {b}: {ess_b}")
-
-
-
-
 
 class AttitudinalEmbedding(BaseEstimator, TransformerMixin): 
 
@@ -491,7 +509,6 @@ class AttitudinalEmbedding(BaseEstimator, TransformerMixin):
         except AttributeError:
             raise AttributeError('Transformation parameters have not been computed.')
 
-
 def adjacency_to_edge_list(Y):
     
     # Y: K x J
@@ -508,9 +525,7 @@ def adjacency_to_edge_list(Y):
     
     return df
 
-
-
-def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, selected_coords_names, partylabels, country, dirout):
+def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, partylabels, country, dirout):
     
     color_dic = {'0':'blue','1':'red','2':'gold','3':'orange','4':'green',
                  '5':'violet','6':'cyan','7':'magenta','8':'brown','9':'gray',
@@ -525,7 +540,32 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
         df_k = target_coords[target_coords['k']==k]        
         ax.scatter(df_k[selected_coords_names[0]],df_k[selected_coords_names[1]],
             marker='+',s=30,alpha=0.5,color=color_dic[k])
-        
+
+    if country == 'us':
+        ax.axvline(x=1, color='red', linestyle='--', label='GOP')
+        ax.axvline(x=-1, color='blue', linestyle='--', label='Dem')
+        ax.set_xlabel(selected_coords_names_att[0])
+        custom_lines = [
+            Line2D([0], [0], color='red', linestyle='--'),
+            Line2D([0], [0], color='blue', linestyle='--')
+        ]
+
+        plt.legend(
+            handles=[plt.Line2D([], [], color='black'), *custom_lines],
+            labels=["Dem", "GOP"],
+        )
+        fig = g.figure
+        outpath = "{}/plots_upd2/{}".format(dirout, country)
+        pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
+        savename = "{}/{}_{}_{}_{}_att.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+        print('About to save the figure...')
+        fig.savefig(savename,
+                dpi=300,
+                bbox_inches='tight',
+                transparent=False) 
+        print('✅ Figure saved to {}'.format(savename))
+        return
+
     fig = g.figure
     # plt.show()
     outpath = "{}/plots_upd2/{}".format(dirout, country)
@@ -538,17 +578,22 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
             transparent=False) 
     print('✅ Figure saved to {}'.format(savename))
     
+    
     group_attitudes['k'] = group_attitudes['k'].astype(str)  
     group_ideologies = target_coords.groupby('k').mean()
     fig = plt.figure(figsize=(10,4))# width, height inches
-    ax = {1:fig.add_subplot(1,2,1),2:fig.add_subplot(1,2,2)}
+    ax = {1:fig.add_subplot(1,2,1), 2:fig.add_subplot(1,2,2)}
     for k,row in group_ideologies[group_ideologies.index.isin(group_attitudes['k'])].iterrows():
         ax[1].plot(row[selected_coords_names[0]],row[selected_coords_names[1]],'o',mec='k',color=color_dic[k])
-    ax[1].set_xlabel(selected_coords_names[0]),ax[1].set_ylabel(selected_coords_names[1])
+    ax[1].set_xlabel(selected_coords_names[0])
+    ax[1].set_ylabel(selected_coords_names[1])
     ax[1].set_title('Group positions in ideological space')
+    
+    # TODO: CHECK THE CORRECTNESS OF DIMENSIONS? ISSUE 1 OR 2 IS THE ATTITUDINAL DIMENSION?
     for k,row in group_attitudes.iterrows():
-        ax[2].plot(row[selected_coords_names[0]],row[selected_coords_names[1]],'o',mec='k',color=color_dic[row['k']])
-    ax[2].set_xlabel(selected_coords_names[0]),ax[2].set_ylabel(selected_coords_names[1])
+        ax[2].plot(row[selected_coords_names_att[0]], row[selected_coords_names_att[1]],'o',mec='k',color=color_dic[row['k']])
+    ax[2].set_xlabel(selected_coords_names_att[0])
+    ax[2].set_ylabel(selected_coords_names_att[1])
     ax[2].set_title('Group positions in attitudinal space')
     attiembedding_model = AttitudinalEmbedding(N = 2)
     target_coords['entity'] = target_coords.index 
@@ -561,12 +606,12 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
     source_attitudinal = attiembedding_model.transform(source_coords)
     target_attitudinal['k'] = target_attitudinal['entity'].map(pd.Series(index=df_ref_group['i'].values,data=df_ref_group['k'].values))
 
-    g = sn.jointplot(data=source_attitudinal.drop_duplicates(),x=selected_coords_names[0],y=selected_coords_names[1], kind="hex", gridsize=100)
+    g = sn.jointplot(data=source_attitudinal.drop_duplicates(),x=selected_coords_names_att[0],y=selected_coords_names_att[1], kind="hex", gridsize=100)
     print('jointplot created – axes:', g.ax_joint)
     ax = g.ax_joint
     print('axes object:', ax)
     for k in target_attitudinal['k'].unique():
-        df_k = target_attitudinal[target_attitudinal['k']==k]
+        df_k = target_attitudinal[target_attitudinal['k']==k]       
         df_k_mean = df_k[[selected_coords_names[0],selected_coords_names[1]]].mean()
         ax.scatter(df_k[selected_coords_names[0]],df_k[selected_coords_names[1]],marker='+',s=30,alpha=0.5,color=color_dic[k])
         ax.plot(df_k_mean[selected_coords_names[0]],df_k_mean[selected_coords_names[1]],'o',mec='k',color=color_dic[k],ms=7)
@@ -604,6 +649,7 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
 
 
 
+
 if __name__ == "__main__":
     
     # standardise resulting CA dimensions
@@ -617,7 +663,7 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries = ["us"] #["poland", "netherlands", "uk", "france", "finland", "germany"] #, "us"]  #
+    countries = ["us", "poland", "netherlands", "uk", "france", "finland", "germany"]
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
     for year in [2023, 2020]:
@@ -627,7 +673,8 @@ if __name__ == "__main__":
             selected_coords = [36, 47] # choose two CHES dimensions related to COVID-19 polarised debates, set dataframe names to the names of the coords
         elif year == 2023:
             selected_coords = [1, 12]
-        selected_coords_names = ['lrecon', 'galtan']
+        selected_coords_names = ['issue_1', 'issue_2']
+        selected_coords_names_att = ["lrecon", "galtan"]
 
         for country in countries:
             
@@ -659,62 +706,14 @@ if __name__ == "__main__":
                     # total politicians followed per user                    
                     csum = np.sum(Y, axis=1)
                     csum = np.asarray(csum).flatten()
-                    F = rsum
-                    goal_n = 5e6 #1.5e7
-                    # 5 strata of popularity for politicians 
-                    H = 5
-                    c = 5000
-                    strata = np.percentile(rsum, np.linspace(0, 100, H+1))
-                    strata_idx = np.digitize(rsum, strata)-1
-                    strata_idx[strata_idx==H] = H-1
-                    # Proportional allocation: allocate sample to each bucket proportional to total followers in that bucket (preserve global share).
-                    # Flattened allocation: allocate equal numbers to each bucket (gives small followees more representation).
-                    # Compromise: allocate by N_h^α with α ∈ [0,1], where α=1 → proportional; α=0 → equal.
-                    alpha = 0.5
-                    y_idx_subsample = []
-                    # get lead users per bucket - indices of politicians in each bucket
-                    buckets = [np.where(strata_idx==h)[0] for h in range(H)]                    
-                    # total followers to extract per stratum h
-                    FF = np.zeros(H)                    
-                    Th_all = [] 
-                    for h in range(H):
-                        Th_all.append(np.sum(list(set([F[wh] for wh in buckets[h]]))))
-                    Th_all = np.array(Th_all)
-                    for h in range(H):
-                        Th = Th_all[h]
-                        FF[h] = np.round( goal_n * (Th**alpha) / np.sum(Th_all**alpha) )                    
-                    
-                    m_j_all = np.zeros(rsum.shape)
-                    for h in range(H):                        
-                        print(h)                        
-                        S = np.arange(0, len(buckets[h]), 1)
-                        # sample followers of stratum's politicians, capped at c per politician  DEDUPLICATE FOLLOWERS ACROSS POLITICIANS?
-                        sum_s_followees = np.sum([min(rsum[i], c) for i in S])
-                        bucket_quota = FF[h]
-                        m_j = [min(rsum[i], round(bucket_quota * min(rsum[i], c) / sum_s_followees)) for i in S]                                   
-                        leftover = bucket_quota - np.sum(m_j)                        
-                        m_j_prev = None
-                        while (not np.allclose(m_j, [min(rsum[i], c) for i in S])) and (leftover > 0):                                                            
-                            unsaturated = [i for i in range(len(S)) if m_j[i] < rsum[S[i]]]                            
-                            sum_s_followees_u = np.sum([rsum[S[i]] - m_j[i] for i in unsaturated])
-                            # print(leftover, sum_s_followees_u)
-                            for i in unsaturated:
-                                m_j[i] = min(rsum[S[i]], round(m_j[i]+leftover*(rsum[S[i]]-m_j[i])/sum_s_followees_u))
-                            leftover = bucket_quota - np.sum(m_j)                            
-                            if m_j_prev == m_j:
-                                break
-                            m_j_prev = m_j.copy()
-                                                        
-                        m_j = np.round(m_j).astype(int)                                   
-                        for i in range(len(S)):
-                            m_j_all[S[i]] = m_j[i]
-                        for i in range(len(S)):
-                            y_idx_subsample.extend(np.random.choice(np.argwhere(Y[:, S[i]]==1)[:, 0], size=m_j[i], replace=False).tolist())
-                    
-                    m_j_all = allocate_followers(N=rsum, n_h=goal_n, cap=c, threshold=500)
-                    ipdb.set_trace()
+                    goal_n = 1.5e7                   
+                    c = 30000                                    
+                    threshold_census = 1000
+                    y_idx_subsample = []                    
+                    m_j_all = allocate_followers(N=rsum, n_h=goal_n, cap=c, threshold=threshold_census)                         
+                    for i in range(len(m_j_all)):
+                        y_idx_subsample.extend(np.random.choice(np.argwhere(Y[:, i]==1)[:, 0], size=m_j_all[i], replace=False).tolist())                        
                     diagnostics(N=rsum, m=m_j_all, cap=c, n_h=goal_n, dirout=dataspace)
-                    # y_idx_subsample = np.random.choice(np.arange(0, Y.shape[0]), size=int(np.round(0.5*Y.shape[0])))            
                     Y = Y[y_idx_subsample, :]
                     Y = Y.todense().astype(np.int8)
                     K = Y.shape[0]
@@ -724,7 +723,6 @@ if __name__ == "__main__":
                 else:
                     Y = Y.todense().astype(np.int8)
                 
-
                 bipartite = adjacency_to_edge_list(Y)            
                 print('columns :'+str(bipartite.columns))
                 print('edges: '+str(bipartite.shape[0]))
@@ -732,7 +730,7 @@ if __name__ == "__main__":
                 print('num. of follower nodes j: '+ str(bipartite['j'].nunique()))
                 
                 bipartite.rename(columns={'i':'target','j':'source'},inplace=True)
-                # bipartite.to_csv("{}/bipartite_{}_{}.csv".format(dataspace, country, year), index=False)
+                bipartite.to_csv("{}/bipartite_{}_{}.csv".format(dataspace, country, year), index=False)
 
             ideoembedding_model.fit(bipartite)
             target_coords = ideoembedding_model.ideological_embedding_target_latent_dimensions_
@@ -773,13 +771,16 @@ if __name__ == "__main__":
                 elif year == 2023:
                     if country == "us":
                         parties_politicians[party] = mp_mapping.loc[mp_mapping.GPS2019_party_acronym==party, "mp_pseudo_id"].values.tolist()   
-                        map_y_tmp = pd.read_csv("{}/y_party_gps2019_{}_{}.csv".format(dataspace, country, year))      
-                        ipdb.set_trace()              
-                        map_y_tmp = map_y_tmp.loc[map_y_tmp.GPS2019_party_acronym==party, :].drop(columns=['GPS2019_party_acronym', "country", "electionyear",
-                                                                                                            "EPO_party_acronym", "family", "in_gov"])
-                        feature_names = map_y_tmp.columns.values.tolist()
-                        map_y_tmp = map_y_tmp.values.flatten()
-                        linate_map_y.append(map_y_tmp[selected_coords])
+                        # map_y_tmp = pd.read_csv("{}/y_party_gps2019_{}_{}.csv".format(dataspace, country, year))                              
+                        # map_y_tmp = map_y_tmp.loc[map_y_tmp.GPS2019_party_acronym==party, :].drop(columns=['GPS2019_party_acronym', "country", "electionyear",
+                        #                                                                                     "EPO_party_acronym", "family", "in_gov"])
+                        # feature_names = map_y_tmp.columns.values.tolist()
+                        # map_y_tmp = map_y_tmp.values.flatten()
+                        if party == "Dem":                            
+                            map_y_tmp = np.array([-1])
+                        else:                            
+                            map_y_tmp = np.array([1])
+                        linate_map_y.append(map_y_tmp)
                     else:
                         parties_politicians[party] = mp_mapping.loc[mp_mapping.CHES2023_party_acronym==party, "mp_pseudo_id"].values.tolist()   
                         map_y_tmp = pd.read_csv("{}/y_party_ches2023_{}_{}.csv".format(dataspace, country, year))                    
@@ -789,25 +790,7 @@ if __name__ == "__main__":
                         map_y_tmp = map_y_tmp.values.flatten()
                         linate_map_y.append(map_y_tmp[selected_coords])
             linate_map_y = np.stack(linate_map_y)
-
-            # TODO: NEED TO VERIFY THE COLUMN/ROW IDX - USER ID correspondence FOR US - extract again the subsampled indices!  ##########################################
-            # dataframes of CA-estimated X, Z ideal points. Columns names: target_id/source_id (int indices), latent_dimension_0, latent_dimension_1
-            # with jsonlines.open("{}/{}/estimation_CA_{}/params_out_global_theta_hat.jsonl".format(dataspace, country, year), mode="r") as f: 
-            #     for result in f.iter(type=dict, skip_invalid=True):                    
-            #         param_hat = result["X"]
-            #         X_hat = np.asarray(param_hat).reshape((d, K), order="F").T                         
-            #         param_hat = result["Z"]
-            #         Z_hat = np.asarray(param_hat).reshape((d, J), order="F").T                         
-            #         break
-            # xcolumns = selected_coords_names #["latent_dimension_{}".format(i) for i in range(X_hat.shape[1])]
-            # X_hat_df = pd.DataFrame(X_hat, columns=xcolumns)
-            # X_hat_df.index.name = "source"
-            # X_hat_df.index = X_hat_df.index.astype(str)
-            # zcolumns = selected_coords_names # ["latent_dimension_{}".format(i) for i in range(Z_hat.shape[1])]
-            # Z_hat_df = pd.DataFrame(Z_hat, columns=zcolumns)
-            # Z_hat_df.index.name = "target"
-            # Z_hat_df.index = Z_hat_df.index.astype(str)
-            
+           
             # party ideal points in estimated space, average over MPs of each party
             # parties in order of appearance in all_parties
             party_ideal_points_est = np.zeros((len(all_parties), d))
@@ -832,11 +815,18 @@ if __name__ == "__main__":
             # ipdb.set_trace()
             df_ref_group = pd.DataFrame({"i": leaduser_i, "k": party_idx}) # i: idx of lead user, k: idx of party
             df_ref_group = df_ref_group.astype({"i": str, "k": str})
-            group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names[0], selected_coords_names[1]])
+            
+            if country == "us" and year == 2023:
+                all_parties = ["Dem", "Rep"]
+                linate_map_y = np.array([[-1], [1]])
+                selected_coords_names_att = ['Party']
+                group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names[0]])
+            else:
+                group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names[0], selected_coords_names[1]])
             group_attitudes = group_attitudes.astype({"k": int}).astype({"k": str})
             Z_hat_df = Z_hat_df.loc[Z_hat_df.index.isin(df_ref_group['i'])].copy()
 
-            plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, all_parties, country, dataspace)
+            plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace)
 
 
 
