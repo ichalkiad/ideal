@@ -115,18 +115,18 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
         fig.update_layout(title=title, plot_bgcolor='rgb(255,255,255)',
                         yaxis=dict(
                             title=yaxis_title,
-                            titlefont_size=20,
-                            tickfont_size=20,
+                            titlefont_size=22,
+                            tickfont_size=22,
                             showgrid=showgrid,
                         ),
                         xaxis=dict(
                             title=xaxis_title,
-                            titlefont_size=20,
-                            tickfont_size=20,
+                            titlefont_size=22,
+                            tickfont_size=22,
                             showgrid=showgrid
                         ),
                         font=dict(
-                            size=20
+                            size=22
                         ),
                         showlegend=showlegend)
         if showlegend:
