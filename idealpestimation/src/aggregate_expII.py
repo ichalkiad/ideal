@@ -750,17 +750,17 @@ if __name__ == "__main__":
     fix_plot_layout_and_save(time_fig, savename, xaxis_title="Users sample size", yaxis_title="Duration (in minutes)", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False) 
+                            print_pdf=True) 
     fix_plot_layout_and_save(time_fig, savename, xaxis_title="Users sample size", yaxis_title="Duration (in minutes)", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
                             print_pdf=False) 
     savename = "{}/ram_max_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))    
-    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Max RAM consumption (in GB)", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False) 
-    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+                            print_pdf=True) 
+    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Max RAM consumption (in GB)", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
                             print_pdf=False) 
@@ -768,25 +768,25 @@ if __name__ == "__main__":
     fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average RAM consumption (in GB)", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False) 
+                            print_pdf=True) 
     fix_plot_layout_and_save(ram_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average RAM consumption (in GB)", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
                             print_pdf=False) 
     savename = "{}/cpu_max_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))    
-    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Max CPU utilisation (% usage of 1 core)", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
                             print_pdf=False) 
-    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Users sample size", yaxis_title="Max CPU utilisation (% usage of 1 core)", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False) 
+                            print_pdf=True) 
     savename = "{}/cpu_avg_J{}_sigmae_{}.html".format(dir_out, J, str(sigma_e).replace(".", ""))    
     fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False) 
+                            print_pdf=True) 
     fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Users sample size", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
@@ -800,7 +800,7 @@ if __name__ == "__main__":
                                 yaxis_title="Mean relative error (under rotation/translation)", 
                                 title="", showgrid=False, showlegend=False, 
                                 print_png=True, print_html=False, 
-                                print_pdf=False) 
+                                print_pdf=True) 
             fix_plot_layout_and_save(param_err_fig["{}_RT".format(param)], 
                                 savename, xaxis_title="Users sample size", 
                                 yaxis_title="Mean relative error (under rotation/translation)", 
@@ -811,7 +811,7 @@ if __name__ == "__main__":
         fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative error", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False)    
+                            print_pdf=True)    
         fix_plot_layout_and_save(param_err_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative error", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
@@ -823,7 +823,7 @@ if __name__ == "__main__":
                             yaxis_title="Mean relative squared error (under rotation/translation)", 
                             title="", showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False) 
+                            print_pdf=True) 
             fix_plot_layout_and_save(param_sqerr_fig["{}_RT".format(param)], savename, 
                             xaxis_title="Users sample size", 
                             yaxis_title="Mean relative squared error (under rotation/translation)", 
@@ -834,7 +834,7 @@ if __name__ == "__main__":
         fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative squared error", title="", 
                             showgrid=False, showlegend=False, 
                             print_png=True, print_html=False, 
-                            print_pdf=False) 
+                            print_pdf=True) 
         fix_plot_layout_and_save(param_sqerr_fig[param], savename, xaxis_title="Users sample size", yaxis_title="Mean relative squared error", title="", 
                             showgrid=False, showlegend=True, 
                             print_png=False, print_html=True, 
@@ -846,11 +846,11 @@ if __name__ == "__main__":
                         yaxis_title=r"$\text{Lead user total utility relative error }(p_{\cdot j})$", 
                         title="", showgrid=False, showlegend=True, 
                         print_png=True, print_html=True, 
-                        print_pdf=False)
+                        print_pdf=True)
     savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
     fix_plot_layout_and_save(param_pijmean_fig_RT, 
                         savename, xaxis_title="Lead users rank (most to least liked)", 
                         yaxis_title=r"${Lead user total utility relative error under rotation/translation }(p_{\cdot j})$", 
                         title="", showgrid=False, showlegend=True, 
                         print_png=True, print_html=True, 
-                        print_pdf=False)
+                        print_pdf=True)
