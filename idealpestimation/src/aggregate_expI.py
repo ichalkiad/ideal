@@ -69,13 +69,13 @@ if __name__ == "__main__":
                         k += 1    
                 ram_avg_allsigma_fig = go.Figure()
                 cpu_avg_allsigma_fig = go.Figure()
-                time_allsigma_fig = make_subplots(specs=[[{"secondary_y": True}]])
+                time_allsigma_fig = make_subplots(specs=[[{"secondary_y": False}]]) #True}]])
                 param_allsigma_err_fig = {}
                 for param in parameter_names:
                     if param in ["X", "Z"]:
                         param_allsigma_err_fig["{}_RT".format(param)] = go.Figure()
                     param_allsigma_err_fig[param] = go.Figure()
-                for algo in algorithms:
+                for algo_inner in [algo]:
                 # for sigma_e in sigma_es:
                     param_err_fig = {}
                     param_sqerr_fig = {}
@@ -85,7 +85,7 @@ if __name__ == "__main__":
                             param_sqerr_fig["{}_RT".format(param)] = go.Figure()
                         param_err_fig[param] = go.Figure()
                         param_sqerr_fig[param] = go.Figure()
-                    time_fig = make_subplots(specs=[[{"secondary_y": False}]]) #True}]])
+                    time_fig = make_subplots(specs=[[{"secondary_y": True}]])
                     ram_fig_max = go.Figure()
                     cpu_fig_max = go.Figure()
                     ram_fig_avg = go.Figure()
