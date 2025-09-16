@@ -655,11 +655,11 @@ if __name__ == "__main__":
                                             print_png=False, print_html=True, 
                                             print_pdf=False) 
                     savename = "{}/ram_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+                    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Max RAM consumption (in GB)", title="", 
                                             showgrid=False, showlegend=False, 
                                             print_png=True, print_html=False, 
                                             print_pdf=False) 
-                    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum RAM consumption (in GB)", title="", 
+                    fix_plot_layout_and_save(ram_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Max RAM consumption (in GB)", title="", 
                                             showgrid=False, showlegend=True, 
                                             print_png=False, print_html=True, 
                                             print_pdf=False) 
@@ -673,20 +673,20 @@ if __name__ == "__main__":
                                             print_png=False, print_html=True, 
                                             print_pdf=False) 
                     savename = "{}/cpu_max_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+                    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Max CPU utilisation (% usage of 1 core)", title="", 
                                             showgrid=False, showlegend=True, 
                                             print_png=False, print_html=True, 
                                             print_pdf=False) 
-                    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+                    fix_plot_layout_and_save(cpu_fig_max, savename, xaxis_title="Estimation algorithm", yaxis_title="Max CPU utilisation (% usage of 1 core)", title="", 
                                             showgrid=False, showlegend=False, 
                                             print_png=True, print_html=False, 
                                             print_pdf=False) 
                     savename = "{}/cpu_avg_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))    
-                    fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
+                    fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Avg CPU utilisation (% usage of 1 core)", title="", 
                                             showgrid=False, showlegend=False, 
                                             print_png=True, print_html=False, 
                                             print_pdf=False) 
-                    fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Average CPU utilisation (% usage of 1 core)", title="", 
+                    fix_plot_layout_and_save(cpu_fig_avg, savename, xaxis_title="Estimation algorithm", yaxis_title="Avg CPU utilisation (% usage of 1 core)", title="", 
                                             showgrid=False, showlegend=True, 
                                             print_png=False, print_html=True, 
                                             print_pdf=False)
@@ -755,7 +755,7 @@ if __name__ == "__main__":
                 #                         print_png=False, print_html=True, 
                 #                         print_pdf=False) 
                 savename = "{}/ram_avg_K{}_J{}_allsigmae.html".format(dir_out, K, J)    
-                fix_plot_layout_and_save(ram_avg_allsigma_fig, savename, xaxis_title=r"$\sigma_e^2$", yaxis_title="Average RAM consumption (in GB)", title="", 
+                fix_plot_layout_and_save(ram_avg_allsigma_fig, savename, xaxis_title=r"$\sigma_e^2$", yaxis_title="Avg RAM consumption (in GB)", title="", 
                                         showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
                                         print_pdf=True) 
@@ -764,7 +764,7 @@ if __name__ == "__main__":
                 #                         print_png=False, print_html=True, 
                 #                         print_pdf=False) 
                 savename = "{}/cpu_avg_K{}_J{}_allsigmae.html".format(dir_out, K, J)    
-                fix_plot_layout_and_save(cpu_avg_allsigma_fig, savename, xaxis_title=r"$\sigma_e^2$", yaxis_title="Maximum CPU utilisation (% usage of 1 core)", title="", 
+                fix_plot_layout_and_save(cpu_avg_allsigma_fig, savename, xaxis_title=r"$\sigma_e^2$", yaxis_title="Max CPU utilisation (% usage of 1 core)", title="", 
                                         showgrid=False, showlegend=False, 
                                         print_png=True, print_html=True, 
                                         print_pdf=True) 

@@ -60,7 +60,7 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expIIpaperfigs/".format(dataspace)
+    dir_out = "{}/rsspaper_expIIpaperfigs_fonts/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     param_pijmean_fig = go.Figure()
