@@ -23,6 +23,7 @@ import plotly.express as px
 from sklearn.base import BaseEstimator, TransformerMixin
 from typing import List, Optional
 from matplotlib.lines import Line2D
+from scipy.stats import gaussian_kde
 
 
 
@@ -282,6 +283,7 @@ class AttitudinalEmbedding(BaseEstimator, TransformerMixin):
         T_tilda_aff_np_3 = np.linalg.inv(T_tilda_aff_np_2)
         self.T_tilda_aff_np_ = np.matmul(T_tilda_aff_np_1, T_tilda_aff_np_3)
         #print(self.T_tilda_aff_np.shape)
+        self.T_tilda_aff_np_[-1, :-1] = 0.0
 
         return self
 
@@ -301,6 +303,8 @@ class AttitudinalEmbedding(BaseEstimator, TransformerMixin):
             X = X.to_numpy()
 
         try:
+            
+
             X_np = X[:, :self.employed_N_]
             X_np = X_np.T
             ones_np = np.ones((X_np.shape[1],), dtype = float)
@@ -525,7 +529,7 @@ def adjacency_to_edge_list(Y):
     
     return df
 
-def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, partylabels, country, dirout):
+def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, partylabels, country, dirout, vis="users"):
     
     color_dic = {'0':'blue','1':'red','2':'gold','3':'orange','4':'green',
                  '5':'violet','6':'cyan','7':'magenta','8':'brown','9':'gray',
@@ -534,7 +538,11 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
                  "19" : "pink", "20": "khaki"}
     
     target_coords['k'] = target_coords.index.map(df_ref_group.set_index('i')['k'])
-    g = sn.jointplot(data=source_coords.drop_duplicates(), x=selected_coords_names[0], y=selected_coords_names[1], kind="hex", gridsize=100)
+    if vis == "users":
+        g = sn.jointplot(data=source_coords.drop_duplicates(), x=selected_coords_names[0], y=selected_coords_names[1], kind="hex", gridsize=100)
+    else:
+        g = sn.jointplot(data=target_coords.drop_duplicates(), x=selected_coords_names[0], y=selected_coords_names[1], kind="hex", gridsize=100)
+
     ax = g.ax_joint
     for k in target_coords['k'].unique():
         df_k = target_coords[target_coords['k']==k]        
@@ -555,9 +563,9 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
             labels=["Dem", "GOP"],
         )
         fig = g.figure
-        outpath = "{}/plots_upd2/{}".format(dirout, country)
+        outpath = "{}/plots_updfixeddims/{}".format(dirout, country)
         pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
-        savename = "{}/{}_{}_{}_{}_att.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+        savename = "{}/{}_{}_{}_{}_att_{}.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1], vis)
         print('About to save the figure...')
         fig.savefig(savename,
                 dpi=300,
@@ -568,9 +576,9 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
 
     fig = g.figure
     # plt.show()
-    outpath = "{}/plots_upd2/{}".format(dirout, country)
+    outpath = "{}/plots_upd_fixeddims/{}".format(dirout, country)
     pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
-    savename = "{}/{}_{}_{}_{}.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+    savename = "{}/{}_{}_{}_{}_{}.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1], vis)
     print('About to save the first figure...')
     fig.savefig(savename,
             dpi=300,
@@ -589,13 +597,25 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
     ax[1].set_ylabel(selected_coords_names[1])
     ax[1].set_title('Group positions in ideological space')
     
-    # TODO: CHECK THE CORRECTNESS OF DIMENSIONS? ISSUE 1 OR 2 IS THE ATTITUDINAL DIMENSION?
     for k,row in group_attitudes.iterrows():
-        ax[2].plot(row[selected_coords_names[0]], row[selected_coords_names[1]],'o',mec='k',color=color_dic[row['k']])
-    ax[2].set_xlabel(selected_coords_names_att[0])
-    ax[2].set_ylabel(selected_coords_names_att[1])
+        ax[2].plot(row[selected_coords_names_att[0]], row[selected_coords_names_att[1]],'o',mec='k',color=color_dic[row['k']])
+    if selected_coords_names_att[0] == 'lrecon': 
+        ax[2].set_xlabel("Left-Right Economic")
+    elif selected_coords_names_att[0] == 'galtan':
+        ax[2].set_xlabel("Liberal-Conservative")
+    elif selected_coords_names_att[0] == 'antielite_salience':
+        ax[2].set_xlabel("Anti-Elite Salience")
+    if selected_coords_names_att[1] == 'lrecon': 
+        ax[2].set_ylabel("Left-Right Economic")
+    elif selected_coords_names_att[1] == 'galtan':
+        ax[2].set_ylabel("Liberal-Conservative")
+    elif selected_coords_names_att[1] == 'antielite_salience':
+        ax[2].set_ylabel("Anti-Elite Salience")
+    # ax[2].set_xlabel(selected_coords_names_att[0])
+    # ax[2].set_ylabel(selected_coords_names_att[1])
     ax[2].set_title('Group positions in attitudinal space')
     attiembedding_model = AttitudinalEmbedding(N = 2)
+
     target_coords['entity'] = target_coords.index 
     X = attiembedding_model.convert_to_group_ideological_embedding(target_coords, df_ref_group.rename(columns={'i':'entity','k':'group'}))
     Y = group_attitudes.rename(columns={'k':'entity'})
@@ -606,46 +626,144 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
     source_attitudinal = attiembedding_model.transform(source_coords)
     target_attitudinal['k'] = target_attitudinal['entity'].map(pd.Series(index=df_ref_group['i'].values,data=df_ref_group['k'].values))
 
-    g = sn.jointplot(data=source_attitudinal.drop_duplicates(),x=selected_coords_names[0],y=selected_coords_names[1], kind="hex", gridsize=100)
+    if vis == "users":
+        g = sn.jointplot(data=source_attitudinal.drop_duplicates(),x=selected_coords_names_att[0],y=selected_coords_names_att[1], kind="hex", gridsize=100)
+    else:
+        g = sn.jointplot(data=target_attitudinal.drop_duplicates(),x=selected_coords_names_att[0],y=selected_coords_names_att[1], kind="hex", gridsize=100)
+
     print('jointplot created – axes:', g.ax_joint)
     ax = g.ax_joint
     print('axes object:', ax)
     for k in target_attitudinal['k'].unique():
         df_k = target_attitudinal[target_attitudinal['k']==k]       
-        df_k_mean = df_k[[selected_coords_names[0],selected_coords_names[1]]].mean()
-        ax.scatter(df_k[selected_coords_names[0]],df_k[selected_coords_names[1]],marker='+',s=30,alpha=0.5,color=color_dic[k])
-        ax.plot(df_k_mean[selected_coords_names[0]],df_k_mean[selected_coords_names[1]],'o',mec='k',color=color_dic[k],ms=7)
+        df_k_mean = df_k[[selected_coords_names_att[0],selected_coords_names_att[1]]].mean()
+        ax.scatter(df_k[selected_coords_names_att[0]],df_k[selected_coords_names_att[1]],marker='+',s=30,alpha=0.5,color=color_dic[k])
+        ax.plot(df_k_mean[selected_coords_names_att[0]],df_k_mean[selected_coords_names_att[1]],'o',mec='k',color=color_dic[k],ms=7)
         if int(k) % 2 ==0:
             ax.annotate(
                 partylabels[int(k)].replace(";", "/"),
-                xy=(df_k_mean[selected_coords_names[0]],df_k_mean[selected_coords_names[1]]),         # Point to annotate
-                xytext=(df_k_mean[selected_coords_names[0]]-0.1,df_k_mean[selected_coords_names[1]]+0.2),   # Text location
+                xy=(df_k_mean[selected_coords_names_att[0]],df_k_mean[selected_coords_names_att[1]]),         # Point to annotate
+                xytext=(df_k_mean[selected_coords_names_att[0]]-0.1,df_k_mean[selected_coords_names_att[1]]+0.2),   # Text location
                 # arrowprops=dict(arrowstyle="->", color="red")
             )
         else:
             ax.annotate(
                 partylabels[int(k)],
-                xy=(df_k_mean[selected_coords_names[0]],df_k_mean[selected_coords_names[1]]),         # Point to annotate
-                xytext=(df_k_mean[selected_coords_names[0]]+0.1,df_k_mean[selected_coords_names[1]]-0.2),   # Text location
+                xy=(df_k_mean[selected_coords_names_att[0]],df_k_mean[selected_coords_names_att[1]]),         # Point to annotate
+                xytext=(df_k_mean[selected_coords_names_att[0]]+0.1,df_k_mean[selected_coords_names_att[1]]-0.2),   # Text location
                 # arrowprops=dict(arrowstyle="->", color="red")
             )
-
-    
-    # x_max, x_min = group_attitudes[selected_coords_names[0]].max()+1.5, group_attitudes[selected_coords_names[0]].min()-1.5
-    # y_max, y_min = group_attitudes[selected_coords_names[1]].max()+1.5, group_attitudes[selected_coords_names[1]].min()-1.5
-    # plt.xlim(x_min, x_max)
-    # plt.ylim(y_min, y_max)
-
+    if selected_coords_names_att[0] == 'lrecon': 
+        ax.set_xlabel("Left-Right Economic")
+    elif selected_coords_names_att[0] == 'galtan':
+        ax.set_xlabel("Liberal-Conservative")
+    elif selected_coords_names_att[0] == 'antielite_salience':
+        ax.set_xlabel("Anti-Elite Salience")
+    if selected_coords_names_att[1] == 'lrecon': 
+        ax.set_ylabel("Left-Right Economic")
+    elif selected_coords_names_att[1] == 'galtan':
+        ax.set_ylabel("Liberal-Conservative")
+    elif selected_coords_names_att[1] == 'antielite_salience':
+        ax.set_ylabel("Anti-Elite Salience")
     fig = g.figure
-    outpath = "{}/plots_upd2/{}".format(dirout, country)
+    outpath = "{}/plots_upd_fixeddims/{}".format(dirout, country)
     pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
-    savename = "{}/{}_{}_{}_{}_att.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
-    print('About to save the figure...')
-    fig.savefig(savename,
-            dpi=300,
-            bbox_inches='tight',
-            transparent=False) 
-    print('✅ Figure saved to {}'.format(savename))
+    savename = "{}/{}_{}_{}_{}_att_{}.png".format(outpath, country, year, selected_coords_names_att[0], selected_coords_names_att[1], vis)
+    print('About to save the second figure...')
+    try:
+        fig.savefig(savename,
+                dpi=100,
+                bbox_inches='tight',
+                transparent=False) 
+        print('✅ Figure saved to {}'.format(savename))
+    except:
+        return
+
+def plot_single_coord(axe, axe_att, coord_idx, target_coords, source_coords, df_ref_group, group_attitudes, 
+                    selected_coords_names, selected_coords_names_att, partylabels, country, dirout, year, coordtargetplot, vis="users"):
+    
+    color_dic = {'0':'blue','1':'red','2':'gold','3':'orange','4':'green',
+                 '5':'violet','6':'cyan','7':'magenta','8':'brown','9':'gray',
+                 '10':'olive','11':'yellow','12':'lime','13':'navy','14':'coral', 
+                 '15': "turquoise", "16": "indigo", "17": "teal", "18": "purple", 
+                 "19" : "pink", "20": "khaki"}
+    
+    target_coords['k'] = target_coords.index.map(df_ref_group.set_index('i')['k'])
+    if vis == "users":
+        df = source_coords.drop_duplicates()
+    else:
+        df = target_coords.drop_duplicates()
+    series = df[selected_coords_names[coord_idx]]
+    axe.hist(series.dropna(), color=color_dic[str(coord_idx+2+coordtargetplot)], bins=20, edgecolor='black', alpha=0.7, density=True)
+    if coord_idx == 0:
+        axe.set_title("{} - {}".format(country, year))
+    axe.set_xlabel(series.name)
+    kde = gaussian_kde(series.dropna().values)
+    x_vals = np.linspace(series.dropna().values.min(), series.dropna().values.max(), 200)
+    axe.plot(x_vals, kde(x_vals), color="red", linewidth=2, label="")
+        
+    group_attitudes['k'] = group_attitudes['k'].astype(str)  
+    group_ideologies = target_coords.groupby('k').mean()
+    attiembedding_model = AttitudinalEmbedding(N = 2)
+
+    target_coords['entity'] = target_coords.index 
+    X = attiembedding_model.convert_to_group_ideological_embedding(target_coords, df_ref_group.rename(columns={'i':'entity','k':'group'}))
+    Y = group_attitudes.rename(columns={'k':'entity'})
+    attiembedding_model.fit(X, Y)
+    target_coords['entity'] = target_coords.index
+    target_attitudinal = attiembedding_model.transform(target_coords)
+    source_coords['entity'] = source_coords.index
+    source_attitudinal = attiembedding_model.transform(source_coords)
+    target_attitudinal['k'] = target_attitudinal['entity'].map(pd.Series(index=df_ref_group['i'].values,data=df_ref_group['k'].values))
+
+    if vis == "users":
+        df = source_attitudinal.drop_duplicates()
+    else:
+        df = target_attitudinal.drop_duplicates()
+    series = df[selected_coords_names_att[coord_idx]]
+    axe_att.hist(series.dropna(), color=color_dic[str(coord_idx+2+coordtargetplot)], bins=20, edgecolor='black', alpha=0.7, density=True)
+    if coord_idx == 0:
+        axe_att.set_title("{} - {}".format(country, year))
+    if series.name == "lrecon":
+        axe_att.set_xlabel("Left-Right Economic")
+    elif series.name == "galtan":
+        axe_att.set_xlabel("Liberal-Conservative")
+    elif series.name == "antielite_salience":
+        axe_att.set_xlabel("Anti-Elite Salience")    
+    kde = gaussian_kde(series.dropna().values)
+    x_vals = np.linspace(series.dropna().values.min(), series.dropna().values.max(), 200)
+    axe_att.plot(x_vals, kde(x_vals), color="red", linewidth=2, label="")
+        
+    plt.tight_layout()
+
+    # if country == 'us':
+    #     ax.axvline(x=1, color='red', linestyle='--', label='GOP')
+    #     ax.axvline(x=-1, color='blue', linestyle='--', label='Dem')
+    #     ax.set_xlabel(selected_coords_names_att[0])
+    #     custom_lines = [
+    #         Line2D([0], [0], color='red', linestyle='--'),
+    #         Line2D([0], [0], color='blue', linestyle='--')
+    #     ]
+
+    #     plt.legend(
+    #         handles=[plt.Line2D([], [], color='black'), *custom_lines],
+    #         labels=["Dem", "GOP"],
+    #     )
+    #     fig = g.figure
+    #     outpath = "{}/plots_updfixeddims/{}".format(dirout, country)
+    #     pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
+    #     savename = "{}/{}_{}_{}_{}_att.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+    #     print('About to save the figure...')
+    #     fig.savefig(savename,
+    #             dpi=300,
+    #             bbox_inches='tight',
+    #             transparent=False) 
+    #     print('✅ Figure saved to {}'.format(savename))
+    #     return
+
+  
+    
+    return
 
 
 
@@ -663,179 +781,239 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries = ["finland", "us", "poland", "netherlands", "uk", "france", "germany"]
+    countries =  ["poland"] #["netherlands", "finland", "uk", "france", "germany", "us", "poland"]
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
-    for year in [2023, 2020]:
+    for year in [2020]: #, 2023]:
         # CHES2019:  0: 'lrecon', 2: 'antielite_salience', 28: 'civlib_laworder', 30: 'country', 36: 'lrgen', 47: 'people_vs_elite', 15 : "galtan" (liberal-conservative)
         # CHES2023:  5: 'lrecon', 0: 'antielite_salience', 12: "galtan" (liberal-conservative)
         if year == 2020:
-            selected_coords = [36, 47] # choose two CHES dimensions related to COVID-19 polarised debates, set dataframe names to the names of the coords
+            #selected_coords = [36, 47] # choose two CHES dimensions related to COVID-19 polarised debates, set dataframe names to the names of the coords
+            selected_coords_top = [0, 15, 2]
         elif year == 2023:
-            selected_coords = [1, 12]
-        selected_coords_names = ['issue_1', 'issue_2']
-        selected_coords_names_att = ["lrecon", "galtan"]
+            selected_coords_top = [5, 12, 0]        
+        selected_coords_names_top = ['latent_dimension_1', 'latent_dimension_2', "latent_dimension_3"]
+        selected_coords_names_att_top = ["lrecon", "galtan", "antielite_salience"]
+        
+        for country in countries: 
 
-        for country in countries:
-            
-            if country == "us" and year == 2020:
-                continue
+            fig_users, axes_users = plt.subplots(3, 1, figsize=(8, 10))
+            fig_leadusers, axes_leadusers = plt.subplots(3, 1, figsize=(8, 10))
+            fig_users_att, axes_users_att = plt.subplots(3, 1, figsize=(8, 10))
+            fig_leadusers_att, axes_leadusers_att = plt.subplots(3, 1, figsize=(8, 10))
+            coordsplotted = []
 
-            datasets_names = [file.name for file in pathlib.Path(dataspace).iterdir() if file.is_file() and (country in file.name and str(year) in file.name and "mappings" in file.name)]
-            if len(datasets_names) == 0:
-                continue
-
-            K = int(datasets_names[0].split("_")[3].replace("K", ""))
-            J = int(datasets_names[0].split("_")[4].replace("J", ""))            
-            print(parallel, K, J, elementwise, evaluate_posterior)            
-            parameter_names = ["X", "Z"]
-            d = 2  
-
-            mappings, node_to_index_start, index_to_node_start, \
-                    node_to_index_end, index_to_node_end, Y = load_matrix("{}/Y_{}_{}".format(dataspace, country, year), K, J)      
-            
-            try:
-                bipartite = pd.read_csv("{}/bipartite_{}_{}.csv".format(dataspace, country, year))
-                X_hat_df = pd.read_csv("{}/{}/X_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
-                Z_hat_df = pd.read_csv("{}/{}/Z_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
-                Z_hat = Z_hat_df.to_numpy()
-                X_hat = X_hat_df.to_numpy()
-            except:                
-                ideoembedding_model = IdeologicalEmbedding(n_latent_dimensions = 2, 
-                                                        in_degree_threshold = 10, 
-                                                        out_degree_threshold = 10)
-                if country == "us":                   
-                    # total followers per politician
-                    rsum = np.sum(Y, axis=0)
-                    rsum = np.asarray(rsum).flatten()
-                    # total politicians followed per user                    
-                    csum = np.sum(Y, axis=1)
-                    csum = np.asarray(csum).flatten()
-                    goal_n = 1.5e7                   
-                    c = 30000                                    
-                    threshold_census = 1000
-                    y_idx_subsample = []                    
-                    m_j_all = allocate_followers(N=rsum, n_h=goal_n, cap=c, threshold=threshold_census)                         
-                    for i in range(len(m_j_all)):
-                        y_idx_subsample.extend(np.random.choice(np.argwhere(Y[:, i]==1)[:, 0], size=m_j_all[i], replace=False).tolist())                        
-                    diagnostics(N=rsum, m=m_j_all, cap=c, n_h=goal_n, dirout=dataspace)
-                    Y = Y[y_idx_subsample, :]
-                    Y = Y.todense().astype(np.int8)
-                    K = Y.shape[0]
-                    # note that if Users IDs are needed, they must be stored here and retrieved when needed - subsampling changes order
-                    parameter_space_dim = (K+J)*d + J + K + 2
-                    print(Y.shape)
-                else:
-                    Y = Y.todense().astype(np.int8)
+            for selected_coords, selected_coords_names, selected_coords_names_att in zip([selected_coords_top[:2], selected_coords_top[1:], selected_coords_top[::2]],
+                [selected_coords_names_top[:2], selected_coords_names_top[1:], selected_coords_names_top[::2]],
+                [selected_coords_names_att_top[:2], selected_coords_names_att_top[1:], selected_coords_names_att_top[::2]]):
                 
-                bipartite = adjacency_to_edge_list(Y)            
-                print('columns :'+str(bipartite.columns))
-                print('edges: '+str(bipartite.shape[0]))
-                print('num. of reference nodes i: '+ str(bipartite['i'].nunique()))
-                print('num. of follower nodes j: '+ str(bipartite['j'].nunique()))
+                print('Selected coords:', selected_coords, selected_coords_names, selected_coords_names_att)    
+                if country == "us" and year == 2020:
+                    continue
+                datasets_names = [file.name for file in pathlib.Path(dataspace).iterdir() if file.is_file() and (country in file.name and str(year) in file.name and "mappings" in file.name)]
+                if len(datasets_names) == 0:
+                    continue                
+
+                K = int(datasets_names[0].split("_")[3].replace("K", ""))
+                J = int(datasets_names[0].split("_")[4].replace("J", ""))            
+                print(parallel, K, J, elementwise, evaluate_posterior)            
+                parameter_names = ["X", "Z"]
+                d = 2
+                mappings, node_to_index_start, index_to_node_start, \
+                        node_to_index_end, index_to_node_end, Y = load_matrix("{}/Y_{}_{}".format(dataspace, country, year), K, J)      
                 
-                bipartite.rename(columns={'i':'target','j':'source'},inplace=True)
-                bipartite.to_csv("{}/{}/bipartite_{}_{}.csv".format(dataspace, country, country, year), index=False)
+                try:
+                    bipartite = pd.read_csv("{}/bipartite_{}_{}.csv".format(dataspace, country, year))
+                    X_hat_df = pd.read_csv("{}/{}/X_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
+                    Z_hat_df = pd.read_csv("{}/{}/Z_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
+                    Z_hat = Z_hat_df.to_numpy()
+                    X_hat = X_hat_df.to_numpy()
+                except:                
+                    ideoembedding_model = IdeologicalEmbedding(n_latent_dimensions = 2, 
+                                                            in_degree_threshold = 10, 
+                                                            out_degree_threshold = 10)
+                    if country == "us":                   
+                        # total followers per politician
+                        rsum = np.sum(Y, axis=0)
+                        rsum = np.asarray(rsum).flatten()
+                        # total politicians followed per user                    
+                        csum = np.sum(Y, axis=1)
+                        csum = np.asarray(csum).flatten()
+                        goal_n = 1.5e7                   
+                        c = 30000                                    
+                        threshold_census = 1000
+                        y_idx_subsample = []                    
+                        m_j_all = allocate_followers(N=rsum, n_h=goal_n, cap=c, threshold=threshold_census)                         
+                        for i in range(len(m_j_all)):
+                            y_idx_subsample.extend(np.random.choice(np.argwhere(Y[:, i]==1)[:, 0], size=m_j_all[i], replace=False).tolist())                        
+                        diagnostics(N=rsum, m=m_j_all, cap=c, n_h=goal_n, dirout=dataspace)
+                        Y = Y[y_idx_subsample, :]
+                        Y = Y.todense().astype(np.int8)
+                        K = Y.shape[0]
+                        # note that if Users IDs are needed, they must be stored here and retrieved when needed - subsampling changes order
+                        parameter_space_dim = (K+J)*d + J + K + 2
+                        print(Y.shape)
+                    else:
+                        Y = Y.todense().astype(np.int8)
+                    
+                    bipartite = adjacency_to_edge_list(Y)            
+                    print('columns :'+str(bipartite.columns))
+                    print('edges: '+str(bipartite.shape[0]))
+                    print('num. of reference nodes i: '+ str(bipartite['i'].nunique()))
+                    print('num. of follower nodes j: '+ str(bipartite['j'].nunique()))
+                    
+                    bipartite.rename(columns={'i':'target','j':'source'},inplace=True)
+                    bipartite.to_csv("{}/{}/bipartite_{}_{}.csv".format(dataspace, country, country, year), index=False)
 
-                ideoembedding_model.fit(bipartite)
-                target_coords = ideoembedding_model.ideological_embedding_target_latent_dimensions_
-                print(len(target_coords))
-                target_coords.columns = selected_coords_names
-                source_coords = ideoembedding_model.ideological_embedding_source_latent_dimensions_
-                print(len(source_coords))
-                source_coords.columns = selected_coords_names
-                Z_hat_df = target_coords
-                Z_hat_df.to_csv("{}/{}/Z_{}_{}.csv".format(dataspace, country, country, year))
-                Z_hat = target_coords.to_numpy()
-                X_hat_df = source_coords
-                X_hat_df.to_csv("{}/{}/X_{}_{}.csv".format(dataspace, country, country, year))
+                    ideoembedding_model.fit(bipartite)
+                    target_coords = ideoembedding_model.ideological_embedding_target_latent_dimensions_
+                    print(len(target_coords))
+                    target_coords.columns = selected_coords_names
+                    source_coords = ideoembedding_model.ideological_embedding_source_latent_dimensions_
+                    print(len(source_coords))
+                    source_coords.columns = selected_coords_names
+                    Z_hat_df = target_coords
+                    Z_hat_df.to_csv("{}/{}/Z_{}_{}.csv".format(dataspace, country, country, year))
+                    Z_hat = target_coords.to_numpy()
+                    X_hat_df = source_coords
+                    X_hat_df.to_csv("{}/{}/X_{}_{}.csv".format(dataspace, country, country, year))
 
-            mp_mapping = pd.read_csv("{}/parties_lead_users_{}_{}.csv".format(dataspace, country, year))
-            if year == 2020:
-                all_parties = np.unique(mp_mapping.CHES2019_party_acronym.dropna().values).tolist()
-            elif year == 2023:
-                if country == "us":
-                    all_parties = np.unique(mp_mapping.GPS2019_party_acronym.dropna().values).tolist()
-                else:
-                    all_parties = np.unique(mp_mapping.CHES2023_party_acronym.dropna().values).tolist()
-
-            # linate map in same order as all_parties, keep only dimensions of interest
-            parties_politicians = dict()
-            linate_map_y = []
-            for party in all_parties:
+                mp_mapping = pd.read_csv("{}/parties_lead_users_{}_{}.csv".format(dataspace, country, year))
                 if year == 2020:
-                    parties_politicians[party] = mp_mapping.loc[mp_mapping.CHES2019_party_acronym==party, "mp_pseudo_id"].values.tolist()
-                    map_y_tmp = pd.read_csv("{}/y_party_ches2019_{}_{}.csv".format(dataspace, country, year))
-                    map_y_tmp = map_y_tmp.loc[map_y_tmp.CHES2019_party_acronym==party, :].drop(columns=['CHES2019_party_acronym', 
-                                                                                                        "EPO_party_acronym",
-                                                                                                        "eu_econ_require",
-                                                                                                        "eu_political_require",
-                                                                                                        "eu_googov_require",
-                                                                                                        "lrecon_dissent"])
-                    feature_names = map_y_tmp.columns.values.tolist()
-                    map_y_tmp = map_y_tmp.values.flatten()
-                    linate_map_y.append(map_y_tmp[selected_coords])
+                    all_parties = np.unique(mp_mapping.CHES2019_party_acronym.dropna().values).tolist()
                 elif year == 2023:
                     if country == "us":
-                        parties_politicians[party] = mp_mapping.loc[mp_mapping.GPS2019_party_acronym==party, "mp_pseudo_id"].values.tolist()   
-                        # map_y_tmp = pd.read_csv("{}/y_party_gps2019_{}_{}.csv".format(dataspace, country, year))                              
-                        # map_y_tmp = map_y_tmp.loc[map_y_tmp.GPS2019_party_acronym==party, :].drop(columns=['GPS2019_party_acronym', "country", "electionyear",
-                        #                                                                                     "EPO_party_acronym", "family", "in_gov"])
-                        # feature_names = map_y_tmp.columns.values.tolist()
-                        # map_y_tmp = map_y_tmp.values.flatten()
-                        if party == "Dem":                            
-                            map_y_tmp = np.array([-1])
-                        else:                            
-                            map_y_tmp = np.array([1])
-                        linate_map_y.append(map_y_tmp)
+                        all_parties = np.unique(mp_mapping.GPS2019_party_acronym.dropna().values).tolist()
                     else:
-                        parties_politicians[party] = mp_mapping.loc[mp_mapping.CHES2023_party_acronym==party, "mp_pseudo_id"].values.tolist()   
-                        map_y_tmp = pd.read_csv("{}/y_party_ches2023_{}_{}.csv".format(dataspace, country, year))                    
-                        map_y_tmp = map_y_tmp.loc[map_y_tmp.CHES2023_party_acronym==party, :].drop(columns=['CHES2023_party_acronym', "country", "electionyear",
-                                                                                                            "EPO_party_acronym", "family", "in_gov"])
+                        all_parties = np.unique(mp_mapping.CHES2023_party_acronym.dropna().values).tolist()
+
+                # linate map in same order as all_parties, keep only dimensions of interest
+                parties_politicians = dict()
+                linate_map_y = []
+                for party in all_parties:
+                    if year == 2020:
+                        parties_politicians[party] = mp_mapping.loc[mp_mapping.CHES2019_party_acronym==party, "mp_pseudo_id"].values.tolist()
+                        map_y_tmp = pd.read_csv("{}/y_party_ches2019_{}_{}.csv".format(dataspace, country, year))
+                        map_y_tmp = map_y_tmp.loc[map_y_tmp.CHES2019_party_acronym==party, :].drop(columns=['CHES2019_party_acronym', 
+                                                                                                            "EPO_party_acronym",
+                                                                                                            "eu_econ_require",
+                                                                                                            "eu_political_require",
+                                                                                                            "eu_googov_require",
+                                                                                                            "lrecon_dissent"])
                         feature_names = map_y_tmp.columns.values.tolist()
                         map_y_tmp = map_y_tmp.values.flatten()
+                        selected_coords = [feature_names.index(selected_coords_names_att[0]), feature_names.index(selected_coords_names_att[1])]
+                        print(np.asarray(feature_names)[selected_coords])
                         linate_map_y.append(map_y_tmp[selected_coords])
-            linate_map_y = np.stack(linate_map_y)
-           
-            # party ideal points in estimated space, average over MPs of each party
-            # parties in order of appearance in all_parties
-            party_ideal_points_est = np.zeros((len(all_parties), d))
-            party_idx = []
-            leaduser_i = []
-            for party in all_parties:
-                z_loc = []
-                for mp in parties_politicians[party]:
-                    # second condition accounts for dropped nodes due to degree thresholding
-                    if mp in node_to_index_end.keys():
-                        try:
-                            user_idx = node_to_index_end[mp]                            
-                            z_loc.append(Z_hat[user_idx, :])
-                            leaduser_i.append(user_idx)                
-                            party_idx.append(all_parties.index(party))
-                        except:
-                            print("{} dropped due to degree thresholding".format(user_idx))
-                    else:
-                        print("Lead user {} not found in mapping.".format(mp))
-                        continue                    
-                party_ideal_points_est[all_parties.index(party), :] = np.mean(np.stack(z_loc), axis=0)     
-            # ipdb.set_trace()
-            df_ref_group = pd.DataFrame({"i": leaduser_i, "k": party_idx}) # i: idx of lead user, k: idx of party
-            df_ref_group = df_ref_group.astype({"i": str, "k": str})
+                    elif year == 2023:
+                        if country == "us":
+                            parties_politicians[party] = mp_mapping.loc[mp_mapping.GPS2019_party_acronym==party, "mp_pseudo_id"].values.tolist()   
+                            if party == "Dem":                            
+                                map_y_tmp = np.array([-1])
+                            else:                            
+                                map_y_tmp = np.array([1])
+                            linate_map_y.append(map_y_tmp)
+                        else:
+                            parties_politicians[party] = mp_mapping.loc[mp_mapping.CHES2023_party_acronym==party, "mp_pseudo_id"].values.tolist()   
+                            map_y_tmp = pd.read_csv("{}/y_party_ches2023_{}_{}.csv".format(dataspace, country, year))                    
+                            map_y_tmp = map_y_tmp.loc[map_y_tmp.CHES2023_party_acronym==party, :].drop(columns=['CHES2023_party_acronym', "country", "electionyear",
+                                                                                                                "EPO_party_acronym", "family", "in_gov"])
+                            feature_names = map_y_tmp.columns.values.tolist()
+                            selected_coords = [feature_names.index(selected_coords_names_att[0]), feature_names.index(selected_coords_names_att[1])]
+                            print(np.asarray(feature_names)[selected_coords])
+                            map_y_tmp = map_y_tmp.values.flatten()
+                            linate_map_y.append(map_y_tmp[selected_coords])
+                linate_map_y = np.stack(linate_map_y)
             
-            if country == "us" and year == 2023:
-                all_parties = ["Dem", "Rep"]
-                linate_map_y = np.array([[-1], [1]])
-                selected_coords_names_att = ['Party']
-                group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names[0]])
-            else:
-                group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names[0], selected_coords_names[1]])
-            group_attitudes = group_attitudes.astype({"k": int}).astype({"k": str})
-            Z_hat_df = Z_hat_df.loc[Z_hat_df.index.isin(df_ref_group['i'])].copy()
+                # party ideal points in estimated space, average over MPs of each party
+                # parties in order of appearance in all_parties
+                party_ideal_points_est = np.zeros((len(all_parties), d))
+                party_idx = []
+                leaduser_i = []
+                for party in all_parties:
+                    z_loc = []
+                    for mp in parties_politicians[party]:
+                        # second condition accounts for dropped nodes due to degree thresholding
+                        if mp in node_to_index_end.keys():
+                            try:
+                                user_idx = node_to_index_end[mp]                            
+                                z_loc.append(Z_hat[user_idx, :])
+                                leaduser_i.append(user_idx)                
+                                party_idx.append(all_parties.index(party))
+                            except:
+                                print("{} dropped due to degree thresholding".format(user_idx))
+                        else:
+                            print("Lead user {} not found in mapping.".format(mp))
+                            continue                    
+                    party_ideal_points_est[all_parties.index(party), :] = np.mean(np.stack(z_loc), axis=0)     
+                
+                df_ref_group = pd.DataFrame({"i": leaduser_i, "k": party_idx}) # i: idx of lead user, k: idx of party
+                df_ref_group = df_ref_group.astype({"i": str, "k": str})
+                
+                if country == "us" and year == 2023:
+                    all_parties = ["Dem", "Rep"]
+                    linate_map_y = np.array([[-1], [1]])
+                    selected_coords_names_att = ['Party']
+                    group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names_att[0]])
+                else:
+                    group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names_att[0], selected_coords_names_att[1]])
+                group_attitudes = group_attitudes.astype({"k": int}).astype({"k": str})
+                Z_hat_df = Z_hat_df.loc[Z_hat_df.index.isin(df_ref_group['i'])].copy()
 
-            plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace)
+                plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, vis="users")
+                plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, vis="leadusers")
+                
+                if len(coordsplotted) == 2:
+                    coordtargetplot = 1
+                else:
+                    coordtargetplot = 0
+                if selected_coords_names[0] not in coordsplotted:
+                    plot_single_coord(axes_users[0+coordtargetplot], axes_users_att[0+coordtargetplot], 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users")
+                if selected_coords_names[1] not in coordsplotted:   
+                    plot_single_coord(axes_users[1+coordtargetplot], axes_users_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users")
+                if selected_coords_names[0] not in coordsplotted:
+                    plot_single_coord(axes_leadusers[0+coordtargetplot], axes_leadusers_att[0+coordtargetplot], 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers")
+                    coordsplotted.append(selected_coords_names[0])
+                if selected_coords_names[1] not in coordsplotted:   
+                    plot_single_coord(axes_leadusers[1+coordtargetplot], axes_leadusers_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers")
+                    coordsplotted.append(selected_coords_names[1])
+            outpath = "{}/plots_upd_fixeddims/{}".format(dataspace, country)
+            pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
+            savename = "{}/{}_{}_{}_{}_hist.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+            print('About to save the figure...')
+            fig_users.savefig(savename,
+                    dpi=300,
+                    bbox_inches='tight',
+                    transparent=False) 
+            print('✅ Figure saved to {}'.format(savename))         
+            savename = "{}/{}_{}_{}_{}_hist_att.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+            print('About to save the figure...')
+            fig_users_att.savefig(savename,
+                    dpi=300,
+                    bbox_inches='tight',
+                    transparent=False) 
+            print('✅ Figure saved to {}'.format(savename))    
 
-
+            outpath = "{}/plots_upd_fixeddims/{}".format(dataspace, country)
+            pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
+            savename = "{}/{}_{}_{}_{}_hist_lead.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+            print('About to save the figure...')
+            fig_leadusers.savefig(savename,
+                    dpi=300,
+                    bbox_inches='tight',
+                    transparent=False) 
+            print('✅ Figure saved to {}'.format(savename))         
+            savename = "{}/{}_{}_{}_{}_hist_att_lead.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+            print('About to save the figure...')
+            fig_leadusers_att.savefig(savename,
+                    dpi=300,
+                    bbox_inches='tight',
+                    transparent=False) 
+            print('✅ Figure saved to {}'.format(savename))                 
 
     
     
