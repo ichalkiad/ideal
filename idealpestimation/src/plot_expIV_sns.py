@@ -25,7 +25,80 @@ from typing import List, Optional
 from matplotlib.lines import Line2D
 from scipy.stats import gaussian_kde
 
+from sklearn.linear_model import RidgeCV
+from sklearn.model_selection import GridSearchCV, KFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import make_scorer, mean_squared_error
 
+def ridge_cv_estimate(X, y, dirout, alphas=None, seed_value=None, selected_coords_names=None, country=None, year=None):
+    """
+    Ridge regression with 10-fold CV to select lambda    
+    -----------
+    X : np.ndarray
+        Feature matrix (n_samples x n_features)
+    y : np.ndarray
+        Target vector (n_samples,)
+    alphas : array-like, optional
+        Candidate regularization strengths (λ). Default: logspace(-4, 4, 50)
+
+    Returns:
+    --------
+    beta_matrix : np.ndarray
+        Estimated coefficients including intercept (shape: n_features+1,)
+        Format: [intercept, coef_1, coef_2, ..., coef_p]
+    best_alpha : float
+        The selected regularization coefficient
+    """
+    if alphas is None:
+        alphas = np.logspace(-4, 4, 50)
+    
+    # RidgeCV with LOOCV
+    ridgecv = make_pipeline(
+        StandardScaler(),
+        RidgeCV(alphas=alphas, store_cv_results=True, cv=None)
+    )
+
+    # Fit model
+    ridgecv.fit(X, y)
+    # Extract best alpha
+    best_alpha = ridgecv.named_steps['ridgecv'].alpha_
+    # Extract coefficients
+    intercept = ridgecv.named_steps['ridgecv'].intercept_
+    coefs = ridgecv.named_steps['ridgecv'].coef_
+    beta_matrix = coefs
+    beta_matrix[:, -1] = intercept
+    
+    cv_values = ridgecv.named_steps['ridgecv'].cv_results_
+    mean_loocv_mse = cv_values.mean(axis=0).sum(axis=0)
+    mean_loocv_rmse = np.sqrt(mean_loocv_mse)
+    plt.figure(figsize=(8,5))
+    plt.semilogx(alphas, mean_loocv_rmse, marker="o")
+    plt.axvline(best_alpha, color="r", linestyle="--", 
+                label=f"Best α = {best_alpha:.4f}")
+    plt.xlabel("Alpha (λ)")
+    plt.ylabel("LOOCV RMSE")
+    plt.title("Ridge Regression: LOOCV Error vs Regularization Strength")
+    plt.legend()
+    outpath = "{}/plots_upd_fixeddims_ridgecv/{}".format(dirout, country)
+    pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
+    if country == "us":
+        savename = "{}/{}_{}_{}_ridgecv.png".format(outpath, country, year, selected_coords_names[0])
+    else:
+        savename = "{}/{}_{}_{}_{}_ridgecv.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+    print('About to save the figure...')
+    plt.savefig(savename,
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
+    plt.savefig(savename.replace("png","pdf"),
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
+    print('✅ Figure saved to {}'.format(savename))
+    # plt.show()
+    
+    return beta_matrix, best_alpha
 
 def allocate_followers(N: List[int], n_h: int, cap: int, threshold: Optional[int] = None) -> List[int]:
     """
@@ -132,6 +205,10 @@ def diagnostics(N: List[int], m: List[int], cap: int, n_h: int, buckets: Optiona
             dpi=300,
             bbox_inches='tight',
             transparent=False) 
+    plt.savefig(savename.replace("png","pdf"),
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
     
     plt.figure(figsize=(8, 5))  
     plt.hist(m, bins=30, alpha=0.5, label="Allocated followers")
@@ -155,6 +232,10 @@ def diagnostics(N: List[int], m: List[int], cap: int, n_h: int, buckets: Optiona
             dpi=300,
             bbox_inches='tight',
             transparent=False) 
+    plt.savefig(savename.replace("png","pdf"),
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
 
     # Coverage ratio
     coverage = m / np.maximum(N, 1)
@@ -165,8 +246,12 @@ def diagnostics(N: List[int], m: List[int], cap: int, n_h: int, buckets: Optiona
     plt.ylabel("Coverage ratio (allocated / original)")
     plt.title("Coverage ratio by followee size")
     # plt.show()
-    savename = "{}/{}_{}_coverage_ration_by_followee_size.png".format(dirout, country, year)    
+    savename = "{}/{}_{}_coverage_ratio_by_followee_size.png".format(dirout, country, year)    
     plt.savefig(savename,
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
+    plt.savefig(savename.replace("png","pdf"),
             dpi=300,
             bbox_inches='tight',
             transparent=False) 
@@ -198,6 +283,10 @@ def diagnostics(N: List[int], m: List[int], cap: int, n_h: int, buckets: Optiona
             dpi=300,
             bbox_inches='tight',
             transparent=False) 
+    plt.savefig(savename.replace("png","pdf"),
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
 
     # Effective sample size (ESS)
     if np.any(weights > 0):
@@ -222,7 +311,7 @@ class AttitudinalEmbedding(BaseEstimator, TransformerMixin):
         # number of latent ideological dimensions to be considered
         self.N = N # default : None --> P (number of groups) - 1
 
-    def fit(self, X, Y):
+    def fit(self, X, Y, dirout, seed_value, selected_coords_names=None, country=None, year=None):
 
         if not isinstance(X, pd.DataFrame):
             raise ValueError('\'X\' parameter must be a pandas dataframe')
@@ -278,13 +367,17 @@ class AttitudinalEmbedding(BaseEstimator, TransformerMixin):
         #print(X_tilda_np.shape)
 
         # finally compute T_tilda_aff
-        T_tilda_aff_np_1 = np.matmul(Y_tilda_np, X_tilda_np.T)
-        T_tilda_aff_np_2 = np.matmul(X_tilda_np, X_tilda_np.T)
-        T_tilda_aff_np_3 = np.linalg.inv(T_tilda_aff_np_2)
-        self.T_tilda_aff_np_ = np.matmul(T_tilda_aff_np_1, T_tilda_aff_np_3)
-        #print(self.T_tilda_aff_np.shape)
-        self.T_tilda_aff_np_[-1, :-1] = 0.0
+        # T_tilda_aff_np_1 = np.matmul(Y_tilda_np, X_tilda_np.T)
+        # T_tilda_aff_np_2 = np.matmul(X_tilda_np, X_tilda_np.T)
+        # T_tilda_aff_np_3 = np.linalg.inv(T_tilda_aff_np_2)
+        # self.T_tilda_aff_np_ = np.matmul(T_tilda_aff_np_1, T_tilda_aff_np_3)
+        # #print(self.T_tilda_aff_np.shape)
+        # self.T_tilda_aff_np_[-1, :-1] = 0.0
 
+        beta_matrix, best_alpha = ridge_cv_estimate(X_tilda_np.T, Y_tilda_np.T, dirout=dirout, alphas=None, seed_value=seed_value,
+                                                    selected_coords_names=selected_coords_names, country=country, year=year)
+        self.T_tilda_aff_np_ = beta_matrix
+        
         return self
 
     def transform(self, X):
@@ -529,7 +622,7 @@ def adjacency_to_edge_list(Y):
     
     return df
 
-def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, partylabels, country, dirout, vis="users"):
+def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, partylabels, country, dirout, vis="users", seed_value=None):
     
     color_dic = {'0':'blue','1':'red','2':'gold','3':'orange','4':'green',
                  '5':'violet','6':'cyan','7':'magenta','8':'brown','9':'gray',
@@ -553,6 +646,7 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
         ax.axvline(x=1, color='red', linestyle='--', label='GOP')
         ax.axvline(x=-1, color='blue', linestyle='--', label='Dem')
         ax.set_xlabel(selected_coords_names_att[0])
+        ax.set_ylabel("")
         custom_lines = [
             Line2D([0], [0], color='red', linestyle='--'),
             Line2D([0], [0], color='blue', linestyle='--')
@@ -563,7 +657,7 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
             labels=["Dem", "GOP"],
         )
         fig = g.figure
-        outpath = "{}/plots_updfixeddims/{}".format(dirout, country)
+        outpath = "{}/plots_upd_fixeddims_ridgecv/{}".format(dirout, country)
         pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
         savename = "{}/{}_{}_{}_{}_att_{}.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1], vis)
         print('About to save the figure...')
@@ -572,15 +666,23 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
                 bbox_inches='tight',
                 transparent=False) 
         print('✅ Figure saved to {}'.format(savename))
+        fig.savefig(savename.replace("png","pdf"),
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
         return
 
     fig = g.figure
     # plt.show()
-    outpath = "{}/plots_upd_fixeddims/{}".format(dirout, country)
+    outpath = "{}/plots_upd_fixeddims_ridgecv/{}".format(dirout, country)
     pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
     savename = "{}/{}_{}_{}_{}_{}.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1], vis)
     print('About to save the first figure...')
     fig.savefig(savename,
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
+    fig.savefig(savename.replace("png","pdf"),
             dpi=300,
             bbox_inches='tight',
             transparent=False) 
@@ -619,7 +721,7 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
     target_coords['entity'] = target_coords.index 
     X = attiembedding_model.convert_to_group_ideological_embedding(target_coords, df_ref_group.rename(columns={'i':'entity','k':'group'}))
     Y = group_attitudes.rename(columns={'k':'entity'})
-    attiembedding_model.fit(X, Y)
+    attiembedding_model.fit(X, Y, dirout=dirout, seed_value=seed_value, selected_coords_names=selected_coords_names_att, country=country, year=year)
     target_coords['entity'] = target_coords.index
     target_attitudinal = attiembedding_model.transform(target_coords)
     source_coords['entity'] = source_coords.index
@@ -666,7 +768,7 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
     elif selected_coords_names_att[1] == 'antielite_salience':
         ax.set_ylabel("Anti-Elite Salience")
     fig = g.figure
-    outpath = "{}/plots_upd_fixeddims/{}".format(dirout, country)
+    outpath = "{}/plots_upd_fixeddims_ridgecv/{}".format(dirout, country)
     pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
     savename = "{}/{}_{}_{}_{}_att_{}.png".format(outpath, country, year, selected_coords_names_att[0], selected_coords_names_att[1], vis)
     print('About to save the second figure...')
@@ -675,33 +777,38 @@ def plot_hexhist(target_coords, source_coords, df_ref_group, group_attitudes, se
                 dpi=100,
                 bbox_inches='tight',
                 transparent=False) 
+        fig.savefig(savename.replace("png","pdf"),
+            dpi=300,
+            bbox_inches='tight',
+            transparent=False) 
         print('✅ Figure saved to {}'.format(savename))
     except:
         return
 
 def plot_single_coord(axe, axe_att, coord_idx, target_coords, source_coords, df_ref_group, group_attitudes, 
-                    selected_coords_names, selected_coords_names_att, partylabels, country, dirout, year, coordtargetplot, vis="users"):
+                    selected_coords_names, selected_coords_names_att, partylabels, country, dirout, year, coordtargetplot, vis="users", seed_value=None):
     
     color_dic = {'0':'blue','1':'red','2':'gold','3':'orange','4':'green',
                  '5':'violet','6':'cyan','7':'magenta','8':'brown','9':'gray',
                  '10':'olive','11':'yellow','12':'lime','13':'navy','14':'coral', 
                  '15': "turquoise", "16": "indigo", "17": "teal", "18": "purple", 
                  "19" : "pink", "20": "khaki"}
-    
+
     target_coords['k'] = target_coords.index.map(df_ref_group.set_index('i')['k'])
     if vis == "users":
         df = source_coords.drop_duplicates()
     else:
         df = target_coords.drop_duplicates()
     series = df[selected_coords_names[coord_idx]]
-    axe.hist(series.dropna(), color=color_dic[str(coord_idx+2+coordtargetplot)], bins=20, edgecolor='black', alpha=0.7, density=True)
-    if coord_idx == 0:
-        axe.set_title("{} - {}".format(country, year))
-    axe.set_xlabel(series.name)
-    kde = gaussian_kde(series.dropna().values)
-    x_vals = np.linspace(series.dropna().values.min(), series.dropna().values.max(), 200)
-    axe.plot(x_vals, kde(x_vals), color="red", linewidth=2, label="")
-        
+    if axe is not None:
+        axe.hist(series.dropna(), color=color_dic[str(coord_idx+2+coordtargetplot)], bins=20, edgecolor='black', alpha=0.7, density=True)
+        if coord_idx == 0:
+            axe.set_title("{} - {}".format(country, year))
+        axe.set_xlabel(series.name)
+        kde = gaussian_kde(series.dropna().values)
+        x_vals = np.linspace(series.dropna().values.min(), series.dropna().values.max(), 200)
+        axe.plot(x_vals, kde(x_vals), color="red", linewidth=2, label="")
+       
     group_attitudes['k'] = group_attitudes['k'].astype(str)  
     group_ideologies = target_coords.groupby('k').mean()
     attiembedding_model = AttitudinalEmbedding(N = 2)
@@ -709,7 +816,7 @@ def plot_single_coord(axe, axe_att, coord_idx, target_coords, source_coords, df_
     target_coords['entity'] = target_coords.index 
     X = attiembedding_model.convert_to_group_ideological_embedding(target_coords, df_ref_group.rename(columns={'i':'entity','k':'group'}))
     Y = group_attitudes.rename(columns={'k':'entity'})
-    attiembedding_model.fit(X, Y)
+    attiembedding_model.fit(X, Y, dirout=dirout, seed_value=seed_value, selected_coords_names=selected_coords_names_att, country=country, year=year)
     target_coords['entity'] = target_coords.index
     target_attitudinal = attiembedding_model.transform(target_coords)
     source_coords['entity'] = source_coords.index
@@ -730,38 +837,13 @@ def plot_single_coord(axe, axe_att, coord_idx, target_coords, source_coords, df_
         axe_att.set_xlabel("Liberal-Conservative")
     elif series.name == "antielite_salience":
         axe_att.set_xlabel("Anti-Elite Salience")    
+    elif series.name == "Party":
+        axe_att.set_xlabel("Democrats - Republicans")
     kde = gaussian_kde(series.dropna().values)
     x_vals = np.linspace(series.dropna().values.min(), series.dropna().values.max(), 200)
     axe_att.plot(x_vals, kde(x_vals), color="red", linewidth=2, label="")
         
-    plt.tight_layout()
-
-    # if country == 'us':
-    #     ax.axvline(x=1, color='red', linestyle='--', label='GOP')
-    #     ax.axvline(x=-1, color='blue', linestyle='--', label='Dem')
-    #     ax.set_xlabel(selected_coords_names_att[0])
-    #     custom_lines = [
-    #         Line2D([0], [0], color='red', linestyle='--'),
-    #         Line2D([0], [0], color='blue', linestyle='--')
-    #     ]
-
-    #     plt.legend(
-    #         handles=[plt.Line2D([], [], color='black'), *custom_lines],
-    #         labels=["Dem", "GOP"],
-    #     )
-    #     fig = g.figure
-    #     outpath = "{}/plots_updfixeddims/{}".format(dirout, country)
-    #     pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
-    #     savename = "{}/{}_{}_{}_{}_att.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
-    #     print('About to save the figure...')
-    #     fig.savefig(savename,
-    #             dpi=300,
-    #             bbox_inches='tight',
-    #             transparent=False) 
-    #     print('✅ Figure saved to {}'.format(savename))
-    #     return
-
-  
+    plt.tight_layout() 
     
     return
 
@@ -781,10 +863,10 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries =  ["poland"] #["netherlands", "finland", "uk", "france", "germany", "us", "poland"]
+    countries = ["poland", "netherlands", "finland", "uk", "france", "germany", "us"]
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
-    for year in [2020]: #, 2023]:
+    for year in [2020, 2023]:
         # CHES2019:  0: 'lrecon', 2: 'antielite_salience', 28: 'civlib_laworder', 30: 'country', 36: 'lrgen', 47: 'people_vs_elite', 15 : "galtan" (liberal-conservative)
         # CHES2023:  5: 'lrecon', 0: 'antielite_salience', 12: "galtan" (liberal-conservative)
         if year == 2020:
@@ -792,20 +874,25 @@ if __name__ == "__main__":
             selected_coords_top = [0, 15, 2]
         elif year == 2023:
             selected_coords_top = [5, 12, 0]        
-        selected_coords_names_top = ['latent_dimension_1', 'latent_dimension_2', "latent_dimension_3"]
+        selected_coords_names = ['latent_dimension_1', 'latent_dimension_2']
         selected_coords_names_att_top = ["lrecon", "galtan", "antielite_salience"]
         
         for country in countries: 
-
-            fig_users, axes_users = plt.subplots(3, 1, figsize=(8, 10))
-            fig_leadusers, axes_leadusers = plt.subplots(3, 1, figsize=(8, 10))
-            fig_users_att, axes_users_att = plt.subplots(3, 1, figsize=(8, 10))
-            fig_leadusers_att, axes_leadusers_att = plt.subplots(3, 1, figsize=(8, 10))
+            
+            if country == "us":
+                fig_users, axes_users = plt.subplots(1, 1, figsize=(8, 10))
+                fig_leadusers, axes_leadusers = plt.subplots(1, 1, figsize=(8, 10))
+                fig_users_att, axes_users_att = plt.subplots(1, 1, figsize=(8, 10))
+                fig_leadusers_att, axes_leadusers_att = plt.subplots(1, 1, figsize=(8, 10))
+            else:
+                fig_users, axes_users = plt.subplots(2, 1, figsize=(8, 10))
+                fig_leadusers, axes_leadusers = plt.subplots(2, 1, figsize=(8, 10))
+                fig_users_att, axes_users_att = plt.subplots(3, 1, figsize=(8, 10))
+                fig_leadusers_att, axes_leadusers_att = plt.subplots(3, 1, figsize=(8, 10))
             coordsplotted = []
-
-            for selected_coords, selected_coords_names, selected_coords_names_att in zip([selected_coords_top[:2], selected_coords_top[1:], selected_coords_top[::2]],
-                [selected_coords_names_top[:2], selected_coords_names_top[1:], selected_coords_names_top[::2]],
-                [selected_coords_names_att_top[:2], selected_coords_names_att_top[1:], selected_coords_names_att_top[::2]]):
+            
+            for selected_coords, selected_coords_names_att in zip([selected_coords_top[:2], selected_coords_top[1:], selected_coords_top[::2]],
+                    [selected_coords_names_att_top[:2], selected_coords_names_att_top[1:], selected_coords_names_att_top[::2]]):
                 
                 print('Selected coords:', selected_coords, selected_coords_names, selected_coords_names_att)    
                 if country == "us" and year == 2020:
@@ -823,7 +910,7 @@ if __name__ == "__main__":
                         node_to_index_end, index_to_node_end, Y = load_matrix("{}/Y_{}_{}".format(dataspace, country, year), K, J)      
                 
                 try:
-                    bipartite = pd.read_csv("{}/bipartite_{}_{}.csv".format(dataspace, country, year))
+                    bipartite = pd.read_csv("{}/{}/bipartite_{}_{}.csv".format(dataspace, country, country, year))
                     X_hat_df = pd.read_csv("{}/{}/X_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
                     Z_hat_df = pd.read_csv("{}/{}/Z_{}_{}.csv".format(dataspace, country, country, year), index_col=0)
                     Z_hat = Z_hat_df.to_numpy()
@@ -958,30 +1045,48 @@ if __name__ == "__main__":
                 else:
                     group_attitudes = pd.DataFrame(np.column_stack([np.arange(0, len(all_parties), 1), linate_map_y]), columns=["k", selected_coords_names_att[0], selected_coords_names_att[1]])
                 group_attitudes = group_attitudes.astype({"k": int}).astype({"k": str})
-                Z_hat_df = Z_hat_df.loc[Z_hat_df.index.isin(df_ref_group['i'])].copy()
 
-                plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, vis="users")
-                plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, vis="leadusers")
-                
+                Z_hat_df.index = Z_hat_df.index.map(str)
+                Z_hat_df = Z_hat_df.loc[Z_hat_df.index.isin(df_ref_group['i'])].copy()              
+
+                plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, vis="users", seed_value=seed_value)
+                plot_hexhist(Z_hat_df, X_hat_df, df_ref_group, group_attitudes, selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, vis="leadusers", seed_value=seed_value)
+
                 if len(coordsplotted) == 2:
                     coordtargetplot = 1
                 else:
                     coordtargetplot = 0
-                if selected_coords_names[0] not in coordsplotted:
-                    plot_single_coord(axes_users[0+coordtargetplot], axes_users_att[0+coordtargetplot], 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
-                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users")
-                if selected_coords_names[1] not in coordsplotted:   
-                    plot_single_coord(axes_users[1+coordtargetplot], axes_users_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
-                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users")
-                if selected_coords_names[0] not in coordsplotted:
-                    plot_single_coord(axes_leadusers[0+coordtargetplot], axes_leadusers_att[0+coordtargetplot], 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
-                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers")
-                    coordsplotted.append(selected_coords_names[0])
-                if selected_coords_names[1] not in coordsplotted:   
-                    plot_single_coord(axes_leadusers[1+coordtargetplot], axes_leadusers_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
-                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers")
-                    coordsplotted.append(selected_coords_names[1])
-            outpath = "{}/plots_upd_fixeddims/{}".format(dataspace, country)
+                if len(coordsplotted) == 1 and country == "us":
+                    continue
+                if selected_coords_names_att[0] not in coordsplotted:
+                    if country == "us":
+                        plot_single_coord(axes_users, axes_users_att, 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users", seed_value=seed_value)                                    
+                        plot_single_coord(axes_leadusers, axes_leadusers_att, 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers", seed_value=seed_value)
+                    else:
+                        plot_single_coord(axes_users[0+coordtargetplot], axes_users_att[0+coordtargetplot], 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users", seed_value=seed_value)                                    
+                        plot_single_coord(axes_leadusers[0+coordtargetplot], axes_leadusers_att[0+coordtargetplot], 0, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                      selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers", seed_value=seed_value)
+                    coordsplotted.append(selected_coords_names_att[0])
+                if country != "us":
+                    if selected_coords_names_att[1] not in coordsplotted and len(coordsplotted) < 2:                           
+                        plot_single_coord(axes_users[1+coordtargetplot], axes_users_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                    selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users", seed_value=seed_value)                    
+                        plot_single_coord(axes_leadusers[1+coordtargetplot], axes_leadusers_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                    selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers", seed_value=seed_value)
+                        coordsplotted.append(selected_coords_names_att[1])
+                    elif selected_coords_names_att[1] not in coordsplotted and len(coordsplotted) == 2:
+                        plot_single_coord(None, axes_users_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                    selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="users", seed_value=seed_value)                    
+                        plot_single_coord(None, axes_leadusers_att[1+coordtargetplot], 1, Z_hat_df, X_hat_df, df_ref_group, group_attitudes, 
+                                    selected_coords_names, selected_coords_names_att, all_parties, country, dataspace, year, coordtargetplot, vis="leadusers", seed_value=seed_value)
+                        coordsplotted.append(selected_coords_names_att[1])
+                
+            if country == "us" and year == 2020:
+                continue
+            outpath = "{}/plots_upd_fixeddims_ridgecv/{}".format(dataspace, country)
             pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
             savename = "{}/{}_{}_{}_{}_hist.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
             print('About to save the figure...')
@@ -989,16 +1094,24 @@ if __name__ == "__main__":
                     dpi=300,
                     bbox_inches='tight',
                     transparent=False) 
+            fig_users.savefig(savename.replace("png","pdf"),
+                dpi=300,
+                bbox_inches='tight',
+                transparent=False) 
             print('✅ Figure saved to {}'.format(savename))         
-            savename = "{}/{}_{}_{}_{}_hist_att.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+            savename = "{}/{}_{}_hist_att.png".format(outpath, country, year)
             print('About to save the figure...')
             fig_users_att.savefig(savename,
                     dpi=300,
                     bbox_inches='tight',
                     transparent=False) 
+            fig_users_att.savefig(savename.replace("png","pdf"),
+                dpi=300,
+                bbox_inches='tight',
+                transparent=False) 
             print('✅ Figure saved to {}'.format(savename))    
 
-            outpath = "{}/plots_upd_fixeddims/{}".format(dataspace, country)
+            outpath = "{}/plots_upd_fixeddims_ridgecv/{}".format(dataspace, country)
             pathlib.Path(outpath).mkdir(parents=True, exist_ok=True)
             savename = "{}/{}_{}_{}_{}_hist_lead.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
             print('About to save the figure...')
@@ -1006,13 +1119,21 @@ if __name__ == "__main__":
                     dpi=300,
                     bbox_inches='tight',
                     transparent=False) 
+            fig_leadusers.savefig(savename.replace("png","pdf"),
+                    dpi=300,
+                    bbox_inches='tight',
+                    transparent=False) 
             print('✅ Figure saved to {}'.format(savename))         
-            savename = "{}/{}_{}_{}_{}_hist_att_lead.png".format(outpath, country, year, selected_coords_names[0], selected_coords_names[1])
+            savename = "{}/{}_{}_hist_att_lead.png".format(outpath, country, year)
             print('About to save the figure...')
             fig_leadusers_att.savefig(savename,
                     dpi=300,
                     bbox_inches='tight',
                     transparent=False) 
+            fig_leadusers_att.savefig(savename.replace("png","pdf"),
+                dpi=300,
+                bbox_inches='tight',
+                transparent=False) 
             print('✅ Figure saved to {}'.format(savename))                 
 
     
