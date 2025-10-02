@@ -126,9 +126,9 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"    
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper_expIupd/"    
     parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentIII_ca.csv", header=None)
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_ca_upd.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])

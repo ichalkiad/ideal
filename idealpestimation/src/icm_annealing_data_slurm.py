@@ -227,9 +227,9 @@ if __name__ == "__main__":
     plot_online = False
     fastrun = True
 
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"     
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper_expIupd/"     
     parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentIII_icm_data.csv", header=None)
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_data_upd.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])
@@ -258,7 +258,14 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     d = 2  
-    gridpoints_num = 50  #50,  80 for quite a few
+    # gridpoints_num = 50  #50,  80 for quite a few
+    gridpoints_num = dict()
+    gridpoints_num["X"] = 80
+    gridpoints_num["Z"] = 80
+    gridpoints_num["alpha"] = 150
+    gridpoints_num["beta"] = 150
+    gridpoints_num["gamma"] = 300
+    gridpoints_num["sigma_e"] = 300
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))

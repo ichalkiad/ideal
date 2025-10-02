@@ -585,11 +585,11 @@ if __name__ == "__main__":
     # Generate synthetic data
     # trials
     M = 10
-    # number of leaders
-    Js = [50, 500, 1000]  #[100] #, 500, 1000]
+    # number of leaders 
+    Js = [100] # [50, 500, 1000]
     # number of followers
-    Ks = [10000] #, 50000, 100000]
-    sigma_es = [0.01, 0.5, 5.0] #[0.1, 0.5, 1.0, 5.0, 0.01]  # expI-expII
+    Ks = [50000] #[10000] #, 50000, 100000]
+    sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]  # expI-expII  #[0.01, 0.5, 5.0]
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
     for K in Ks:
@@ -607,16 +607,29 @@ if __name__ == "__main__":
                 print(K, J, sigma_e)
                 parameter_space_dim = (K+J)*d + J + K + 2
 
-                alpha_js = generate_normal_data(n_samples=J, n_dimensions=1, mu=alpha_mean, sigma=alpha_var, rng=rng)                
-                beta_is = generate_normal_data(n_samples=K, n_dimensions=1, mu=beta_mean, sigma=beta_var, rng=rng)
+                
+                DATA_dirinit = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/data_K{}_J{}_sigmae001/0/".format(K, J)                
+                with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(DATA_dirinit), "r") as f:
+                    for result in f.iter(type=dict, skip_invalid=True):
+                            parameters = result
+                J = parameters["J"]
+                K = parameters["K"]
+                mu_e = 0
+                alpha_js = np.asarray(parameters["alpha"])
+                beta_is = np.asarray(parameters["beta"])                
+                zs = np.asarray(parameters["Z"]).reshape((d, J), order="F")
+                xs = np.asarray(parameters["X"]).reshape((d, K), order="F")
+                    
 
-                # followers' ideal points
-                # K x d
-                xs = generate_normal_data(n_samples=K, n_dimensions=d, mu=xs_mean_1, sigma=xs_sigma_1, rng=rng)
-                xs = xs.transpose()
-                # leaders' ideal points - unimodal distribution
-                zs1 = generate_normal_data(n_samples=J, n_dimensions=d, mu=zs_mean_1, sigma=zs_sigma_1, rng=rng)
-                zs = zs1.transpose()
+                # alpha_js = generate_normal_data(n_samples=J, n_dimensions=1, mu=alpha_mean, sigma=alpha_var, rng=rng)                
+                # beta_is = generate_normal_data(n_samples=K, n_dimensions=1, mu=beta_mean, sigma=beta_var, rng=rng)
+                # # followers' ideal points
+                # # K x d
+                # xs = generate_normal_data(n_samples=K, n_dimensions=d, mu=xs_mean_1, sigma=xs_sigma_1, rng=rng)
+                # xs = xs.transpose()
+                # # leaders' ideal points - unimodal distribution
+                # zs1 = generate_normal_data(n_samples=J, n_dimensions=d, mu=zs_mean_1, sigma=zs_sigma_1, rng=rng)
+                # zs = zs1.transpose()
 
                 theta, param_positions_dict = params2optimisation_dict(J, K, d, parameter_names, xs, zs, None, alpha_js, beta_is, gamma, delta, sigma_e)    
                 theta = np.asarray(theta)
@@ -634,7 +647,7 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
+                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_updExpI/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
                     # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)

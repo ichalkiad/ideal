@@ -285,10 +285,10 @@ if __name__ == "__main__":
 
     M = 10
     # Exp I        
-    # Ks = [50000]
-    # Js = [100]
-    # sigma_es = [0.01, 0.1, 0.5, 1.0, 5.0]    
-    # batchsize = {50000: 1504}
+    Ks = [50000]
+    Js = [100]
+    sigma_es = [0.1, 0.5, 1.0, 5.0]    # 0.01, 
+    batchsize = {50000: 1504}
     # Exp II
     # Ks = [10000, 100000]
     # Js = [100]
@@ -298,13 +298,13 @@ if __name__ == "__main__":
     # dir_out = "/mnt/hdd2/ioannischalkiadakis/"
     # get_slurm_experiment_csvs("II", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
     # Exp III
-    Ks = [10000]
-    Js = [50, 500, 1000]
-    sigma_es = [1, 3, 5]
-    batchsize = {50: 604, 500: 64, 1000: 34}
-    dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIIIupd/"
-    dir_out = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIIIupd/"
-    get_slurm_experiment_csvs("III", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
+    # Ks = [10000]
+    # Js = [50, 500, 1000]
+    # sigma_es = [1, 3, 5]
+    # batchsize = {50: 604, 500: 64, 1000: 34}
+    dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIupd/"
+    dir_out = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIupd/"
+    get_slurm_experiment_csvs("I", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
     sys.exit()
 
     # python idealpestimation/src/ca.py --trials 1 --K 30 --J 10 --sigmae 001

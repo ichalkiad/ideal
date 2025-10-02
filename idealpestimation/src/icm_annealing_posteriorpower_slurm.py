@@ -150,8 +150,8 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
 
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper/"         
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentIII_icm_poster.csv", header=None)
+    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper_expIupd/"         
+    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster_upd.csv", header=None)
     # dataspace = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
     # parameter_grid = pd.read_csv("/mnt/hdd2/ioannischalkiadakis/slurm_experimentI_icm_poster.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
@@ -179,7 +179,14 @@ if __name__ == "__main__":
     # no status quo
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     d = 2  
-    gridpoints_num = 30 # 30
+    # gridpoints_num = 30 # 30
+    gridpoints_num = dict()
+    gridpoints_num["X"] = 30
+    gridpoints_num["Z"] = 30
+    gridpoints_num["alpha"] = 100
+    gridpoints_num["beta"] = 100
+    gridpoints_num["gamma"] = 180
+    gridpoints_num["sigma_e"] = 180
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))

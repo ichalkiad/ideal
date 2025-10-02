@@ -93,13 +93,13 @@ def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir
                         mle["data_end"].append(end)
                         icm_data["data_end"].append(end)
     caout = pd.DataFrame.from_dict(ca)              
-    caout.to_csv("{}/slurm_experiment{}_ca.csv".format(dir_out, exper), header=None, index=False)
+    caout.to_csv("{}/slurm_experiment{}_ca_upd.csv".format(dir_out, exper), header=None, index=False)
     mleout = pd.DataFrame.from_dict(mle)              
-    mleout.to_csv("{}/slurm_experiment{}_mle.csv".format(dir_out, exper), header=None, index=False)
+    mleout.to_csv("{}/slurm_experiment{}_mle_upd.csv".format(dir_out, exper), header=None, index=False)
     icmpout = pd.DataFrame.from_dict(icm_poster)              
-    icmpout.to_csv("{}/slurm_experiment{}_icm_poster.csv".format(dir_out, exper), header=None, index=False)
+    icmpout.to_csv("{}/slurm_experiment{}_icm_poster_upd.csv".format(dir_out, exper), header=None, index=False)
     icmdout = pd.DataFrame.from_dict(icm_data)              
-    icmdout.to_csv("{}/slurm_experiment{}_icm_data.csv".format(dir_out, exper), header=None, index=False)
+    icmdout.to_csv("{}/slurm_experiment{}_icm_data_upd.csv".format(dir_out, exper), header=None, index=False)
 
 
 
@@ -3126,17 +3126,24 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
     
     if gridpoints_num_plot is not None:
         gridpoints_num = gridpoints_num_plot
+        gridpoints_num_p = gridpoints_num
     
-    if not elementwise:
-        gridpoints_num_alpha_beta = gridpoints_num**2
+    if isinstance(gridpoints_num, dict):
+        if param in ["X", "Phi", "Z"]:
+            gridpoints_num_p = gridpoints_num[param]
+        else:
+            gridpoints_num_alpha_beta = gridpoints_num[param]
     else:
-        gridpoints_num_alpha_beta = gridpoints_num*3 #2, 5,6 for some when large J
-        if param in ["gamma"]:
-            gridpoints_num_alpha_beta = gridpoints_num*6 # *3 enough for most to converge, then 4 ok - for ICM-P, 5,6 for icm-d
-        if param in ["sigma_e"]: # for ICM-D
-            gridpoints_num_alpha_beta = gridpoints_num*3  # 3 ok for most, then 4 , 6 for icm-d
-        if param in ["alpha"]:   #for expIII
-            gridpoints_num_alpha_beta = 20  #gridpoints_num
+        if not elementwise:
+            gridpoints_num_alpha_beta = gridpoints_num_p**2
+        else:
+            gridpoints_num_alpha_beta = gridpoints_num_p*3 #2, 5,6 for some when large J
+            if param in ["gamma"]:
+                gridpoints_num_alpha_beta = gridpoints_num_p*6 # *3 enough for most to converge, then 4 ok - for ICM-P, 5,6 for icm-d
+            if param in ["sigma_e"]: # for ICM-D
+                gridpoints_num_alpha_beta = gridpoints_num_p*3  # 3 ok for most, then 4 , 6 for icm-d
+            if param in ["alpha"]:   #for expIII
+                gridpoints_num_alpha_beta = 20  #gridpoints_num
     xx_ = None
 
     if param == "alpha":
@@ -3156,24 +3163,24 @@ def get_evaluation_grid(param, vector_coordinate, args, gridpoints_num_plot=None
     else:           
         if d == 1 or elementwise and vector_coordinate is not None:
             if param == "Phi":
-                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate], grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate], gridpoints_num).tolist()                
+                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate], grid_width_std*np.sqrt(prior_scale_phi[vector_coordinate, vector_coordinate])+prior_loc_phi[vector_coordinate], gridpoints_num_p).tolist()                
             elif param == "Z":
-                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], gridpoints_num).tolist()                
+                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], grid_width_std*np.sqrt(prior_scale_z[vector_coordinate, vector_coordinate])+prior_loc_z[vector_coordinate], gridpoints_num_p).tolist()                
             elif param == "X":
-                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], gridpoints_num).tolist()                            
+                grid = np.linspace(-grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], grid_width_std*np.sqrt(prior_scale_x[vector_coordinate, vector_coordinate])+prior_loc_x[vector_coordinate], gridpoints_num_p).tolist()                            
         elif (d > 1 and d <= 5) and not elementwise:
             if param == "Phi":
-                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], gridpoints_num).tolist() for i in range(d)]
+                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], gridpoints_num_p).tolist() for i in range(d)]
                 grid = itertools.product(*unidimensional_grid)
-                xx_ = np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], gridpoints_num).tolist()
+                xx_ = np.linspace(-grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], grid_width_std*np.sqrt(prior_scale_phi[0,0])+prior_loc_phi[0], gridpoints_num_p).tolist()
             elif param == "Z":
-                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], gridpoints_num).tolist() for i in range(d)]
+                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], gridpoints_num_p).tolist() for i in range(d)]
                 grid = itertools.product(*unidimensional_grid)
-                xx_ = np.linspace(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], gridpoints_num).tolist()
+                xx_ = np.linspace(-grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], grid_width_std*np.sqrt(prior_scale_z[0,0])+prior_loc_z[0], gridpoints_num_p).tolist()
             elif param == "X":
-                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], gridpoints_num).tolist() for i in range(d)]
+                unidimensional_grid = [np.linspace(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], gridpoints_num_p).tolist() for i in range(d)]
                 grid = itertools.product(*unidimensional_grid)
-                xx_ = np.linspace(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], gridpoints_num).tolist()
+                xx_ = np.linspace(-grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], grid_width_std*np.sqrt(prior_scale_x[0,0])+prior_loc_x[0], gridpoints_num_p).tolist()
         else:
             raise NotImplementedError("Use a Sobol sequence to generate a grid in such high dimensional space.")
     if xx_ is None:
