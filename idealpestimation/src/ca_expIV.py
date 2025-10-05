@@ -152,10 +152,10 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     
-    countries = ["finland", "france", "germany", "netherlands", "poland", "uk"] #["us"]
+    countries = ["us"] #["finland", "france", "germany", "netherlands", "poland", "uk"] #["us"]
     dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
 
-    for year in [2023, 2020]: #2020
+    for year in [2020]: #2023
         for country in countries:
 
             datasets_names = [file.name for file in pathlib.Path(dataspace).iterdir() if file.is_file() and (country in file.name and str(year) in file.name and "mappings" in file.name)]
