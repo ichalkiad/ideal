@@ -260,8 +260,8 @@ if __name__ == "__main__":
     d = 2  
     # gridpoints_num = 50  #50,  80 for quite a few
     gridpoints_num = dict()
-    gridpoints_num["X"] = 80
-    gridpoints_num["Z"] = 80
+    gridpoints_num["X"] = 50
+    gridpoints_num["Z"] = 50
     gridpoints_num["alpha"] = 100 #150
     gridpoints_num["beta"] = 100 # 150
     gridpoints_num["gamma"] = 250 # 300
@@ -288,8 +288,8 @@ if __name__ == "__main__":
     tempering_rate = [0.1]
 
     niter = 300 #100, 300
-    max_restarts = 5 # 2,3 ,5
-    max_partial_restarts = 4 #4 ,5, 10, 12
+    max_restarts = 3 # 2,3 ,5
+    max_partial_restarts = 5 #4 ,5, 10, 12
     max_halving = 2 # not applicable in data annealing
     max_signal2noise_ratio = 25 # in dB   # max snr
 
