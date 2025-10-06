@@ -185,8 +185,8 @@ if __name__ == "__main__":
     gridpoints_num["Z"] = 30
     gridpoints_num["alpha"] = 100
     gridpoints_num["beta"] = 100
-    gridpoints_num["gamma"] = 150
-    gridpoints_num["sigma_e"] = 150
+    gridpoints_num["gamma"] = 100
+    gridpoints_num["sigma_e"] = 50
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
