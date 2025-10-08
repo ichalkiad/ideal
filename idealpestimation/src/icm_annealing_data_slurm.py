@@ -260,8 +260,8 @@ if __name__ == "__main__":
     d = 2  
     # gridpoints_num = 50  #50,  80 for quite a few
     gridpoints_num = dict()
-    gridpoints_num["X"] = 50
-    gridpoints_num["Z"] = 50
+    gridpoints_num["X"] = 80
+    gridpoints_num["Z"] = 80
     gridpoints_num["alpha"] = 100 #150
     gridpoints_num["beta"] = 100 # 150
     gridpoints_num["gamma"] = 100 # 300
