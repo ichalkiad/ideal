@@ -183,10 +183,10 @@ if __name__ == "__main__":
     gridpoints_num = dict()
     gridpoints_num["X"] = 30
     gridpoints_num["Z"] = 30
-    gridpoints_num["alpha"] = 100
-    gridpoints_num["beta"] = 100
-    gridpoints_num["gamma"] = 100
-    gridpoints_num["sigma_e"] = 50
+    gridpoints_num["alpha"] = 120
+    gridpoints_num["beta"] = 120
+    gridpoints_num["gamma"] = 120
+    gridpoints_num["sigma_e"] = 120
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     niter = 25 #25 # 15
     fastrun = True
     max_restarts = 2 #2
-    max_partial_restarts = 3 # 2, 4
+    max_partial_restarts = 4 # 2, 4
     max_halving = 2 # 2
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
