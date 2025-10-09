@@ -183,10 +183,10 @@ if __name__ == "__main__":
     gridpoints_num = dict()
     gridpoints_num["X"] = 30
     gridpoints_num["Z"] = 30
-    gridpoints_num["alpha"] = 120
-    gridpoints_num["beta"] = 120
-    gridpoints_num["gamma"] = 120
-    gridpoints_num["sigma_e"] = 120
+    gridpoints_num["alpha"] = 100
+    gridpoints_num["beta"] = 100
+    gridpoints_num["gamma"] = 150
+    gridpoints_num["sigma_e"] = 100
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
