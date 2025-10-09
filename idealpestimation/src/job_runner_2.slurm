@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=expI_icmd_upd5
+#SBATCH --job-name=expI_icmd_upd6
 #SBATCH --output=%x_%A_%a.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost  #cpu_p1
 #SBATCH --time=05:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
