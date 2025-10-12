@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=expI_icmp_upd7
+#SBATCH --job-name=expI_icmp_upd8
 #SBATCH --output=%x_%A_%a.out # create output files indexed with the job array task id
 #SBATCH --partition=prepost  #cpu_p1
 #SBATCH --time=18:00:00   # DMLE, ICM-D: 2h, CA: 30min, ICM-P: 18h (max)
@@ -8,7 +8,7 @@
 #SBATCH --nodes=1          
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1  ############################  2 for CA, 3 for ICM-P on cpu_p1, 1 on prepost
-#SBATCH --array=0,8,10,11,14,21-23  # expI ca, icm-p  # 0-1649 expI icm-d, mle   , expIII: ca, icmp 0-29, mle: 0-4659,
+#SBATCH --array=8,10,14,21-23  # expI ca, icm-p  # 0-1649 expI icm-d, mle   , expIII: ca, icmp 0-29, mle: 0-4659,
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL
