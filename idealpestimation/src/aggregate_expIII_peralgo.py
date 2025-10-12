@@ -27,14 +27,14 @@ if __name__ == "__main__":
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
-    dir_in = "{}/idealdata_rsspaper/".format(dataspace)
+    dir_in = "{}/idealdata_rsspaper/".format(dataspace)   #################################################
     # dir_out = "{}/rsspaper_expIII_normparameterspacesize/".format(dataspace)
     # pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     algorithms = ["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
 
-    dir_out = "{}/rsspaper_expIIIpaperfigs__normparameterspacesize_per_algo/".format(dataspace)
+    dir_out = "{}/rsspaper_expIIIpaperfigs_normparameterspacesize_per_algo/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
     for K in Ks:        
         for jidx in range(len(Js)):
@@ -610,7 +610,7 @@ if __name__ == "__main__":
                                         print_png=True, print_html=True, 
                                         print_pdf=True) 
                 savename = "{}/rel_err_{}_K{}_J{}_allalgo.html".format(dir_out, param, K, J)
-                fix_plot_layout_and_save(param_alljsigma_err_fig[param], savename, xaxis_title=r'$J={{{J}}},\sigma_e^2={{{sigma_e}}}$'.format(J=J, sigma_e=sigma_e), 
+                fix_plot_layout_and_save(param_allalgo_err_fig[param], savename, xaxis_title=r'$J={{{J}}},\sigma_e^2={{{sigma_e}}}$'.format(J=J, sigma_e=sigma_e), 
                                     yaxis_title="Mean relative error", title="", 
                                     showgrid=False, showlegend=False, 
                                     print_png=True, print_html=True, 
