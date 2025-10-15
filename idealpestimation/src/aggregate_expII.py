@@ -60,7 +60,7 @@ if __name__ == "__main__":
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
     dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expIIpaperfigs_fonts/".format(dataspace)
+    dir_out = "{}/rsspaper_expIIpaperfigs_nooutliers/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     param_pijmean_fig = go.Figure()
@@ -599,7 +599,7 @@ if __name__ == "__main__":
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[K])                          
+                                boxpoints=False, line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -619,7 +619,7 @@ if __name__ == "__main__":
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[K])                          
+                                boxpoints=False, line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -639,7 +639,7 @@ if __name__ == "__main__":
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[K])                          
+                                boxpoints=False, line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -659,7 +659,7 @@ if __name__ == "__main__":
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[K])                          
+                                boxpoints=False, line=dict(color=colors[K])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -677,7 +677,7 @@ if __name__ == "__main__":
                         for jidx in range(err_alltrials.shape[1]):
                             algo_leadusers_boxplots_alpha.add_trace(go.Box(
                                     y=err_alltrials[:, jidx], showlegend=False,
-                                    boxpoints='outliers', line=dict(color=colors[K])                          
+                                    boxpoints=False, line=dict(color=colors[K])                          
                                 ))
                         algo_leadusers_boxplots_alpha.update_xaxes(showticklabels=False)
                         savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}_norm_param_dim.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -699,50 +699,50 @@ if __name__ == "__main__":
             sec_y = False
         time_fig.add_trace(go.Box(
             y=runtimes, showlegend=True, name=plotname,
-            boxpoints='outliers', line=dict(color=colors[K]),                                
+            boxpoints=False, line=dict(color=colors[K]),                                
         ), secondary_y=sec_y)
         ram_fig_max.add_trace(go.Box(
             y=ram["max"], showlegend=True, name="{}-max".format(plotname),
-            boxpoints='outliers', line=dict(color=colors[K])                          
+            boxpoints=False, line=dict(color=colors[K])                          
         ))
         ram_fig_avg.add_trace(go.Box(
             y=ram["avg"], showlegend=True, name="{}-avg".format(plotname),
-            boxpoints='outliers', line=dict(color=colors[K])                          
+            boxpoints=False, line=dict(color=colors[K])                          
         ))
         cpu_fig_max.add_trace(go.Box(
             y=cpu_util["max"], showlegend=True, name="{}-max".format(plotname),
-            boxpoints='outliers', line=dict(color=colors[K])                          
+            boxpoints=False, line=dict(color=colors[K])                          
         ))
         cpu_fig_avg.add_trace(go.Box(
             y=cpu_util["avg"], showlegend=True, name="{}-avg".format(plotname),
-            boxpoints='outliers', line=dict(color=colors[K])                          
+            boxpoints=False, line=dict(color=colors[K])                          
         ))
         for param in parameter_names:
             if param in ["X", "Z"]:
                 param_err_fig[param].add_trace(go.Box(
                     y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
-                    boxpoints='outliers', line=dict(color=colors[K])                          
+                    boxpoints=False, line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig[param].add_trace(go.Box(
                     y=np.asarray(theta_sqerr[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
-                    boxpoints='outliers', line=dict(color=colors[K])                          
+                    boxpoints=False, line=dict(color=colors[K])                          
                 ))
                 param_err_fig["{}_RT".format(param)].add_trace(go.Box(
                     y=np.asarray(theta_err_RT[param])/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
-                    boxpoints='outliers', line=dict(color=colors[K])                          
+                    boxpoints=False, line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig["{}_RT".format(param)].add_trace(go.Box(
                     y=np.asarray(theta_sqerr_RT[param])/parameter_space_dim, showlegend=True, name="{}-RT".format(plotname),
-                    boxpoints='outliers', line=dict(color=colors[K])                          
+                    boxpoints=False, line=dict(color=colors[K])                          
                 ))
             else:
                 param_err_fig[param].add_trace(go.Box(
                     y=np.asarray(theta_err[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
-                    boxpoints='outliers', line=dict(color=colors[K])                          
+                    boxpoints=False, line=dict(color=colors[K])                          
                 ))
                 param_sqerr_fig[param].add_trace(go.Box(
                     y=np.asarray(theta_sqerr[param])/parameter_space_dim, showlegend=True, name="{}".format(plotname),
-                    boxpoints='outliers', line=dict(color=colors[K])                          
+                    boxpoints=False, line=dict(color=colors[K])                          
                 ))
                 
     # save figures per K
