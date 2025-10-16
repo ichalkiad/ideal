@@ -156,11 +156,14 @@ if __name__ == "__main__":
                                         ram["max"].append(result["max_total_ram_residentsetsize_MB"]/1000)
                             elif algo == "icmp":         
                                 readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
+                                if not pathlib.Path(readinfile).exists():
+                                    print("Did not find: {}".format(readinfile))                                    
+                                    continue
                                 precomputed_errors = False
                                 if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
                                     precomputed_errors = True
                                     readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)    
-                                    print("ICM-P - loaded precomputed errors.")
+                                    print("ICM-P - loaded precomputed errors.")                                
                                 with jsonlines.open(readinfile, mode="r") as f: 
                                     for result in f.iter(type=dict, skip_invalid=True):                                    
                                         dataloglik.append(result["logfullposterior"])                                    
@@ -222,13 +225,11 @@ if __name__ == "__main__":
                                         if not precomputed_errors:
                                             # save updated file
                                             out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
-                                            try:
-                                                with open(out_file, 'a') as f:         
-                                                    writer = jsonlines.Writer(f)
-                                                    writer.write(result)
-                                            except:
-                                                print("Did not find: {}".format(out_file))
-                                                continue
+                                            
+                                            with open(out_file, 'a') as f:         
+                                                writer = jsonlines.Writer(f)
+                                                writer.write(result)
+                                            
                                         # only consider the best solution
                                         break
                                 with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
