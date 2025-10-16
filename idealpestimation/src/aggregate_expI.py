@@ -222,9 +222,13 @@ if __name__ == "__main__":
                                         if not precomputed_errors:
                                             # save updated file
                                             out_file = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)
-                                            with open(out_file, 'a') as f:         
-                                                writer = jsonlines.Writer(f)
-                                                writer.write(result)
+                                            try:
+                                                with open(out_file, 'a') as f:         
+                                                    writer = jsonlines.Writer(f)
+                                                    writer.write(result)
+                                            except:
+                                                print("Did not find: {}".format(out_file))
+                                                continue
                                         # only consider the best solution
                                         break
                                 with jsonlines.open("{}/efficiency_metrics.jsonl".format(trial_path), mode="r") as f: 
