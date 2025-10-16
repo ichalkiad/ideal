@@ -186,7 +186,7 @@ if __name__ == "__main__":
     gridpoints_num["alpha"] = 80
     gridpoints_num["beta"] = 80
     gridpoints_num["gamma"] = 100
-    gridpoints_num["sigma_e"] = 150
+    gridpoints_num["sigma_e"] = 120
     prior_loc_x = np.zeros((d,))
     prior_scale_x = np.eye(d)
     prior_loc_z = np.zeros((d,))
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     niter = 25 #25 # 15
     fastrun = True
     max_restarts = 2 #2
-    max_partial_restarts = 4 # 2, 4
+    max_partial_restarts = 5 # 2, 4
     max_halving = 1 # 2
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
