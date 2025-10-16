@@ -26,7 +26,7 @@ if __name__ == "__main__":
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
-    dir_in = "{}/idealdata_rsspaper/".format(dataspace)
+    dir_in = "{}/idealdata_rsspaper_expIupd/".format(dataspace)
     # dir_out = "{}/rsspaper_expIpaperfigs_indiv/".format(dataspace)
     # pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
