@@ -444,7 +444,7 @@ if __name__ == "__main__":
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints=False, line=dict(color=colors[algo])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -464,7 +464,7 @@ if __name__ == "__main__":
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints=False, line=dict(color=colors[algo])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -484,7 +484,7 @@ if __name__ == "__main__":
                     for jidx in range(pij_err_alltrials.shape[1]):
                         algo_leadusers_boxplots.add_trace(go.Box(
                                 y=pij_err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints=False, line=dict(color=colors[algo])                          
                             ))
                     algo_leadusers_boxplots.update_xaxes(showticklabels=False)
                     savename = "{}/pij_sumi_leadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -504,7 +504,7 @@ if __name__ == "__main__":
                     for jidx in range(err_alltrials.shape[1]):
                         algo_leadusers_boxplots_Z.add_trace(go.Box(
                                 y=err_alltrials[:, jidx], showlegend=False,
-                                boxpoints='outliers', line=dict(color=colors[algo])                          
+                                boxpoints=False, line=dict(color=colors[algo])                          
                             ))
                     algo_leadusers_boxplots_Z.update_xaxes(showticklabels=False)
                     savename = "{}/Z_sortedleadusers_err_RT_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
@@ -522,7 +522,7 @@ if __name__ == "__main__":
                         for jidx in range(err_alltrials.shape[1]):
                             algo_leadusers_boxplots_alpha.add_trace(go.Box(
                                     y=err_alltrials[:, jidx], showlegend=False,
-                                    boxpoints='outliers', line=dict(color=colors[algo])                          
+                                    boxpoints=False, line=dict(color=colors[algo])                          
                                 ))
                         algo_leadusers_boxplots_alpha.update_xaxes(showticklabels=False)
                         savename = "{}/alpha_sortedleadusers_err_algorithm_{}_K{}_J{}_sigmae_{}.html".format(dir_out, algo, K, J, str(sigma_e).replace(".", ""))
