@@ -196,6 +196,9 @@ if __name__ == "__main__":
                         elif algo == "icmp":         
                             readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = True
+                            if not pathlib.Path(readinfile).exists():
+                                print("Did not find: {}".format(readinfile))                                    
+                                continue
                             # if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
                             #     precomputed_errors = True
                             #     readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)           
