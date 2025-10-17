@@ -64,8 +64,8 @@ if __name__ == "__main__":
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
     dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
-    dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expI/".format(dataspace)
+    dir_in = "{}/idealdata_rsspaper_expIupd/".format(dataspace)
+    dir_out = "{}/rsspaper_expI_pij_nooutliers/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     algorithms = ["icmp", "icmd", "ca", "mle"]
@@ -195,7 +195,7 @@ if __name__ == "__main__":
 
                         elif algo == "icmp":         
                             readinfile = "{}/params_out_global_theta_hat.jsonl".format(trial_path)
-                            precomputed_errors = False
+                            precomputed_errors = True
                             # if pathlib.Path("{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)).exists():
                             #     precomputed_errors = True
                             #     readinfile = "{}/params_out_global_theta_hat_upd_with_computed_err.jsonl".format(trial_path)           
@@ -251,7 +251,7 @@ if __name__ == "__main__":
                             data_location = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
-                            if False: #pathlib.Path(readinfile).exists():
+                            if pathlib.Path(readinfile).exists():
                                 precomputed_errors = True
                                 ffop = open(readinfile, mode="r")
                                 reader = jsonlines.Reader(ffop)
@@ -307,7 +307,7 @@ if __name__ == "__main__":
                             DIR_base = trial_path
                             readinfile = "{}/params_out_combined_theta_hat.jsonl".format(trial_path)
                             precomputed_errors = False
-                            if False: #pathlib.Path(readinfile).exists():
+                            if pathlib.Path(readinfile).exists():
                                 precomputed_errors = True
                                 ffop = open(readinfile, mode="r")
                                 reader = jsonlines.Reader(ffop)
@@ -450,7 +450,7 @@ if __name__ == "__main__":
                                         yaxis_title="Relative error", 
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
-                                        print_pdf=False) 
+                                        print_pdf=True) 
                     param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
                                                         name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
                     param_pijmean_fig.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
@@ -470,7 +470,7 @@ if __name__ == "__main__":
                                         yaxis_title="Lead user ideal points relative error", 
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
-                                        print_pdf=False)
+                                        print_pdf=True)
 
 
                     # RT
@@ -490,7 +490,7 @@ if __name__ == "__main__":
                                         yaxis_title="Relative error (under rotation/scaling)", 
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
-                                        print_pdf=False) 
+                                        print_pdf=True) 
                     param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_mean, x=np.arange(1, pij_err_alltrials.shape[1]),
                                                         name="{}-Average".format(algo), showlegend=True, opacity=0.5, line=dict(color=colors[algo])))
                     param_pijmean_fig_RT.add_trace(go.Scatter(y=pij_err_alltrials_median, x=np.arange(1, pij_err_alltrials.shape[1]),
@@ -510,7 +510,7 @@ if __name__ == "__main__":
                                         yaxis_title="Lead user ideal points relative error (under rotation/scaling)", 
                                         title="", showgrid=False, showlegend=False, 
                                         print_png=True, print_html=False, 
-                                        print_pdf=False)
+                                        print_pdf=True)
 
 
                     if algo != "ca":
@@ -528,7 +528,7 @@ if __name__ == "__main__":
                                             yaxis_title="Lead user popularity relative error", 
                                             title="", showgrid=False, showlegend=False, 
                                             print_png=True, print_html=False, 
-                                            print_pdf=False)
+                                            print_pdf=True)
                 savename = "{}/pij_sumi_sortedleadusers_err_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
                 param_pijmean_fig.update_layout(legend=dict(orientation="h"))
                 fix_plot_layout_and_save(param_pijmean_fig, 
@@ -536,7 +536,7 @@ if __name__ == "__main__":
                                     yaxis_title=r"$\text{Lead user total utility relative error }(p_{\cdot j})$", 
                                     title="", showgrid=False, showlegend=True, 
                                     print_png=True, print_html=True, 
-                                    print_pdf=False)
+                                    print_pdf=True)
                 savename = "{}/pij_sumi_sortedleadusers_err_RT_allalgorithms_K{}_J{}_sigmae_{}.html".format(dir_out, K, J, str(sigma_e).replace(".", ""))
                 param_pijmean_fig_RT.update_layout(legend=dict(orientation="h"))
                 fix_plot_layout_and_save(param_pijmean_fig_RT, 
@@ -544,7 +544,7 @@ if __name__ == "__main__":
                                     yaxis_title=r"$\text{Lead user total utility relative error under rotation/scaling }(p_{\cdot j})$", 
                                     title="", showgrid=False, showlegend=True, 
                                     print_png=True, print_html=True, 
-                                    print_pdf=False)
+                                    print_pdf=True)
                 
 
 
