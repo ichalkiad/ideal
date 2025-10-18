@@ -211,8 +211,8 @@ if __name__ == "__main__":
     niter = 25 #25 # 15
     fastrun = True
     max_restarts = 2 #2
-    max_partial_restarts = 5 # 2, 4
-    max_halving = 1 # 2
+    max_partial_restarts = 4 # 2, 4
+    max_halving = 2 # 2
     plot_online = False
     max_signal2noise_ratio = 25 # in dB   # max snr
 
