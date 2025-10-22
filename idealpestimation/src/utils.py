@@ -31,8 +31,6 @@ import sqlite3
 from sqlite3 import Error
 from scipy import sparse
 import plotly.io as pio
-# Force Kaleido to wait a bit before capturing
-pio.kaleido.scope.wait_for_render = 2
 
 
 def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
@@ -147,6 +145,8 @@ def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", titl
         if print_html:
             pio.write_html(fig, savename, auto_open=False)
         if print_pdf:
+            # Force Kaleido to wait a bit before capturing
+            pio.kaleido.scope.wait_for_render = 5
             pio.write_image(fig, savename.replace(".html", ".pdf"), engine="kaleido")
         if print_png:
             pio.write_image(fig, savename.replace("html", "png"), width=1540, height=871, scale=1)
