@@ -2,14 +2,10 @@ import matplotlib
 matplotlib.use("Agg") 
 print(matplotlib.get_backend())
 from matplotlib import rcParams
-print(rcParams.get("mathtext.engine"))
+rcParams.clear()
 rcParams["text.usetex"] = False
 rcParams["mathtext.fontset"] = "dejavusans"
 rcParams["mathtext.default"] = "regular"
-rcParams["mathtext.rm"] = "serif"
-rcParams["mathtext.it"] = "serif:italic"
-rcParams["mathtext.bf"] = "serif:bold"
-rcParams["mathtext.engine"] = "mathtext"
 
 import sys
 import ipdb
