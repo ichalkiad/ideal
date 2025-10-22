@@ -1,6 +1,7 @@
 import matplotlib
 matplotlib.use("Agg") 
 print(matplotlib.get_backend())
+print(matplotlib.__version__)
 from matplotlib import rcParams
 rcParams.clear()
 rcParams["text.usetex"] = False
