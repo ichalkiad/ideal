@@ -14,7 +14,9 @@ from plotly.subplots import make_subplots
 from matplotlib import rcParams
 rcParams["mathtext.fontset"] = "dejavusans"
 rcParams["text.usetex"] = False
-
+rcParams["mathtext.rm"] = "serif"
+rcParams["mathtext.it"] = "serif:italic"
+rcParams["mathtext.bf"] = "serif:bold"
 
 if __name__ == "__main__":
 
