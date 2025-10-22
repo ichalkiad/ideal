@@ -11,6 +11,10 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                                 optimisation_dict2params, clean_up_data_matrix, get_data_tempering_variance_combined_solution,\
                                                                 get_min_achievable_mse_under_rotation_trnsl, go
 from plotly.subplots import make_subplots
+from matplotlib import rcParams
+rcParams["mathtext.fontset"] = "dejavusans"
+rcParams["text.usetex"] = False
+
 
 if __name__ == "__main__":
 
