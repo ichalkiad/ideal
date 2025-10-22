@@ -1,3 +1,7 @@
+import matplotlib
+matplotlib.use("Agg") 
+print(matplotlib.get_backend())
+
 import sys
 import ipdb
 import pathlib
@@ -17,6 +21,7 @@ rcParams["text.usetex"] = False
 rcParams["mathtext.rm"] = "serif"
 rcParams["mathtext.it"] = "serif:italic"
 rcParams["mathtext.bf"] = "serif:bold"
+plt.rcParams["svg.fonttype"] = "none" 
 
 if __name__ == "__main__":
 
