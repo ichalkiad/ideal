@@ -30,7 +30,9 @@ from prince import svd as ca_svd
 import sqlite3
 from sqlite3 import Error
 from scipy import sparse
-
+import plotly.io as pio
+# Force Kaleido to wait a bit before capturing
+pio.kaleido.scope.wait_for_render = 2
 
 
 def get_slurm_experiment_csvs(exper, Ks, Js, sigma_es, M, batchsize, dir_in, dir_out):
@@ -110,6 +112,7 @@ def print_threadpool_info():
 
 def fix_plot_layout_and_save(fig, savename, xaxis_title="", yaxis_title="", title="", showgrid=False, showlegend=False,
                             print_png=True, print_html=True, print_pdf=True):
+        
         fig.update_xaxes(showline=True, linewidth=2, linecolor='black')
         fig.update_yaxes(showline=True, linewidth=2, linecolor='black')
         fig.update_layout(title=title, plot_bgcolor='rgb(255,255,255)',
