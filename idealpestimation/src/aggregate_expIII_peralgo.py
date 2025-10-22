@@ -1,6 +1,15 @@
 import matplotlib
 matplotlib.use("Agg") 
 print(matplotlib.get_backend())
+from matplotlib import rcParams
+print(rcParams.get("mathtext.engine"))
+rcParams["text.usetex"] = False
+rcParams["mathtext.fontset"] = "dejavusans"
+rcParams["mathtext.default"] = "regular"
+rcParams["mathtext.rm"] = "serif"
+rcParams["mathtext.it"] = "serif:italic"
+rcParams["mathtext.bf"] = "serif:bold"
+rcParams["mathtext.engine"] = "mathtext"
 
 import sys
 import ipdb
@@ -15,13 +24,8 @@ from idealpestimation.src.utils import time, timedelta, fix_plot_layout_and_save
                                                                 optimisation_dict2params, clean_up_data_matrix, get_data_tempering_variance_combined_solution,\
                                                                 get_min_achievable_mse_under_rotation_trnsl, go
 from plotly.subplots import make_subplots
-from matplotlib import rcParams
-rcParams["mathtext.fontset"] = "dejavusans"
-rcParams["text.usetex"] = False
-rcParams["mathtext.rm"] = "serif"
-rcParams["mathtext.it"] = "serif:italic"
-rcParams["mathtext.bf"] = "serif:bold"
-rcParams["svg.fonttype"] = "none" 
+
+
 
 if __name__ == "__main__":
 
