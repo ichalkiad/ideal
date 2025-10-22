@@ -21,7 +21,7 @@ rcParams["text.usetex"] = False
 rcParams["mathtext.rm"] = "serif"
 rcParams["mathtext.it"] = "serif:italic"
 rcParams["mathtext.bf"] = "serif:bold"
-plt.rcParams["svg.fonttype"] = "none" 
+rcParams["svg.fonttype"] = "none" 
 
 if __name__ == "__main__":
 
