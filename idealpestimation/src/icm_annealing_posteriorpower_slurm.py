@@ -150,10 +150,8 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
 
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper_expIupd/"         
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_poster_upd.csv", header=None)
-    # dataspace = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
-    # parameter_grid = pd.read_csv("/mnt/hdd2/ioannischalkiadakis/slurm_experimentI_icm_poster.csv", header=None)
+    dataspace = "/tmp/idealdata_expI/"         
+    parameter_grid = pd.read_csv("/tmp/slurm_experimentI_icm_poster_upd.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])

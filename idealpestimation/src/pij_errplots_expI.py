@@ -63,8 +63,8 @@ if __name__ == "__main__":
     batchsize = 1504 # 50k
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma" , "sigma_e"]
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
-    dir_in = "{}/idealdata_rsspaper_expIupd/".format(dataspace)
+    dataspace = "/tmp/"
+    dir_in = "{}/idealdata_expIupd/".format(dataspace)
     dir_out = "{}/rsspaper_expI_pij_nooutliers/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 

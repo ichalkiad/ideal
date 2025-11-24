@@ -592,6 +592,7 @@ if __name__ == "__main__":
     Ks = [10000] #, 50000, 100000]    
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
 
+    # Fixing polarity for leaders and very the noise level depending on hierarchy: lower indices -> less noise
     polarity = np.random.choice(np.asarray([-1,1]), size=Js[-1], replace=True, p=[0.5, 0.5])
     for K in Ks:        
         for J in Js:
@@ -637,8 +638,7 @@ if __name__ == "__main__":
 
                 for m in range(M):
                     print(m)
-                    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIIIupd/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)
-                    # data_location = "/home/ioannis/Dropbox (Heriot-Watt University Team)/ideal/idealpestimation/testplots/data_K{}_J{}_sigmae{}_goodsnr/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                
+                    data_location = "/tmp/idealdata_expIII/data_K{}_J{}_sigmae{}/{}/".format(K, J, str(sigma_e).replace(".", ""), m)                    
                     generate_trial_data(parameter_names, m, J, K, d, distance_func, utility_func, data_location, param_positions_dict, theta, x_var=xs_sigma_1[0,0], z_var=zs_sigma_1[0,0], 
                                         alpha_var=alpha_var, beta_var=beta_var, debug=False, rng=rng)
                     time.sleep(1)

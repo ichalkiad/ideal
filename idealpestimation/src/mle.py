@@ -4,7 +4,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["NUMBA_NUM_THREADS"] = "1"
-# os.environ["JAX_NUM_THREADS"] = "500"
+# os.environ["JAX_NUM_THREADS"] = "50"
 # os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=true intra_op_parallelism_threads=500"
 
 import sys
@@ -750,7 +750,7 @@ def main(J=2, K=2, d=1, N=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-    # plot_loglik_runtimes("/mnt/hdd2/ioannischalkiadakis/idealdata/timings_parallellikelihood.jsonl", "/mnt/hdd2/ioannischalkiadakis/idealdata/")
+    # plot_loglik_runtimes("/tmp/idealdata/timings_parallellikelihood.jsonl", "/tmp/idealdata/")
     # import sys
     # sys.exit(0)
     # python idealpestimation/src/mle.py  --trials 1 --K 30 --J 10 --sigmae 05 --parallel --total_running_processes 5
@@ -824,8 +824,8 @@ if __name__ == "__main__":
     prior_scale_delta= 1        
     prior_loc_sigmae = 3
     prior_scale_sigmae = 0.5
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
-    # data_location = "/mnt/hdd2/ioannischalkiadakis/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
+    data_location = "/tmp/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    # data_location = "/tmp/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))           
     # with jsonlines.open("{}/synthetic_gen_parameters.jsonl".format(data_location), mode="r") as f:
     #     for result in f.iter(type=dict, skip_invalid=True):                              
     #         J = result["J"]

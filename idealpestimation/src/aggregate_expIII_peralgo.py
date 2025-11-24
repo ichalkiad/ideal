@@ -38,16 +38,14 @@ if __name__ == "__main__":
     batchsizes = [604, 64, 34]
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
-    dir_in = "{}/idealdata_rsspaper/".format(dataspace)   #################################################
-    # dir_out = "{}/rsspaper_expIII_normparameterspacesize/".format(dataspace)
-    # pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
-
+    dataspace = "/tmp/"       #"/mnt/hdd2/ioannischalkiadakis/"
+    dir_in = "{}/idealdata_expIII/".format(dataspace)
+    dir_out = "{}/idealdata_expIII_group_plots_per_algortihm/".format(dataspace)
+    pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
+    
     algorithms = ["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
 
-    dir_out = "{}/rsspaper_expIIIpaperfigs_normparameterspacesize_per_algo/".format(dataspace)
-    pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
     for K in Ks:        
         for jidx in range(len(Js)):
             J = Js[jidx]

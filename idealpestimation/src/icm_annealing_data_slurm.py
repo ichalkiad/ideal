@@ -15,11 +15,86 @@ import math
 import pandas as pd
 from idealpestimation.src.parallel_manager import jsonlines
 from idealpestimation.src.icm_annealing_posteriorpower import icm_posterior_power_annealing
-from idealpestimation.src.icm_annealing_data import serial_worker
-from idealpestimation.src.utils import time, timedelta, rank_and_plot_solutions, \
+from idealpestimation.src.utils import clean_up_data_matrix, time, timedelta, rank_and_plot_solutions, \
                                                             print_threadpool_info, \
-                                                                optimisation_dict2params, clean_up_data_matrix, get_data_tempering_variance_combined_solution
+                                                                optimisation_dict2params, \
+                                                                    clean_up_data_matrix, \
+                                                                        get_data_tempering_variance_combined_solution
 from idealpestimation.src.efficiency_monitor import Monitor
+
+
+def serial_worker(args):
+
+    t0 = time.time()
+    k_prev, s, Y_annealed, temperature_rate, temperature_steps, percentage_parameter_change,\
+        fastrun, _, batchrows, theta_part_annealing, theta, elapsedtime, param_positions_dict,\
+        DIR_out, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
+        parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
+        prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
+        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
+        gridpoints_num, diff_iter, disp, min_sigma_e, theta_true, param_positions_dict_prev,\
+        max_restarts, max_partial_restarts, max_halving, plot_online, seedint, subdataset_name = args
+    
+    # if np.allclose(s, 1):
+    #     s = 1
+    # DIR_out_icm = "{}/{}/".format(DIR_out, str(s).replace(".", ""))
+    DIR_out_icm = "{}/{}/".format(DIR_out, subdataset_name)
+    print(DIR_out_icm)
+    pathlib.Path(DIR_out_icm).mkdir(parents=True, exist_ok=True)
+    icm_args = (DIR_out_icm, total_running_processes, data_location, optimisation_method, parameter_names, J, K, d, dst_func, L, tol,\
+                parameter_space_dim, m, penalty_weight_Z, constant_Z, retries, parallel, elementwise, evaluate_posterior, prior_loc_x, prior_scale_x,\
+                    prior_loc_z, prior_scale_z, prior_loc_phi, prior_scale_phi, prior_loc_beta, prior_scale_beta, prior_loc_alpha, prior_scale_alpha,\
+                        prior_loc_gamma, prior_scale_gamma, prior_loc_delta, prior_scale_delta, prior_loc_sigmae, prior_scale_sigmae,\
+                            gridpoints_num, diff_iter, disp, min_sigma_e, theta_true)
+
+    thetas = icm_posterior_power_annealing(Y_annealed, param_positions_dict, icm_args,
+                                temperature_rate=temperature_rate, temperature_steps=temperature_steps, 
+                                plot_online=plot_online, percentage_parameter_change=percentage_parameter_change, 
+                                fastrun=fastrun, data_annealing=True, annealing_prev=param_positions_dict_prev, 
+                                theta_part_annealing=theta_part_annealing, max_restarts=max_restarts, 
+                                max_partial_restarts=max_partial_restarts, max_halving=max_halving)
+    elapsedtime = str(timedelta(seconds=time.time()-t0))   
+    # get highest-likelihood solution and feed into icm_posterior_power_annealing to initialise theta for next iteration 
+    # ensure indices of estimated theta segment are stored - not really needed for when batches are non-overlapping, except for Z, alpha, gamma, sigma_e
+    print(len(thetas))
+    thetas_and_errors = []
+    params_true = optimisation_dict2params(theta_true, param_positions_dict, J, K, d, parameter_names)            
+    for solution in thetas:
+        theta_curr = solution[0]
+        params_hat = optimisation_dict2params(theta_curr, param_positions_dict, J, K, d, parameter_names)
+        for param in ["X", "Z"]:
+            if param == "X":                        
+                X_hat_vec = np.asarray(params_hat[param]).reshape((d*K,), order="F")       
+                X_true_vec = np.asarray(params_true[param]).reshape((d*K,), order="F")       
+                x_rel_err = (X_true_vec - X_hat_vec)/X_true_vec
+                x_sq_err = x_rel_err**2
+            elif param == "Z":                               
+                Z_hat_vec = np.asarray(params_hat[param]).reshape((d*J,), order="F")         
+                Z_true_vec = np.asarray(params_true[param]).reshape((d*J,), order="F")       
+                z_rel_err = (Z_true_vec - Z_hat_vec)/Z_true_vec
+                z_sq_err = z_rel_err**2
+        thetas_and_errors.append((theta_curr, None, None, np.mean(x_sq_err), np.mean(z_sq_err), None, None, np.mean(x_rel_err), np.mean(z_rel_err), solution[-1]))
+         
+    theta_part_annealing = rank_and_plot_solutions(thetas_and_errors, elapsedtime, None, Y_annealed, J, batchrows, d, parameter_names, 
+                                                dst_func, param_positions_dict, DIR_out_icm, icm_args, data_tempering=True, 
+                                                row_start=k_prev, row_end=k_prev+batchrows, seedint=seedint, get_RT_error=False, plot_solutions=False)
+    
+    try:
+        out_file = "{}/params_out_local_theta_hat_{}_{}.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+        params_out = dict()
+        with jsonlines.open(out_file, 'r') as f:         
+            for result in f.iter(type=dict, skip_invalid=True):
+                for kparam in result.keys():
+                    params_out[kparam] = result[kparam]
+                    if isinstance(params_out[kparam], np.ndarray):
+                        params_out[kparam] = params_out[kparam].tolist()
+                break
+        out_file = "{}/params_out_local_theta_hat_{}_{}_best.jsonl".format(DIR_out_icm, k_prev, k_prev+batchrows)
+        with open(out_file, 'a') as f:         
+            writer = jsonlines.Writer(f)
+            writer.write(params_out)
+    except:
+        print("Did not converge: {}".format(DIR_out_icm))
 
 
 def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/", batchsize=None,
@@ -227,9 +302,9 @@ if __name__ == "__main__":
     plot_online = False
     fastrun = True
 
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/idealdata_rsspaper_expIupd/"     
+    dataspace = "/tmp/idealdata_expI/"     
     parameter_vector_idx = int(os.environ["SLURM_ARRAY_TASK_ID"])    
-    parameter_grid = pd.read_csv("/linkhome/rech/genpuz01/umi36fq/slurm_experimentI_icm_data_upd.csv", header=None)
+    parameter_grid = pd.read_csv("/tmp/slurm_experimentI_icm_data_upd.csv", header=None)
     parameter_vector = parameter_grid.iloc[parameter_vector_idx].values
 
     Mmin = int(parameter_vector[0])

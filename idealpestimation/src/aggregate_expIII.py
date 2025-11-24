@@ -26,16 +26,16 @@ if __name__ == "__main__":
     batchsizes = [604, 64, 34]
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
-    dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    # dir_out = "{}/rsspaper_expIII_normparameterspacesize/".format(dataspace)
-    # pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
+    dataspace = "/tmp/"
+    dir_in = "{}/idealdata_expIII/".format(dataspace)
+    dir_out = "{}/idealdata_expIII_ungrouped/".format(dataspace)
+    pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     algorithms = ["icmp", "icmd", "ca", "mle"]
     colors = {"mle":"Crimson", "ca":"Tomato", "icmd":"ForestGreen", "icmp":"Maroon"}
 
     for algo in algorithms:
-        dir_out = "{}/rsspaper_expIIIpaperfigs__normparameterspacesize_{}/".format(dataspace, algo)
+        dir_out = "{}/idealdata_expIII_ungrouped_{}/".format(dataspace, algo)
         pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
         for K in Ks:
             ram_avg_alljsigma_fig = go.Figure()

@@ -5,6 +5,7 @@ import threading
 
 
 class Monitor:
+    # Class to monitor CPU, memory, threads, and processes of very fast processes and their children
     def __init__(self, interval=0.5, fastprogram=False):
         self.process = psutil.Process(os.getpid())
         self.interval = interval

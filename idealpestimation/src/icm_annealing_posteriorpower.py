@@ -1205,13 +1205,15 @@ def main(J=2, K=2, d=1, total_running_processes=1, data_location="/tmp/",
 
 if __name__ == "__main__":
 
-    # datain = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K30_J10_sigmae001/"
+    # Debugging functionality, apart from icm_posterior_power_annealing()
+
+    # datain = "/tmp/idealdata_plotstest/data_K30_J10_sigmae001/"
     # estimation_folder = "estimation_ICM_evaluate_posterior_elementwise_May2"
     # error_polarisation_plots(datain, estimation_folder, M=1, K=30, J=10, d=2)
 
-    # files = ["/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_500.jsonl", "/mnt/hdd2/ioannischalkiadakis/timings_element_parallel_1k.jsonl", "/mnt/hdd2/ioannischalkiadakis/timings_vector_parallel_1k.jsonl", "/mnt/hdd2/ioannischalkiadakis/timings_vector_numba.jsonl"]
+    # files = ["/tmp/timings_element_parallel_500.jsonl", "/tmp/timings_element_parallel_1k.jsonl", "/tmp/timings_vector_parallel_1k.jsonl", "/tmp/timings_vector_numba.jsonl"]
     # names = ["element-parallel-block-500", "element-parallel-block-1k", "vector-parallel-block-1k", "vector-numba-only"]
-    # plot_posterior_vec_runtimes(files, names, outdir="/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K10000_J100_sigmae0001/0/")
+    # plot_posterior_vec_runtimes(files, names, outdir="/tmp/idealdata_testmle/data_K10000_J100_sigmae0001/0/")
     # import sys
     # sys.exit(0)
 
@@ -1306,14 +1308,11 @@ if __name__ == "__main__":
     min_sigma_e = (K*prior_scale_x[0, 0] + J*prior_scale_z[0, 0] + J*prior_scale_alpha + K*prior_scale_beta)/((K*J)*(10**(max_signal2noise_ratio/10)))
     print(min_sigma_e)
 
-    tol = 1e-6    
-    #/home/ioannischalkiadakis/ideal
-    # data_location = "./idealpestimation/data_K{}_J{}_sigmae{}_goodsnr/".format(K, J, str(sigma_e_true).replace(".", ""))
-    data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
-    # data_location = "/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))
+    tol = 1e-6        
+    data_location = "/tmp/idealdata_plotstest/data_K{}_J{}_sigmae{}/".format(K, J, str(sigma_e_true).replace(".", ""))    
     total_running_processes = 30      
 
-    # with open("/mnt/hdd2/ioannischalkiadakis/idealdata_testmle/data_K10000_J100_sigmae0001/0/Utilities.pickle", "rb") as f:
+    # with open("/tmp/idealdata_testmle/data_K10000_J100_sigmae0001/0/Utilities.pickle", "rb") as f:
     #     utilities = pickle.load(f)
     # ipdb.set_trace()
     # fig = go.Figure()

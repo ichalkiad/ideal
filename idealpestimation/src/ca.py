@@ -294,16 +294,16 @@ if __name__ == "__main__":
     # Js = [100]
     # sigma_es = [0.01] #, 0.1, 0.5, 1.0, 5.0]    
     # batchsize = {10000: 304, 50000: 1504, 100000: 3004}
-    # dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper/"
-    # dir_out = "/mnt/hdd2/ioannischalkiadakis/"
+    # dir_in = "/tmp/idealdata/"
+    # dir_out = "/tmp/idealdata/"
     # get_slurm_experiment_csvs("II", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
     # Exp III
     # Ks = [10000]
     # Js = [50, 500, 1000]
     # sigma_es = [1, 3, 5]
     # batchsize = {50: 604, 500: 64, 1000: 34}
-    dir_in = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIupd/"
-    dir_out = "/mnt/hdd2/ioannischalkiadakis/idealdata_rsspaper_expIupd/"
+    dir_in = "/tmp/idealdata_expI/"
+    dir_out = "/tmp/idealdata_expI/"
     get_slurm_experiment_csvs("I", Ks, Js, sigma_es, M, batchsize, dir_in, dir_out)
     sys.exit()
 

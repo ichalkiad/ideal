@@ -1372,9 +1372,7 @@ def plot_single_coord(axe, axe_att, coord_idx, target_coords, source_coords, df_
 
 
 if __name__ == "__main__":
-    
-    # standardise resulting CA dimensions
-    
+        
     seed_value = 8125
     random.seed(seed_value)
     np.random.seed(seed_value)
@@ -1384,10 +1382,10 @@ if __name__ == "__main__":
     parallel = False
     total_running_processes = 1
     KRR = True
-    countries = ["uk"]#, "france", "germany", "poland", "netherlands", "finland"] #["us"] # 
-    dataspace = "/mnt/hdd2/ioannischalkiadakis/epodata_rsspaper/"
+    countries = ["uk", "france", "germany", "poland", "netherlands", "finland"] #["us"] # 
+    dataspace = "/tmp/epodata_rsspaper/"
 
-    for year in [2023]: #[2020, 2023]:
+    for year in [2020, 2023]:
         # CHES2019:  0: 'lrecon', 2: 'antielite_salience', 28: 'civlib_laworder', 30: 'country', 36: 'lrgen', 47: 'people_vs_elite', 15 : "galtan" (liberal-conservative)
         # CHES2023:  5: 'lrecon', 0: 'antielite_salience', 12: "galtan" (liberal-conservative)
         if year == 2020:

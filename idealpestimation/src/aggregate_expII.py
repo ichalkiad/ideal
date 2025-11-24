@@ -58,9 +58,9 @@ if __name__ == "__main__":
     batchsize = [304, 1504, 3004]
     d = 2
     parameter_names = ["X", "Z", "alpha", "beta", "gamma", "sigma_e"]
-    dataspace = "/linkhome/rech/genpuz01/umi36fq/"       #"/mnt/hdd2/ioannischalkiadakis/"
-    dir_in = "{}/idealdata_rsspaper/".format(dataspace)
-    dir_out = "{}/rsspaper_expIIpaperfigs_nooutliers/".format(dataspace)
+    dataspace = "/tmp/"
+    dir_in = "{}/idealdata/".format(dataspace)
+    dir_out = "{}/idealdata_expII/".format(dataspace)
     pathlib.Path(dir_out).mkdir(parents=True, exist_ok=True) 
 
     param_pijmean_fig = go.Figure()
